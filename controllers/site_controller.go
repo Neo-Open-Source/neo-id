@@ -298,11 +298,10 @@ func (c *SiteController) SiteLogin() {
 	}
 
 	// Generate login URL with site context
-	loginURL := "/api/auth/login?" +
-		"provider=google&" +
+	loginURL := "/login?" +
 		"site_id=" + site.SiteID + "&" +
 		"redirect_url=" + requestData.RedirectURL + "&" +
-		"state=" + requestData.State
+		"site_state=" + requestData.State
 
 	c.Data["json"] = map[string]interface{}{
 		"login_url": loginURL,

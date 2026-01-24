@@ -24,6 +24,60 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const oauthSessionName = "unified_id_oauth"
+
+func getOAuthCookieSession(r *http.Request) (*sessions.Session, error) {
+	if gothic.Store == nil {
+		return nil, fmt.Errorf("oauth store not initialized")
+	}
+	s, err := gothic.Store.Get(r, oauthSessionName)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+func saveOAuthCookieSession(w http.ResponseWriter, r *http.Request, s *sessions.Session) error {
+	if gothic.Store == nil {
+		return fmt.Errorf("oauth store not initialized")
+	}
+	return s.Save(r, w)
+}
+
+func deleteOAuthCookieSession(w http.ResponseWriter, r *http.Request) {
+	s, err := getOAuthCookieSession(r)
+	if err != nil || s == nil {
+		return
+	}
+	for k := range s.Values {
+		delete(s.Values, k)
+	}
+	s.Options.MaxAge = -1
+	_ = s.Save(r, w)
+}
+
+func generateSiteTokenForCallback(userID, siteID string) (string, error) {
+	claims := &struct {
+		UserID string `json:"user_id"`
+		SiteID string `json:"site_id"`
+		jwt.RegisteredClaims
+	}{
+		UserID: userID,
+		SiteID: siteID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	secret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))
+	if strings.TrimSpace(secret) == "" {
+		return "", fmt.Errorf("JWT_SECRET is not configured")
+	}
+	return token.SignedString([]byte(secret))
+}
+
 type AuthController struct {
 	web.Controller
 }
@@ -259,14 +313,6 @@ func InitOAuthProviders() {
 
 // Login initiates OAuth login
 func (c *AuthController) Login() {
-	// Ensure session is initialized before using SetSession/GetSession
-	if c.StartSession() == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize session"}
-		c.ServeJSON()
-		return
-	}
-
 	provider := c.GetString("provider")
 	if provider == "" {
 		provider = c.Ctx.Input.Param(":provider")
@@ -298,8 +344,30 @@ func (c *AuthController) Login() {
 		return
 	}
 
-	// Store provider in session for callback
-	c.SetSession("oauth_provider", provider)
+	oauthSess, err := getOAuthCookieSession(c.Ctx.Request)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize oauth session"}
+		c.ServeJSON()
+		return
+	}
+
+	// Store provider in cookie session for callback
+	oauthSess.Values["oauth_provider"] = provider
+
+	// Preserve optional site integration params
+	siteID := c.GetString("site_id")
+	redirectURL := c.GetString("redirect_url")
+	siteState := c.GetString("site_state")
+	if siteID != "" {
+		oauthSess.Values["site_id"] = siteID
+	}
+	if redirectURL != "" {
+		oauthSess.Values["redirect_url"] = redirectURL
+	}
+	if siteState != "" {
+		oauthSess.Values["site_state"] = siteState
+	}
 
 	if linkMode {
 		token := c.GetString("token")
@@ -328,13 +396,19 @@ func (c *AuthController) Login() {
 			return
 		}
 
-		c.SetSession("oauth_link", true)
-		c.SetSession("oauth_link_user", claims.UnifiedID)
+		oauthSess.Values["oauth_link"] = true
+		oauthSess.Values["oauth_link_user"] = claims.UnifiedID
 	}
 
 	// Generate state parameter for security
 	state := generateState()
-	c.SetSession("oauth_state", state)
+	oauthSess.Values["oauth_state"] = state
+	if err := saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to save oauth session"}
+		c.ServeJSON()
+		return
+	}
 
 	// Ensure goth can detect provider (it expects it in query params)
 	q := c.Ctx.Request.URL.Query()
@@ -358,14 +432,6 @@ func (c *AuthController) Login() {
 
 // Callback handles OAuth callback
 func (c *AuthController) Callback() {
-	// Ensure session is initialized before using GetSession/SetSession
-	if c.StartSession() == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize session"}
-		c.ServeJSON()
-		return
-	}
-
 	provider := c.GetString("provider")
 	if provider == "" {
 		provider = c.Ctx.Input.Param(":provider")
@@ -376,7 +442,15 @@ func (c *AuthController) Callback() {
 		q.Set("provider", provider)
 		c.Ctx.Request.URL.RawQuery = q.Encode()
 	}
-	storedState := c.GetSession("oauth_state")
+	oauthSess, err := getOAuthCookieSession(c.Ctx.Request)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize oauth session"}
+		c.ServeJSON()
+		return
+	}
+
+	storedState := oauthSess.Values["oauth_state"]
 	state := c.GetString("state")
 
 	// Verify state parameter
@@ -400,8 +474,8 @@ func (c *AuthController) Callback() {
 
 	// Get or create user
 	userCRUD := models.NewUserCRUD()
-	linkMode, _ := c.GetSession("oauth_link").(bool)
-	linkUserID, _ := c.GetSession("oauth_link_user").(string)
+	linkMode, _ := oauthSess.Values["oauth_link"].(bool)
+	linkUserID, _ := oauthSess.Values["oauth_link_user"].(string)
 
 	if linkMode && linkUserID != "" {
 		unifiedUser, err := userCRUD.GetUserByUnifiedID(linkUserID)
@@ -446,9 +520,9 @@ func (c *AuthController) Callback() {
 			return
 		}
 
-		c.DelSession("oauth_link")
-		c.DelSession("oauth_link_user")
-		c.DelSession("oauth_state")
+		delete(oauthSess.Values, "oauth_link")
+		delete(oauthSess.Values, "oauth_link_user")
+		delete(oauthSess.Values, "oauth_state")
 
 		accessToken, refreshToken, err := generateTokens(unifiedUser.UnifiedID, unifiedUser.Email)
 		if err != nil {
@@ -477,6 +551,7 @@ func (c *AuthController) Callback() {
 			return
 		}
 
+		_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess)
 		c.Redirect("/dashboard#access_token="+accessToken+"&refresh_token="+refreshToken+"&linked=1", http.StatusTemporaryRedirect)
 		return
 	}
@@ -633,6 +708,26 @@ func (c *AuthController) Callback() {
 		return
 	}
 
+	// If this login was initiated for a site integration, redirect back to the site
+	siteID, _ := oauthSess.Values["site_id"].(string)
+	redirectURL, _ := oauthSess.Values["redirect_url"].(string)
+	siteState, _ := oauthSess.Values["site_state"].(string)
+
+	if siteID != "" && redirectURL != "" {
+		siteToken, err := generateSiteTokenForCallback(unifiedUser.UnifiedID, siteID)
+		if err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+			c.Data["json"] = map[string]interface{}{"error": "Failed to generate site token: " + err.Error()}
+			c.ServeJSON()
+			return
+		}
+
+		deleteOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request)
+		c.Redirect(redirectURL+"?token="+siteToken+"&state="+siteState, http.StatusTemporaryRedirect)
+		return
+	}
+
+	_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess)
 	// Browser flow: redirect back to SPA with tokens
 	c.Redirect("/dashboard#access_token="+accessToken+"&refresh_token="+refreshToken, http.StatusTemporaryRedirect)
 }

@@ -17,7 +17,18 @@ export default function LoginPage() {
   const [error, setError] = useState('')
 
   const oauthLogin = (provider) => {
-    window.location.href = `/api/auth/login/${provider}`
+    const params = new URLSearchParams(window.location.search)
+    const siteId = params.get('site_id')
+    const redirectUrl = params.get('redirect_url')
+    const siteState = params.get('site_state')
+
+    const q = new URLSearchParams()
+    if (siteId) q.set('site_id', siteId)
+    if (redirectUrl) q.set('redirect_url', redirectUrl)
+    if (siteState) q.set('site_state', siteState)
+
+    const qs = q.toString()
+    window.location.href = qs ? `/api/auth/login/${provider}?${qs}` : `/api/auth/login/${provider}`
   }
 
   const onPasswordLogin = async () => {
