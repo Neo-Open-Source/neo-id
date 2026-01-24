@@ -1,33 +1,16 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "web/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "static"
-      }
-    },
-    {
-      "src": "api/index.go",
-      "use": "@vercel/go"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.go"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.go"
-    }
-  ],
   "installCommand": "cd web && npm install",
-  "buildCommand": "cd web && npm run build && cp -r dist/* ../static/ || true && cd .. && go build -o unified-id",
-  "framework": null
+  "buildCommand": "cd web && npm run build",
+  "outputDirectory": "web/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
