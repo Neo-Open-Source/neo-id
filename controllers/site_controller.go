@@ -288,7 +288,17 @@ func (c *SiteController) SiteLogin() {
 		State       string `json:"state"`
 	}
 
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &requestData); err != nil {
+	body, err := io.ReadAll(c.Ctx.Request.Body)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Invalid request body",
+		}
+		c.ServeJSON()
+		return
+	}
+
+	if err := json.Unmarshal(body, &requestData); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 		c.Data["json"] = map[string]interface{}{
 			"error": "Invalid request body",
