@@ -29,6 +29,5 @@
   ],
   "installCommand": "cd web && npm install",
   "buildCommand": "cd web && npm run build && cp -r dist/* ../static/ || true && cd .. && go build -o unified-id",
-  "outputDirectory": "static",
   "framework": null
 }
