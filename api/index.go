@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"os"
+	"strings"
 
 	"unified-id/controllers"
 	"unified-id/models"
@@ -13,6 +14,38 @@ import (
 )
 
 var app *web.HttpServer
+
+func corsFilter(ctx *web.Context) {
+	origin := ctx.Input.Header("Origin")
+	if origin == "" {
+		return
+	}
+
+	allowedRaw := web.AppConfig.DefaultString("allowed_origins", "")
+	allowed := map[string]struct{}{}
+	for _, v := range strings.Split(allowedRaw, ",") {
+		vv := strings.TrimSpace(v)
+		if vv != "" {
+			allowed[vv] = struct{}{}
+		}
+	}
+	// local dev
+	allowed["http://localhost:3000"] = struct{}{}
+	allowed["http://localhost:5173"] = struct{}{}
+
+	if _, ok := allowed[origin]; ok {
+		ctx.Output.Header("Access-Control-Allow-Origin", origin)
+		ctx.Output.Header("Vary", "Origin")
+		ctx.Output.Header("Access-Control-Allow-Credentials", "true")
+		ctx.Output.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+		ctx.Output.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
+	}
+
+	if ctx.Input.Method() == http.MethodOptions {
+		ctx.Output.SetStatus(http.StatusNoContent)
+		_ = ctx.ResponseWriter.Write([]byte{})
+	}
+}
 
 func init() {
 	_ = godotenv.Load()
@@ -30,6 +63,9 @@ func init() {
 
 	// Initialize routers
 	routers.InitRoutes()
+
+	// CORS for browser-based API calls (e.g. NeoMovies Web -> Neo ID)
+	web.InsertFilter("/api/*", web.BeforeRouter, corsFilter)
 
 	// Store the app instance
 	app = web.BeeApp
