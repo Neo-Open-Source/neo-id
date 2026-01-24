@@ -487,7 +487,10 @@ func (c *SiteController) getAuthenticatedUser() (*models.User, error) {
 	if token != "" {
 		token = strings.TrimPrefix(token, "Bearer ")
 	}
-
+	if strings.TrimSpace(token) == "" {
+		// allow token via query for browser redirects (cannot set Authorization header)
+		token = strings.TrimSpace(c.GetString("token"))
+	}
 	if token == "" {
 		return nil, nil
 	}

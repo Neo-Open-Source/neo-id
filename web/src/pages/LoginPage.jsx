@@ -37,6 +37,21 @@ export default function LoginPage() {
     try {
       const data = await passwordLogin(email, password)
       setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+
+      const params = new URLSearchParams(window.location.search)
+      const siteId = params.get('site_id')
+      const redirectUrl = params.get('redirect_url')
+      const siteState = params.get('site_state')
+
+      if (siteId && redirectUrl) {
+        const cb = `/api/site/callback?site_id=${encodeURIComponent(siteId)}` +
+          `&redirect_url=${encodeURIComponent(redirectUrl)}` +
+          `&state=${encodeURIComponent(siteState || '')}` +
+          `&token=${encodeURIComponent(data.access_token)}`
+        window.location.href = cb
+        return
+      }
+
       navigate('/dashboard')
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Login failed')
@@ -51,6 +66,21 @@ export default function LoginPage() {
     try {
       const data = await passwordRegister(email, password, displayName)
       setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+
+      const params = new URLSearchParams(window.location.search)
+      const siteId = params.get('site_id')
+      const redirectUrl = params.get('redirect_url')
+      const siteState = params.get('site_state')
+
+      if (siteId && redirectUrl) {
+        const cb = `/api/site/callback?site_id=${encodeURIComponent(siteId)}` +
+          `&redirect_url=${encodeURIComponent(redirectUrl)}` +
+          `&state=${encodeURIComponent(siteState || '')}` +
+          `&token=${encodeURIComponent(data.access_token)}`
+        window.location.href = cb
+        return
+      }
+
       navigate('/dashboard')
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Registration failed')
