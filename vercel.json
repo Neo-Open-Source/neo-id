@@ -5,7 +5,7 @@
       "src": "web/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "../static"
+        "distDir": "static"
       }
     },
     {
@@ -15,16 +15,20 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "/api/index.go"
     },
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.go"
     }
   ],
   "installCommand": "cd web && npm install",
-  "buildCommand": "cd web && npm run build && cd .. && go build -o unified-id",
+  "buildCommand": "cd web && npm run build && cp -r dist/* ../static/ || true && cd .. && go build -o unified-id",
   "outputDirectory": "static",
   "framework": null
 }
