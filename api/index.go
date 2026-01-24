@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -15,6 +16,30 @@ import (
 )
 
 var app *web.HttpServer
+
+func isAllowedOrigin(origin string, allowed map[string]struct{}) bool {
+	if origin == "" {
+		return false
+	}
+	if _, ok := allowed[origin]; ok {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
+	if host == "" {
+		return false
+	}
+	if host == "neomovies.ru" || strings.HasSuffix(host, ".neomovies.ru") {
+		return true
+	}
+	if strings.HasSuffix(host, ".vercel.app") {
+		return true
+	}
+	return false
+}
 
 func corsFilter(ctx *webctx.Context) {
 	origin := ctx.Input.Header("Origin")
@@ -34,7 +59,7 @@ func corsFilter(ctx *webctx.Context) {
 	allowed["http://localhost:3000"] = struct{}{}
 	allowed["http://localhost:5173"] = struct{}{}
 
-	if _, ok := allowed[origin]; ok {
+	if isAllowedOrigin(origin, allowed) {
 		ctx.Output.Header("Access-Control-Allow-Origin", origin)
 		ctx.Output.Header("Vary", "Origin")
 		ctx.Output.Header("Access-Control-Allow-Credentials", "true")
