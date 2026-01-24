@@ -10,12 +10,13 @@ import (
 	"unified-id/routers"
 
 	"github.com/beego/beego/v2/server/web"
+	webctx "github.com/beego/beego/v2/server/web/context"
 	"github.com/joho/godotenv"
 )
 
 var app *web.HttpServer
 
-func corsFilter(ctx *web.Context) {
+func corsFilter(ctx *webctx.Context) {
 	origin := ctx.Input.Header("Origin")
 	if origin == "" {
 		return
@@ -43,7 +44,7 @@ func corsFilter(ctx *web.Context) {
 
 	if ctx.Input.Method() == http.MethodOptions {
 		ctx.Output.SetStatus(http.StatusNoContent)
-		_ = ctx.ResponseWriter.Write([]byte{})
+		_, _ = ctx.ResponseWriter.Write([]byte{})
 	}
 }
 
