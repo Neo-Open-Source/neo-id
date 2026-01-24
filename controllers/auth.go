@@ -280,7 +280,14 @@ func InitOAuthProviders() {
 	)
 	if sessionSecret != "" {
 		store := sessions.NewCookieStore([]byte(sessionSecret))
-		store.Options = &sessions.Options{Path: "/", HttpOnly: true}
+		secure := strings.HasPrefix(strings.ToLower(strings.TrimSpace(os.Getenv("BASE_URL"))), "https://")
+		store.Options = &sessions.Options{
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   secure,
+			SameSite: http.SameSiteNoneMode,
+			MaxAge:   86400 * 7,
+		}
 		gothic.Store = store
 	}
 
