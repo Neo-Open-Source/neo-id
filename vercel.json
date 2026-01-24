@@ -9,22 +9,18 @@
       }
     },
     {
-      "src": "main.go",
+      "src": "api/index.go",
       "use": "@vercel/go"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/"
+      "src": "/(.*)",
+      "dest": "/api/index.go"
     },
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/"
     }
   ],
   "installCommand": "cd web && npm install",
