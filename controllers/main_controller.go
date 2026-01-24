@@ -16,10 +16,14 @@ type MainController struct {
 func (c *MainController) Get() {
 	indexFile := "static/app/index.html"
 	if _, err := os.Stat(indexFile); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
-		c.Data["json"] = map[string]interface{}{"error": "Frontend not built"}
-		c.ServeJSON()
-		return
+		// Try alternative path
+		indexFile = "static/index.html"
+		if _, err := os.Stat(indexFile); err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
+			c.Data["json"] = map[string]interface{}{"error": "Frontend not built"}
+			c.ServeJSON()
+			return
+		}
 	}
 	file, err := os.Open(indexFile)
 	if err != nil {
