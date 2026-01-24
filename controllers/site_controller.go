@@ -369,19 +369,18 @@ func (c *SiteController) SiteCallback() {
 		return
 	}
 
-	// Generate site-specific token
-	siteToken, err := c.generateSiteToken(user.UnifiedID, siteID)
-	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+	// Redirect back to site with the Neo ID access token (contains unified_id)
+	accessToken := strings.TrimSpace(c.GetString("token"))
+	if accessToken == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 		c.Data["json"] = map[string]interface{}{
-			"error": "Failed to generate site token: " + err.Error(),
+			"error": "token is required",
 		}
 		c.ServeJSON()
 		return
 	}
 
-	// Redirect back to site with token
-	redirectURLWithToken := redirectURL + "?token=" + siteToken + "&state=" + state
+	redirectURLWithToken := redirectURL + "?token=" + accessToken + "&state=" + state
 	c.Redirect(redirectURLWithToken, http.StatusTemporaryRedirect)
 }
 

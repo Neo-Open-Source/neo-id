@@ -715,16 +715,9 @@ func (c *AuthController) Callback() {
 	siteState, _ := oauthSess.Values["site_state"].(string)
 
 	if siteID != "" && redirectURL != "" {
-		siteToken, err := generateSiteTokenForCallback(unifiedUser.UnifiedID, siteID)
-		if err != nil {
-			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-			c.Data["json"] = map[string]interface{}{"error": "Failed to generate site token: " + err.Error()}
-			c.ServeJSON()
-			return
-		}
-
 		deleteOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request)
-		c.Redirect(redirectURL+"?token="+siteToken+"&state="+siteState, http.StatusTemporaryRedirect)
+		// Return standard Neo ID access token (contains unified_id) so the app can call its API
+		c.Redirect(redirectURL+"?token="+accessToken+"&state="+siteState, http.StatusTemporaryRedirect)
 		return
 	}
 
