@@ -27,14 +27,6 @@
       "dest": "/"
     }
   ],
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "JWT_SECRET": "@jwt_secret",
-    "GOOGLE_CLIENT_ID": "@google_client_id",
-    "GOOGLE_CLIENT_SECRET": "@google_client_secret",
-    "GITHUB_CLIENT_ID": "@github_client_id",
-    "GITHUB_CLIENT_SECRET": "@github_client_secret"
-  },
   "installCommand": "cd web && npm install",
   "buildCommand": "cd web && npm run build && cd .. && go build -o unified-id",
   "outputDirectory": "static",
