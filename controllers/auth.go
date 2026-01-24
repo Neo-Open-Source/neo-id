@@ -413,6 +413,8 @@ func (c *AuthController) Login() {
 	// Ensure goth can detect provider (it expects it in query params)
 	q := c.Ctx.Request.URL.Query()
 	q.Set("provider", provider)
+	// Provide our generated state to goth so it's included exactly once
+	q.Set("state", state)
 	c.Ctx.Request.URL.RawQuery = q.Encode()
 
 	// Redirect to OAuth provider
@@ -425,9 +427,8 @@ func (c *AuthController) Login() {
 		return
 	}
 
-	// Add state parameter
-	authURLWithState := authURL + "&state=" + state
-	c.Redirect(authURLWithState, http.StatusTemporaryRedirect)
+	// Redirect to OAuth provider (authURL already contains state)
+	c.Redirect(authURL, http.StatusTemporaryRedirect)
 }
 
 // Callback handles OAuth callback
@@ -450,11 +451,11 @@ func (c *AuthController) Callback() {
 		return
 	}
 
-	storedState := oauthSess.Values["oauth_state"]
+	storedState, _ := oauthSess.Values["oauth_state"].(string)
 	state := c.GetString("state")
 
 	// Verify state parameter
-	if storedState != state {
+	if storedState == "" || storedState != state {
 		c.Data["json"] = map[string]interface{}{
 			"error": "Invalid state parameter",
 		}
