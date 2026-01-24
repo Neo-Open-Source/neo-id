@@ -17,11 +17,9 @@ var app *web.HttpServer
 func init() {
 	_ = godotenv.Load()
 
-	// Configure Beego for serverless
-	web.BConfig.WebConfig.Session.SessionOn = true
-	web.BConfig.WebConfig.Session.SessionProvider = "memory"
-	web.BConfig.WebConfig.Session.SessionName = "unified_id_session"
-	web.BConfig.WebConfig.Session.SessionCookieLifeTime = 3600 * 24 * 30 // 30 days
+	// Configure Beego for serverless - disable sessions for now
+	web.BConfig.WebConfig.Session.SessionOn = false
+	web.BConfig.RunMode = "prod"
 
 	controllers.InitOAuthProviders()
 
