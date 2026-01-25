@@ -4,7 +4,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import { Box, Container, Stack, Typography, TextField, Button, Divider, Alert, Card, CardContent, Tabs, Tab, Link } from '@mui/material'
 import GoogleIcon from '@mui/icons-material/Google'
 import GitHubIcon from '@mui/icons-material/GitHub'
-import { passwordLogin, passwordRegister, resendVerifyEmail } from '../api/endpoints'
+import { passwordLogin, passwordRegister, resendVerifyEmail, verifyEmailCode } from '../api/endpoints'
 import { setTokens } from '../api/client'
 
 export default function LoginPage() {
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -89,9 +90,24 @@ export default function LoginPage() {
     setInfo('')
     try {
       await resendVerifyEmail(email)
-      setInfo('Verification email sent. Please check your inbox.')
+      setInfo('Verification email sent. Check your inbox for a 6-digit code (or use the link).')
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Failed to resend email')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const onVerifyCode = async () => {
+    setLoading(true)
+    setError('')
+    setInfo('')
+    try {
+      await verifyEmailCode(email, verificationCode)
+      setInfo('Email verified. You can sign in now.')
+      setVerificationCode('')
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to verify code')
     } finally {
       setLoading(false)
     }
@@ -156,6 +172,16 @@ export default function LoginPage() {
                   <TextField label="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="nickname" />
                 )}
 
+                {mode === 'login' && (
+                  <TextField
+                    label="Verification code"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 6 }}
+                    helperText="Enter the 6-digit code from the email"
+                  />
+                )}
+
                 {mode === 'login' ? (
                   <Button size="large" variant="contained" disabled={loading} onClick={onPasswordLogin}>
                     Sign in
@@ -169,6 +195,12 @@ export default function LoginPage() {
                 {mode === 'login' && (
                   <Button size="large" variant="outlined" disabled={loading || !email} onClick={onResend}>
                     Resend verification email
+                  </Button>
+                )}
+
+                {mode === 'login' && (
+                  <Button size="large" variant="outlined" disabled={loading || !email || verificationCode.trim().length < 4} onClick={onVerifyCode}>
+                    Verify code
                   </Button>
                 )}
 

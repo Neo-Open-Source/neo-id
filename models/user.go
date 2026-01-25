@@ -30,6 +30,8 @@ type User struct {
 
 	EmailVerificationToken     string     `bson:"email_verification_token,omitempty" json:"-"`
 	EmailVerificationExpiresAt *time.Time `bson:"email_verification_expires_at,omitempty" json:"-"`
+	EmailVerificationCode      string     `bson:"email_verification_code,omitempty" json:"-"`
+	EmailVerificationCodeExpAt *time.Time `bson:"email_verification_code_expires_at,omitempty" json:"-"`
 
 	// Profile info
 	FirstName string `bson:"first_name,omitempty" json:"first_name,omitempty"`

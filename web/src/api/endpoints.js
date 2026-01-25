@@ -15,6 +15,11 @@ export async function resendVerifyEmail(email) {
   return res.data
 }
 
+export async function verifyEmailCode(email, code) {
+  const res = await api.post('/api/auth/verify-email/code', { email, code })
+  return res.data
+}
+
 export async function getProfile() {
   const res = await api.get('/api/user/profile')
   return res.data

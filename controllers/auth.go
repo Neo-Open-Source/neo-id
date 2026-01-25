@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
+	"math/big"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -136,6 +138,33 @@ func sendResendEmail(toEmail string, subject string, html string) error {
 	return nil
 }
 
+func generateEmailVerificationCode() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func buildEmailVerificationHTML(code string, verifyURL string) string {
+	escapedCode := html.EscapeString(code)
+	escapedURL := html.EscapeString(verifyURL)
+	return "<!doctype html><html><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" /></head><body style=\"margin:0;padding:0;background:#0f0f10;color:#ffffff;font-family:Inter,Arial,sans-serif;\">" +
+		"<div style=\"max-width:520px;margin:0 auto;padding:28px 18px;\">" +
+		"<div style=\"background:#151517;border:1px solid #2a2a2d;border-radius:16px;padding:22px;\">" +
+		"<div style=\"font-size:22px;font-weight:800;letter-spacing:-0.3px;\">Neo <span style=\"color:#ff0000;\">ID</span></div>" +
+		"<div style=\"margin-top:10px;color:rgba(255,255,255,0.80);font-size:14px;line-height:20px;\">Use this code to verify your email. You can copy it from your phone and paste it on your computer.</div>" +
+		"<div style=\"margin-top:16px;background:#0f0f10;border:1px solid #2a2a2d;border-radius:14px;padding:14px;text-align:center;\">" +
+		"<div style=\"color:rgba(255,255,255,0.70);font-size:12px;text-transform:uppercase;letter-spacing:0.12em;\">Verification code</div>" +
+		"<div style=\"margin-top:6px;font-size:32px;font-weight:900;letter-spacing:0.18em;\">" + escapedCode + "</div>" +
+		"</div>" +
+		"<div style=\"margin-top:16px;text-align:center;\">" +
+		"<a href=\"" + escapedURL + "\" style=\"display:inline-block;padding:12px 16px;background:#1976d2;color:#fff;border-radius:12px;text-decoration:none;font-weight:800;\">Verify by link</a>" +
+		"</div>" +
+		"<div style=\"margin-top:14px;color:rgba(255,255,255,0.60);font-size:12px;line-height:18px;\">If you didn't request this, you can ignore this email.</div>" +
+		"</div></div></body></html>"
+}
+
 func (c *AuthController) VerifyEmail() {
 	token := strings.TrimSpace(c.GetString("token"))
 	if token == "" {
@@ -164,6 +193,8 @@ func (c *AuthController) VerifyEmail() {
 	user.EmailVerified = true
 	user.EmailVerificationToken = ""
 	user.EmailVerificationExpiresAt = nil
+	user.EmailVerificationCode = ""
+	user.EmailVerificationCodeExpAt = nil
 	if err := userCRUD.UpdateUser(user); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 		c.Data["json"] = map[string]interface{}{"error": "Failed to verify email"}
@@ -178,6 +209,84 @@ func (c *AuthController) VerifyEmail() {
 	}
 
 	c.Redirect("/login?verified=1", http.StatusTemporaryRedirect)
+}
+
+func (c *AuthController) VerifyEmailCode() {
+	var requestBody struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+
+	body, err := io.ReadAll(c.Ctx.Request.Body)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to read request body"}
+		c.ServeJSON()
+		return
+	}
+	if err := json.Unmarshal(body, &requestBody); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Invalid request body"}
+		c.ServeJSON()
+		return
+	}
+
+	emailAddr := strings.TrimSpace(strings.ToLower(requestBody.Email))
+	code := strings.TrimSpace(requestBody.Code)
+	if emailAddr == "" || code == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "email and code are required"}
+		c.ServeJSON()
+		return
+	}
+
+	userCRUD := models.NewUserCRUD()
+	user, err := userCRUD.GetUserByEmail(emailAddr)
+	if err != nil || user == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
+		c.Data["json"] = map[string]interface{}{"error": "user not found"}
+		c.ServeJSON()
+		return
+	}
+	if user.EmailVerified {
+		c.Data["json"] = map[string]interface{}{"verified": true}
+		c.ServeJSON()
+		return
+	}
+
+	if user.EmailVerificationCode == "" || user.EmailVerificationCodeExpAt == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "verification code is not available"}
+		c.ServeJSON()
+		return
+	}
+	if time.Now().After(*user.EmailVerificationCodeExpAt) {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "code expired"}
+		c.ServeJSON()
+		return
+	}
+	if code != user.EmailVerificationCode {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "invalid code"}
+		c.ServeJSON()
+		return
+	}
+
+	user.EmailVerified = true
+	user.EmailVerificationToken = ""
+	user.EmailVerificationExpiresAt = nil
+	user.EmailVerificationCode = ""
+	user.EmailVerificationCodeExpAt = nil
+	if err := userCRUD.UpdateUser(user); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to verify email"}
+		c.ServeJSON()
+		return
+	}
+
+	c.Data["json"] = map[string]interface{}{"verified": true}
+	c.ServeJSON()
 }
 
 func (c *AuthController) ResendVerifyEmail() {
@@ -223,8 +332,18 @@ func (c *AuthController) ResendVerifyEmail() {
 
 	verifyToken := uuid.NewString()
 	expiresAt := time.Now().Add(24 * time.Hour)
+	code, codeErr := generateEmailVerificationCode()
+	codeExp := time.Now().Add(30 * time.Minute)
+	if codeErr != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to generate verification code"}
+		c.ServeJSON()
+		return
+	}
 	user.EmailVerificationToken = verifyToken
 	user.EmailVerificationExpiresAt = &expiresAt
+	user.EmailVerificationCode = code
+	user.EmailVerificationCodeExpAt = &codeExp
 	if err := userCRUD.UpdateUser(user); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 		c.Data["json"] = map[string]interface{}{"error": "Failed to update verification token"}
@@ -233,8 +352,8 @@ func (c *AuthController) ResendVerifyEmail() {
 	}
 
 	verifyURL := getBaseURL() + "/api/auth/verify-email?token=" + verifyToken
-	html := "<p>Confirm your email for Neo ID.</p><p><a href=\"" + verifyURL + "\">Verify email</a></p>"
-	if err := sendResendEmail(email, "Verify your email", html); err != nil {
+	htmlBody := buildEmailVerificationHTML(code, verifyURL)
+	if err := sendResendEmail(email, "Verify your email", htmlBody); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 		c.Data["json"] = map[string]interface{}{"error": err.Error()}
 		c.ServeJSON()
@@ -322,8 +441,18 @@ func (c *AuthController) PasswordRegister() {
 
 	verifyToken := uuid.NewString()
 	expiresAt := time.Now().Add(24 * time.Hour)
+	code, codeErr := generateEmailVerificationCode()
+	codeExp := time.Now().Add(30 * time.Minute)
+	if codeErr != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to generate verification code"}
+		c.ServeJSON()
+		return
+	}
 	user.EmailVerificationToken = verifyToken
 	user.EmailVerificationExpiresAt = &expiresAt
+	user.EmailVerificationCode = code
+	user.EmailVerificationCodeExpAt = &codeExp
 
 	if err := userCRUD.CreateUser(user); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
@@ -333,8 +462,8 @@ func (c *AuthController) PasswordRegister() {
 	}
 
 	verifyURL := getBaseURL() + "/api/auth/verify-email?token=" + verifyToken
-	html := "<p>Confirm your email for Neo ID.</p><p><a href=\"" + verifyURL + "\">Verify email</a></p>"
-	if err := sendResendEmail(user.Email, "Verify your email", html); err != nil {
+	htmlBody := buildEmailVerificationHTML(code, verifyURL)
+	if err := sendResendEmail(user.Email, "Verify your email", htmlBody); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 		c.Data["json"] = map[string]interface{}{"error": err.Error()}
 		c.ServeJSON()
