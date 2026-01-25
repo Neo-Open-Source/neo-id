@@ -173,13 +173,42 @@ export default function LoginPage() {
                 )}
 
                 {mode === 'login' && (
-                  <TextField
-                    label="Verification code"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 6 }}
-                    helperText="Enter the 6-digit code from the email"
-                  />
+                  <Box sx={{ mt: 2 }}>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Email not verified? Enter the 6-digit code from your email below
+                    </Alert>
+                    <TextField
+                      label="Verification code"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 6 }}
+                      helperText="Enter the 6-digit code from the email"
+                      fullWidth
+                    />
+                  </Box>
+                )}
+
+                {mode === 'login' && (
+                  <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+                    <Button 
+                      size="large" 
+                      variant="outlined" 
+                      disabled={loading || !email} 
+                      onClick={onResend}
+                      sx={{ flex: 1 }}
+                    >
+                      Resend email
+                    </Button>
+                    <Button 
+                      size="large" 
+                      variant="contained" 
+                      disabled={loading || !email || verificationCode.trim().length < 6} 
+                      onClick={onVerifyCode}
+                      sx={{ flex: 1 }}
+                    >
+                      Verify code
+                    </Button>
+                  </Stack>
                 )}
 
                 {mode === 'login' ? (
@@ -192,26 +221,11 @@ export default function LoginPage() {
                   </Button>
                 )}
 
-                {mode === 'login' && (
-                  <Button size="large" variant="outlined" disabled={loading || !email} onClick={onResend}>
-                    Resend verification email
-                  </Button>
-                )}
-
-                {mode === 'login' && (
-                  <Button size="large" variant="outlined" disabled={loading || !email || verificationCode.trim().length < 4} onClick={onVerifyCode}>
-                    Verify code
-                  </Button>
-                )}
-
                 <Typography variant="body2" color="text.secondary">
-                  Продолжая, вы соглашаетесь с
-                  {' '}
-                  <Link component={RouterLink} to="/terms" underline="hover">Terms</Link>
-                  {' '}
-                  и
-                  {' '}
-                  <Link component={RouterLink} to="/privacy" underline="hover">Privacy Policy</Link>.
+                  Продолжая, вы соглашаетесь с 
+                  <Link component={RouterLink} to="/terms" underline="hover">Условиями использования</Link>
+                  {' '}и{' '}
+                  <Link component={RouterLink} to="/privacy" underline="hover">Политикой конфиденциальности</Link>.
                 </Typography>
               </Stack>
             </Stack>
