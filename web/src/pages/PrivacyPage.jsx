@@ -20,66 +20,88 @@ export default function PrivacyPage() {
           <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
             <Stack spacing={2}>
               <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: -0.5 }}>Privacy Policy</Typography>
-              <Typography color="text.secondary">
-                Последнее обновление: {new Date().toISOString().slice(0, 10)}
-              </Typography>
+              <Typography color="text.secondary">Last updated: {new Date().toISOString().slice(0, 10)}</Typography>
               <Divider />
 
               <Stack spacing={1}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>1. Какие данные мы обрабатываем</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>1. Scope</Typography>
                 <Typography color="text.secondary">
-                  В рамках работы Neo ID могут обрабатываться:
-                  <br />- email и отображаемое имя
-                  <br />- идентификаторы OAuth провайдеров (например Google/GitHub)
-                  <br />- технические данные сессии (IP/UA), токены сессии
-                  <br />- подключенные сервисы и настройки аккаунта
+                  This Privacy Policy explains how Neo ID collects, uses, and shares information when you use our identity and
+                  authentication services (the "Service"), including our website, APIs, and OAuth-based sign-in.
                 </Typography>
               </Stack>
 
               <Stack spacing={1}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>2. Цели обработки</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>2. Information We Collect</Typography>
                 <Typography color="text.secondary">
-                  Мы используем данные для:
-                  <br />- аутентификации и авторизации
-                  <br />- обеспечения безопасности (сессии, защита от злоупотреблений)
-                  <br />- предоставления функций управления аккаунтом
+                  Depending on how you use the Service, we may collect:
+                  <br />- Account information: email address, display name, password hash (for email/password accounts)
+                  <br />- OAuth information: provider name and provider user identifier (e.g., Google/GitHub ID)
+                  <br />- Session and security data: session identifiers, token identifiers, IP address, user agent, timestamps
+                  <br />- Connected applications: the applications/sites you authorize to sign in with Neo ID
                 </Typography>
               </Stack>
 
               <Stack spacing={1}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>3. Правовые основания (ориентиры)</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>3. How We Use Information</Typography>
                 <Typography color="text.secondary">
-                  Мы ориентируемся на принципы минимизации данных и прозрачности. Для пользователей ЕС — на общие требования GDPR.
-                  Для пользователей Молдовы — на конституционные принципы защиты прав и частной жизни и применимое национальное
-                  регулирование.
+                  We use information to:
+                  <br />- provide authentication and account features
+                  <br />- maintain sessions and issue/verify access tokens
+                  <br />- protect the Service from abuse, fraud, and security incidents
+                  <br />- troubleshoot, monitor, and improve reliability and performance
                 </Typography>
               </Stack>
 
               <Stack spacing={1}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>4. Сроки хранения</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>4. Sharing</Typography>
                 <Typography color="text.secondary">
-                  Мы храним данные настолько, насколько это нужно для работы аккаунта и безопасности. Сессии имеют срок жизни и
-                  могут удаляться при выходе/бане.
+                  We share information in the following ways:
+                  <br />- With applications you authorize: when you sign in to a connected application, Neo ID provides an access
+                  token or user information necessary to complete authentication.
+                  <br />- With service providers: we may use infrastructure providers to host and operate the Service.
+                  <br />- For security and legal reasons: to protect users, prevent abuse, or comply with valid legal requests.
                 </Typography>
               </Stack>
 
               <Stack spacing={1}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>5. Ваши права</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>5. Data Retention</Typography>
                 <Typography color="text.secondary">
-                  Вы можете:
-                  <br />- управлять привязками OAuth провайдеров
-                  <br />- менять пароль
-                  <br />- запросить удаление аккаунта (если будет добавлен соответствующий процесс)
+                  We retain account information for as long as your account remains active. Session and security logs may be stored
+                  for a limited period to operate the Service and protect against abuse. When you delete your account (if available
+                  in the product), we delete or anonymize personal data unless retention is required for security or legal purposes.
+                </Typography>
+              </Stack>
+
+              <Stack spacing={1}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>6. Your Choices and Rights</Typography>
+                <Typography color="text.secondary">
+                  You can:
+                  <br />- update your profile information (if available)
+                  <br />- change your password
+                  <br />- manage linked OAuth providers (if available)
+                  <br />- revoke access for connected applications (if available)
+                </Typography>
+              </Stack>
+
+              <Stack spacing={1}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>7. Security</Typography>
+                <Typography color="text.secondary">
+                  We use reasonable security measures to protect the Service and your data. No method of transmission or storage
+                  is completely secure, and we cannot guarantee absolute security.
+                </Typography>
+              </Stack>
+
+              <Stack spacing={1}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>8. Changes to this Policy</Typography>
+                <Typography color="text.secondary">
+                  We may update this Privacy Policy from time to time. The "Last updated" date indicates when changes were last made.
                 </Typography>
               </Stack>
 
               <Divider />
               <Typography variant="body2" color="text.secondary">
-                Дисклеймер: Этот документ носит информационный характер и не является юридической консультацией.
-              </Typography>
-
-              <Typography variant="body2" color="text.secondary">
-                См. также: <Link href="/terms" underline="hover">Terms</Link>
+                See also: <Link href="/terms" underline="hover">Terms of Service</Link>
               </Typography>
             </Stack>
           </CardContent>
