@@ -10,6 +10,11 @@ export async function passwordRegister(email, password, display_name) {
   return res.data
 }
 
+export async function resendVerifyEmail(email) {
+  const res = await api.post('/api/auth/verify-email/resend', { email })
+  return res.data
+}
+
 export async function getProfile() {
   const res = await api.get('/api/user/profile')
   return res.data

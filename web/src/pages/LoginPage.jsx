@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link as RouterLink } from 'react-router-dom'
 import { Box, Container, Stack, Typography, TextField, Button, Divider, Alert, Card, CardContent, Tabs, Tab, Link } from '@mui/material'
 import GoogleIcon from '@mui/icons-material/Google'
 import GitHubIcon from '@mui/icons-material/GitHub'
-import { passwordLogin, passwordRegister } from '../api/endpoints'
+import { passwordLogin, passwordRegister, resendVerifyEmail } from '../api/endpoints'
 import { setTokens } from '../api/client'
 
 export default function LoginPage() {
@@ -15,6 +15,14 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('verified') === '1') {
+      setInfo('Email verified. You can sign in now.')
+    }
+  }, [])
 
   const oauthLogin = (provider) => {
     const params = new URLSearchParams(window.location.search)
@@ -63,27 +71,27 @@ export default function LoginPage() {
   const onPasswordRegister = async () => {
     setLoading(true)
     setError('')
+    setInfo('')
     try {
-      const data = await passwordRegister(email, password, displayName)
-      setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
-
-      const params = new URLSearchParams(window.location.search)
-      const siteId = params.get('site_id')
-      const redirectUrl = params.get('redirect_url')
-      const siteState = params.get('site_state')
-
-      if (siteId && redirectUrl) {
-        const cb = `/api/site/callback?site_id=${encodeURIComponent(siteId)}` +
-          `&redirect_url=${encodeURIComponent(redirectUrl)}` +
-          `&state=${encodeURIComponent(siteState || '')}` +
-          `&token=${encodeURIComponent(data.access_token)}`
-        window.location.href = cb
-        return
-      }
-
-      navigate('/dashboard')
+      await passwordRegister(email, password, displayName)
+      setInfo('We sent you a verification email. Please check your inbox and click the link to activate your account.')
+      setMode('login')
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Registration failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const onResend = async () => {
+    setLoading(true)
+    setError('')
+    setInfo('')
+    try {
+      await resendVerifyEmail(email)
+      setInfo('Verification email sent. Please check your inbox.')
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to resend email')
     } finally {
       setLoading(false)
     }
@@ -128,6 +136,7 @@ export default function LoginPage() {
               </Tabs>
 
               {error && <Alert severity="error">{error}</Alert>}
+              {info && <Alert severity="success">{info}</Alert>}
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                 <Button startIcon={<GoogleIcon />} size="large" variant="outlined" onClick={() => oauthLogin('google')} sx={{ flex: 1 }}>
@@ -154,6 +163,12 @@ export default function LoginPage() {
                 ) : (
                   <Button size="large" variant="contained" disabled={loading} onClick={onPasswordRegister}>
                     Create account
+                  </Button>
+                )}
+
+                {mode === 'login' && (
+                  <Button size="large" variant="outlined" disabled={loading || !email} onClick={onResend}>
+                    Resend verification email
                   </Button>
                 )}
 

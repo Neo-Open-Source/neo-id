@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -33,12 +34,8 @@ func getOAuthCookieSession(r *http.Request) (*sessions.Session, error) {
 	}
 	s, err := gothic.Store.Get(r, oauthSessionName)
 	if err != nil {
-		// This most commonly happens when SESSION_SECRET/JWT_SECRET was rotated or the browser
-		// has a stale/invalid cookie. Treat it as a non-fatal condition and start a new session.
 		fresh, newErr := gothic.Store.New(r, oauthSessionName)
 		if newErr != nil {
-			// As a last resort, return an empty session object. We will attempt to overwrite
-			// the invalid cookie on the next Save().
 			fallback := sessions.NewSession(gothic.Store, oauthSessionName)
 			fallback.IsNew = true
 			fallback.Options = &sessions.Options{Path: "/", HttpOnly: true}
@@ -92,6 +89,160 @@ func generateSiteTokenForCallback(userID, siteID string) (string, error) {
 
 type AuthController struct {
 	web.Controller
+}
+
+func getBaseURL() string {
+	baseUrl := os.Getenv("BASE_URL")
+	if strings.TrimSpace(baseUrl) == "" {
+		baseUrl = web.AppConfig.DefaultString("base_url", "http://localhost:8080")
+	}
+	return strings.TrimRight(strings.TrimSpace(baseUrl), "/")
+}
+
+func sendResendEmail(toEmail string, subject string, html string) error {
+	apiKey := strings.TrimSpace(os.Getenv("RESEND_API_KEY"))
+	from := strings.TrimSpace(os.Getenv("RESEND_FROM"))
+	if apiKey == "" || from == "" {
+		return fmt.Errorf("email sending is not configured")
+	}
+
+	payload := map[string]interface{}{
+		"from":    from,
+		"to":      []string{toEmail},
+		"subject": subject,
+		"html":    html,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("email provider error: %s", strings.TrimSpace(string(b)))
+	}
+
+	return nil
+}
+
+func (c *AuthController) VerifyEmail() {
+	token := strings.TrimSpace(c.GetString("token"))
+	if token == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "token is required"}
+		c.ServeJSON()
+		return
+	}
+
+	userCRUD := models.NewUserCRUD()
+	user, err := userCRUD.GetUserByEmailVerificationToken(token)
+	if err != nil || user == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "invalid token"}
+		c.ServeJSON()
+		return
+	}
+
+	if user.EmailVerificationExpiresAt != nil && time.Now().After(*user.EmailVerificationExpiresAt) {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "token expired"}
+		c.ServeJSON()
+		return
+	}
+
+	user.EmailVerified = true
+	user.EmailVerificationToken = ""
+	user.EmailVerificationExpiresAt = nil
+	if err := userCRUD.UpdateUser(user); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to verify email"}
+		c.ServeJSON()
+		return
+	}
+
+	if c.GetString("format") == "json" {
+		c.Data["json"] = map[string]interface{}{"verified": true}
+		c.ServeJSON()
+		return
+	}
+
+	c.Redirect("/login?verified=1", http.StatusTemporaryRedirect)
+}
+
+func (c *AuthController) ResendVerifyEmail() {
+	var requestBody struct {
+		Email string `json:"email"`
+	}
+
+	body, err := io.ReadAll(c.Ctx.Request.Body)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to read request body"}
+		c.ServeJSON()
+		return
+	}
+	if err := json.Unmarshal(body, &requestBody); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Invalid request body"}
+		c.ServeJSON()
+		return
+	}
+
+	email := strings.TrimSpace(strings.ToLower(requestBody.Email))
+	if email == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "email is required"}
+		c.ServeJSON()
+		return
+	}
+
+	userCRUD := models.NewUserCRUD()
+	user, err := userCRUD.GetUserByEmail(email)
+	if err != nil || user == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
+		c.Data["json"] = map[string]interface{}{"error": "user not found"}
+		c.ServeJSON()
+		return
+	}
+	if user.EmailVerified {
+		c.Data["json"] = map[string]interface{}{"sent": false, "message": "already verified"}
+		c.ServeJSON()
+		return
+	}
+
+	verifyToken := uuid.NewString()
+	expiresAt := time.Now().Add(24 * time.Hour)
+	user.EmailVerificationToken = verifyToken
+	user.EmailVerificationExpiresAt = &expiresAt
+	if err := userCRUD.UpdateUser(user); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to update verification token"}
+		c.ServeJSON()
+		return
+	}
+
+	verifyURL := getBaseURL() + "/api/auth/verify-email?token=" + verifyToken
+	html := "<p>Confirm your email for Neo ID.</p><p><a href=\"" + verifyURL + "\">Verify email</a></p>"
+	if err := sendResendEmail(email, "Verify your email", html); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": err.Error()}
+		c.ServeJSON()
+		return
+	}
+
+	c.Data["json"] = map[string]interface{}{"sent": true}
+	c.ServeJSON()
 }
 
 func (c *AuthController) PasswordRegister() {
@@ -166,7 +317,13 @@ func (c *AuthController) PasswordRegister() {
 		ConnectedServices: []string{},
 		OAuthProviders:    []models.OAuthProvider{},
 		PasswordHash:      string(hash),
+		EmailVerified:     false,
 	}
+
+	verifyToken := uuid.NewString()
+	expiresAt := time.Now().Add(24 * time.Hour)
+	user.EmailVerificationToken = verifyToken
+	user.EmailVerificationExpiresAt = &expiresAt
 
 	if err := userCRUD.CreateUser(user); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
@@ -175,32 +332,17 @@ func (c *AuthController) PasswordRegister() {
 		return
 	}
 
-	accessToken, refreshToken, err := generateTokens(user.UnifiedID, user.Email)
-	if err != nil {
+	verifyURL := getBaseURL() + "/api/auth/verify-email?token=" + verifyToken
+	html := "<p>Confirm your email for Neo ID.</p><p><a href=\"" + verifyURL + "\">Verify email</a></p>"
+	if err := sendResendEmail(user.Email, "Verify your email", html); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to generate tokens"}
+		c.Data["json"] = map[string]interface{}{"error": err.Error()}
 		c.ServeJSON()
 		return
 	}
 
-	sessionCRUD := models.NewSessionCRUD()
-	_ = sessionCRUD.CreateSession(&models.Session{
-		Token:     accessToken,
-		UserID:    user.UnifiedID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-		IPAddress: c.Ctx.Request.RemoteAddr,
-		UserAgent: c.Ctx.Request.UserAgent(),
-	})
-
 	c.Data["json"] = map[string]interface{}{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-		"user": map[string]interface{}{
-			"unified_id":   user.UnifiedID,
-			"email":        user.Email,
-			"display_name": user.DisplayName,
-			"role":         user.Role,
-		},
+		"verification_sent": true,
 	}
 	c.ServeJSON()
 }
@@ -245,6 +387,12 @@ func (c *AuthController) PasswordLogin() {
 	if user.PasswordHash == "" {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
 		c.Data["json"] = map[string]interface{}{"error": "Password login is not enabled for this user"}
+		c.ServeJSON()
+		return
+	}
+	if !user.EmailVerified {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
+		c.Data["json"] = map[string]interface{}{"error": "Email is not verified"}
 		c.ServeJSON()
 		return
 	}
@@ -720,9 +868,6 @@ func (c *AuthController) Callback() {
 			return
 		}
 	}
-
-	// Note: Beego server-side sessions are disabled in Vercel/serverless.
-	// OAuth state is tracked in the dedicated oauth cookie session instead.
 
 	// Generate JWT tokens
 	accessToken, refreshToken, err := generateTokens(unifiedUser.UnifiedID, unifiedUser.Email)

@@ -26,6 +26,10 @@ type User struct {
 
 	OAuthProviders []OAuthProvider `bson:"oauth_providers,omitempty" json:"oauth_providers,omitempty"`
 	PasswordHash   string          `bson:"password_hash,omitempty" json:"-"`
+	EmailVerified  bool            `bson:"email_verified,omitempty" json:"email_verified,omitempty"`
+
+	EmailVerificationToken     string     `bson:"email_verification_token,omitempty" json:"-"`
+	EmailVerificationExpiresAt *time.Time `bson:"email_verification_expires_at,omitempty" json:"-"`
 
 	// Profile info
 	FirstName string `bson:"first_name,omitempty" json:"first_name,omitempty"`
@@ -128,6 +132,21 @@ func (uc *UserCRUD) GetUserByProvider(provider, externalID string) (*User, error
 		},
 	}).Decode(&user)
 
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (uc *UserCRUD) GetUserByEmailVerificationToken(token string) (*User, error) {
+	ctx := context.Background()
+	var user User
+
+	err := uc.collection.FindOne(ctx, bson.M{"email_verification_token": token}).Decode(&user)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}

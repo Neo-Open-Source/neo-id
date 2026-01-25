@@ -14,6 +14,8 @@ func InitRoutes() {
 	web.Router("/api/auth/callback/:provider", &controllers.AuthController{}, "get:Callback")
 	web.Router("/api/auth/password/login", &controllers.AuthController{}, "post:PasswordLogin")
 	web.Router("/api/auth/password/register", &controllers.AuthController{}, "post:PasswordRegister")
+	web.Router("/api/auth/verify-email", &controllers.AuthController{}, "get:VerifyEmail")
+	web.Router("/api/auth/verify-email/resend", &controllers.AuthController{}, "post:ResendVerifyEmail")
 	web.Router("/api/auth/logout", &controllers.AuthController{}, "post:Logout")
 	web.Router("/api/auth/refresh", &controllers.AuthController{}, "post:RefreshToken")
 
