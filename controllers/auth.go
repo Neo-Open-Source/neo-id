@@ -820,6 +820,9 @@ func (c *AuthController) Callback() {
 			c.ServeJSON()
 			return
 		}
+		if strings.TrimSpace(unifiedUser.Role) == "" {
+			unifiedUser.Role = "User"
+		}
 
 		// migrate legacy provider into list if needed
 		if len(unifiedUser.OAuthProviders) == 0 && unifiedUser.Provider != "" {
@@ -906,6 +909,9 @@ func (c *AuthController) Callback() {
 		byEmail, _ := userCRUD.GetUserByEmail(user.Email)
 		if byEmail != nil {
 			unifiedUser = byEmail
+			if strings.TrimSpace(unifiedUser.Role) == "" {
+				unifiedUser.Role = "User"
+			}
 			if len(unifiedUser.OAuthProviders) == 0 && unifiedUser.Provider != "" {
 				unifiedUser.OAuthProviders = append(unifiedUser.OAuthProviders, models.OAuthProvider{
 					Provider:    unifiedUser.Provider,
@@ -933,6 +939,7 @@ func (c *AuthController) Callback() {
 				Email:             user.Email,
 				DisplayName:       user.Name,
 				Avatar:            user.AvatarURL,
+				Role:              "User",
 				FirstName:         user.FirstName,
 				LastName:          user.LastName,
 				IsBanned:          false,
@@ -956,6 +963,9 @@ func (c *AuthController) Callback() {
 	} else {
 		// Update existing user
 		unifiedUser = existingUser
+		if strings.TrimSpace(unifiedUser.Role) == "" {
+			unifiedUser.Role = "User"
+		}
 		unifiedUser.Avatar = user.AvatarURL
 		unifiedUser.DisplayName = user.Name
 		now := time.Now()
