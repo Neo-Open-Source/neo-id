@@ -721,7 +721,8 @@ func (c *AuthController) Callback() {
 		}
 	}
 
-	c.DelSession("oauth_state")
+	// Note: Beego server-side sessions are disabled in Vercel/serverless.
+	// OAuth state is tracked in the dedicated oauth cookie session instead.
 
 	// Generate JWT tokens
 	accessToken, refreshToken, err := generateTokens(unifiedUser.UnifiedID, unifiedUser.Email)
