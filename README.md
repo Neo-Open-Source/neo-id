@@ -1,215 +1,100 @@
-# Unified ID Service
+# Unified ID
 
-Единый сервис авторизации.
+Единый сервис авторизации для экосистемы NeoMovies и других сайтов.
 
-## Архитектура
+## Стек
 
-- **Backend**: Go с Beego framework
-- **Database**: MongoDB
-- **Frontend**: HTML/CSS/JavaScript с TailwindCSS
-- **Deployment**: Vercel
-- **Authentication**: JWT + OAuth 2.0
+- **Backend**: Go + Beego
+- **DB**: MongoDB
+- **Web**: React (Vite) в `web/`
 
-## Структура проекта
+## Быстрый старт (локально)
 
-```
-unified-id/
-├── main.go                 # Точка входа
-├── go.mod                  # Зависимости
-├── conf/
-│   └── app.conf           # Конфигурация
-├── controllers/
-│   ├── auth.go            # OAuth авторизация
-│   ├── user.go            # Управление профилем
-│   ├── admin.go           # Админ функции
-│   ├── service.go         # API для сервисов
-│   └── dashboard.go       # Dashboard
-├── models/
-│   ├── database.go        # Подключение к MongoDB
-│   ├── user.go            # Модель пользователя
-│   └── session.go         # Сессии и сервисы
-├── routers/
-│   └── routes.go          # Роуты API
-└── views/
-    └── dashboard.html     # Frontend dashboard
-```
+### 1) Конфиг
 
-## Установка и запуск
+Настройки лежат в `conf/app.conf`.
 
-### 1. Клонирование и зависимости
+Важно:
+
+- `httpport` сейчас = `8081` (значит URL: `http://localhost:8081`)
+- `base_url` должен соответствовать домену/порту, где реально крутится сервис
+- `mongodb_uri` обязателен
+
+### 2) Backend
 
 ```bash
-git clone <repository>
-cd unified-id
 go mod tidy
+go run .
 ```
 
-### 2. Настройка MongoDB
+### 3) Frontend
 
 ```bash
-# Запуск MongoDB (Docker)
-docker run -d -p 27017:27017 --name mongodb mongo
-
-# Или установка локально
-# https://docs.mongodb.com/manual/installation/
+cd web
+npm i
+npm run dev
 ```
 
-### 3. Конфигурация
+## Основные роуты
 
-Отредактируйте `conf/app.conf`:
+### Auth
 
-```ini
-# JWT секрет
-jwt_secret = "your-super-secret-jwt-key-change-in-production"
+- `GET /api/auth/login/:provider`
+- `GET /api/auth/callback/:provider`
+- `POST /api/auth/password/login`
+- `POST /api/auth/password/register`
+- `GET /api/auth/verify-email`
+- `POST /api/auth/verify-email/code`
+- `POST /api/auth/verify-email/resend`
+- `POST /api/auth/logout`
+- `POST /api/auth/refresh`
 
-# OAuth приложения Google
-google_client_id = "your-google-client-id"
-google_client_secret = "your-google-client-secret"
+### User
 
-# OAuth приложение GitHub  
-github_client_id = "your-github-client-id"
-github_client_secret = "your-github-client-secret"
+- `GET /api/user/profile`
+- `PUT /api/user/profile`
+- `GET /api/user/providers`
+- `POST /api/user/provider/unlink`
+- `POST /api/user/password/set`
+- `GET /api/user/services`
+- `POST /api/user/services/connect`
+- `POST /api/user/services/disconnect`
+- `GET /api/user/service-apps`
+- `POST /api/user/service-apps`
+- `POST /api/user/service-apps/revoke`
+- `POST /api/user/service-apps/delete`
 
-# MongoDB
-mongodb_uri = "mongodb://localhost:27017"
+### Admin
 
-# Администраторы
-admin_emails = "admin@unified-id.com"
-```
+- `GET /api/admin/users`
+- `POST /api/admin/users/ban`
+- `POST /api/admin/users/unban`
+- `POST /api/admin/users/role`
+- `GET /api/admin/services`
+- `POST /api/admin/services`
+- `GET /api/admin/sites`
 
-### 4. OAuth настройка
+### Site (SaaS модель)
 
-#### Google OAuth
-1. Перейдите в [Google Cloud Console](https://console.cloud.google.com/)
-2. Создайте новое приложение
-3. Добавьте OAuth 2.0 Client ID
-4. Redirect URI: `http://localhost:8080/api/auth/callback?provider=google`
+- `POST /api/site/register`
+- `POST /api/site/login`
+- `GET /api/site/callback`
+- `POST /api/site/verify`
+- `GET /api/site/info`
+- `GET /api/site/my`
 
-#### GitHub OAuth
-1. Перейдите в [GitHub Developer Settings](https://github.com/settings/applications/new)
-2. Создайте новое OAuth App
-3. Authorization callback URL: `http://localhost:8080/api/auth/callback?provider=github`
+### Legacy service integration
 
-### 5. Запуск
-
-```bash
-# Разработка
-go run main.go
-
-# Production
-go build -o unified-id
-./unified-id
-```
-
-Сервис будет доступен на `http://localhost:8080`
-
-## API Эндпоинты
-
-### Аутентификация
-- `GET /api/auth/login?provider={google|github}` - Начало OAuth
-- `GET /api/auth/callback?provider={google|github}` - OAuth callback
-- `POST /api/auth/logout` - Выход
-- `POST /api/auth/refresh` - Обновление токена
-
-### Пользователь
-- `GET /api/user/profile` - Получить профиль
-- `PUT /api/user/profile` - Обновить профиль
-- `GET /api/user/services` - Подключенные сервисы
-- `POST /api/user/services/connect` - Подключить сервис
-- `POST /api/user/services/disconnect` - Отключить сервис
-
-### Админ
-- `GET /api/admin/users` - Список пользователей
-- `POST /api/admin/users/ban` - Забанить пользователя
-- `POST /api/admin/users/unban` - Разбанить пользователя
-- `GET /api/admin/services` - Список сервисов
-- `POST /api/admin/services` - Создать сервис
-
-### Для сервисов
-- `POST /api/service/verify` - Верификация токена
-- `GET /api/service/userinfo` - Информация о пользователе
-
-## Интеграция с сервисами
-
-### NeoMovies/NeoMe
-
-1. Получите сервисный токен у администратора
-2. Используйте API эндпоинты для верификации пользователей:
-
-```javascript
-// Верификация токена пользователя
-const response = await fetch('/api/service/verify', {
-    method: 'POST',
-    headers: {
-        'Authorization': 'Bearer neomovies_secret_token',
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        user_token: 'user_jwt_token'
-    })
-});
-
-const userData = await response.json();
-if (userData.valid) {
-    // Пользователь авторизован
-    console.log(userData.user);
-}
-```
-
-## Развертывание на Vercel
-
-1. Создайте `vercel.json`:
-
-```json
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "main.go",
-      "use": "@vercel/go"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/main.go"
-    }
-  ],
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "JWT_SECRET": "@jwt_secret",
-    "GOOGLE_CLIENT_ID": "@google_client_id",
-    "GOOGLE_CLIENT_SECRET": "@google_client_secret",
-    "GITHUB_CLIENT_ID": "@github_client_id",
-    "GITHUB_CLIENT_SECRET": "@github_client_secret"
-  }
-}
-```
-
-2. Развертывание:
-
-```bash
-vercel --prod
-```
-
-## Безопасность
-
-- JWT токены с истечением срока действия
-- OAuth 2.0 с state параметром
-- HTTPS в production
-- Валидация входных данных
-- Rate limiting (рекомендуется добавить)
+- `POST /api/service/verify`
+- `GET /api/service/userinfo`
 
 ## TODO
-
-- [ ] Добавить Яндекс и ВК OAuth
-- [ ] Rate limiting
-- [ ] Email верификация
-- [ ] 2FA/MFA
-- [ ] Логирование и аудит
-- [ ] Кэширование
-- [ ] Мультиязычность
+- [ ] Нормальное логирование + аудит действий админа
+- [ ] Rate limiting на auth endpoints
+- [ ] MFA/2FA (TOTP)
+- [ ] Улучшить CORS/allowed origins (шаблоны + отдельные окружения)
+- [ ] Тесты для auth flows (register/login/verify/refresh)
 
 ## Лицензия
 
-MIT License
+[MIT](LICENSE)
