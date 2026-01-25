@@ -6,6 +6,7 @@ require (
 	github.com/beego/beego/v2 v2.1.2
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.2.0
+	github.com/gorilla/sessions v1.2.2
 	github.com/joho/godotenv v1.5.1
 	github.com/markbates/goth v1.81.0
 	go.mongodb.org/mongo-driver v1.15.0
@@ -20,8 +21,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.6.2 // indirect
-	github.com/gorilla/securecookie v1.1.1 // indirect
-	github.com/gorilla/sessions v1.1.1 // indirect
+	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/kr/text v0.2.0 // indirect
