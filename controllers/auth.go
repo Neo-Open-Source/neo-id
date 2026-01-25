@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -452,20 +453,24 @@ func (c *AuthController) Callback() {
 			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 			c.Data["json"] = map[string]interface{}{
 				"error": fmt.Sprintf("OAuth callback panic: %v", r),
+				"stack": string(debug.Stack()),
 			}
 			c.ServeJSON()
 		}
 	}()
 
+	if c.Ctx == nil || c.Ctx.Request == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Invalid request context",
+		}
+		c.ServeJSON()
+		return
+	}
+
 	provider := c.GetString("provider")
 	if provider == "" {
 		provider = c.Ctx.Input.Param(":provider")
-	}
-	if provider != "" {
-		// Ensure goth can detect provider (it expects it in query params)
-		q := c.Ctx.Request.URL.Query()
-		q.Set("provider", provider)
-		c.Ctx.Request.URL.RawQuery = q.Encode()
 	}
 	oauthSess, err := getOAuthCookieSession(c.Ctx.Request)
 	if err != nil {
@@ -474,6 +479,22 @@ func (c *AuthController) Callback() {
 		c.ServeJSON()
 		return
 	}
+
+	if provider == "" {
+		if storedProvider, ok := oauthSess.Values["oauth_provider"].(string); ok {
+			provider = storedProvider
+		}
+	}
+	if provider == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Provider is required"}
+		c.ServeJSON()
+		return
+	}
+	// Ensure goth can detect provider (it expects it in query params)
+	q := c.Ctx.Request.URL.Query()
+	q.Set("provider", provider)
+	c.Ctx.Request.URL.RawQuery = q.Encode()
 
 	storedState, _ := oauthSess.Values["oauth_state"].(string)
 	state := c.GetString("state")
