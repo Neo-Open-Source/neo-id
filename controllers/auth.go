@@ -280,12 +280,19 @@ func InitOAuthProviders() {
 	)
 	if sessionSecret != "" {
 		store := sessions.NewCookieStore([]byte(sessionSecret))
-		secure := strings.HasPrefix(strings.ToLower(strings.TrimSpace(os.Getenv("BASE_URL"))), "https://")
+		baseURL := strings.ToLower(strings.TrimSpace(os.Getenv("BASE_URL")))
+		secure := strings.HasPrefix(baseURL, "https://") || os.Getenv("VERCEL") != "" || os.Getenv("VERCEL_URL") != ""
+		sameSite := http.SameSiteLaxMode
+		// OAuth callback comes from a third-party (accounts.google.com / github.com), so we need SameSite=None.
+		// Modern browsers require Secure=true when SameSite=None, otherwise the cookie is rejected.
+		if secure {
+			sameSite = http.SameSiteNoneMode
+		}
 		store.Options = &sessions.Options{
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   secure,
-			SameSite: http.SameSiteNoneMode,
+			SameSite: sameSite,
 			MaxAge:   86400 * 7,
 		}
 		gothic.Store = store
@@ -440,6 +447,16 @@ func (c *AuthController) Login() {
 
 // Callback handles OAuth callback
 func (c *AuthController) Callback() {
+	defer func() {
+		if r := recover(); r != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+			c.Data["json"] = map[string]interface{}{
+				"error": fmt.Sprintf("OAuth callback panic: %v", r),
+			}
+			c.ServeJSON()
+		}
+	}()
+
 	provider := c.GetString("provider")
 	if provider == "" {
 		provider = c.Ctx.Input.Param(":provider")
@@ -463,6 +480,7 @@ func (c *AuthController) Callback() {
 
 	// Verify state parameter
 	if storedState == "" || storedState != state {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 		c.Data["json"] = map[string]interface{}{
 			"error": "Invalid state parameter",
 		}
@@ -473,6 +491,7 @@ func (c *AuthController) Callback() {
 	// Complete OAuth flow
 	user, err := gothic.CompleteUserAuth(c.Ctx.ResponseWriter, c.Ctx.Request)
 	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 		c.Data["json"] = map[string]interface{}{
 			"error": "Failed to complete auth: " + err.Error(),
 		}
