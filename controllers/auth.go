@@ -37,7 +37,12 @@ func getOAuthCookieSession(r *http.Request) (*sessions.Session, error) {
 		// has a stale/invalid cookie. Treat it as a non-fatal condition and start a new session.
 		fresh, newErr := gothic.Store.New(r, oauthSessionName)
 		if newErr != nil {
-			return nil, err
+			// As a last resort, return an empty session object. We will attempt to overwrite
+			// the invalid cookie on the next Save().
+			fallback := sessions.NewSession(gothic.Store, oauthSessionName)
+			fallback.IsNew = true
+			fallback.Options = &sessions.Options{Path: "/", HttpOnly: true}
+			return fallback, nil
 		}
 		return fresh, nil
 	}
