@@ -33,7 +33,13 @@ func getOAuthCookieSession(r *http.Request) (*sessions.Session, error) {
 	}
 	s, err := gothic.Store.Get(r, oauthSessionName)
 	if err != nil {
-		return nil, err
+		// This most commonly happens when SESSION_SECRET/JWT_SECRET was rotated or the browser
+		// has a stale/invalid cookie. Treat it as a non-fatal condition and start a new session.
+		fresh, newErr := gothic.Store.New(r, oauthSessionName)
+		if newErr != nil {
+			return nil, err
+		}
+		return fresh, nil
 	}
 	return s, nil
 }
