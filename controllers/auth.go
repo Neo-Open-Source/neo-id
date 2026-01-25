@@ -362,7 +362,7 @@ func (c *AuthController) Login() {
 	oauthSess, err := getOAuthCookieSession(c.Ctx.Request)
 	if err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize oauth session"}
+		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize oauth session: " + err.Error()}
 		c.ServeJSON()
 		return
 	}
@@ -475,7 +475,7 @@ func (c *AuthController) Callback() {
 	oauthSess, err := getOAuthCookieSession(c.Ctx.Request)
 	if err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize oauth session"}
+		c.Data["json"] = map[string]interface{}{"error": "Failed to initialize oauth session: " + err.Error()}
 		c.ServeJSON()
 		return
 	}
