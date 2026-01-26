@@ -28,7 +28,13 @@ const response = await fetch('https://id.neomovies.ru/api/site/login', {
         'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-        redirect_url: 'https://neomovies.ru/auth/callback',
+        // Web:
+        // redirect_url: 'https://neomovies.ru/auth/callback',
+        // Mobile deep link (any custom scheme):
+        redirect_url: 'neomovies://auth/callback',
+        // redirect_url: 'myapp://auth/callback',
+        // redirect_url: 'anotherapp://auth/callback',
+        // redirect_url: 'anyapp://auth/callback',
         state: 'random_state_string'
     })
 });
@@ -39,9 +45,13 @@ window.location.href = login_url;
 
 ### 2. OAuth Callback
 
-Пользователь проходит OAuth на Unified ID и возвращается на ваш сайт:
+Пользователь проходит OAuth на Unified ID и возвращается на ваш сайт/приложение:
 ```
 https://neomovies.ru/auth/callback?token=jwt_token&state=random_state_string
+
+neomovies://auth/callback?token=jwt_token&state=random_state_string
+myapp://auth/callback?token=jwt_token&state=random_state_string
+anyapp://auth/callback?token=jwt_token&state=random_state_string
 ```
 
 ### 3. Верификация токена

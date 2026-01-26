@@ -142,6 +142,18 @@ func (sc *SiteCRUD) UpdateSite(site *Site) error {
 	return nil
 }
 
+// DeleteSite deletes a site by site_id
+func (sc *SiteCRUD) DeleteSite(siteID string) error {
+	ctx := context.Background()
+
+	_, err := sc.collection.DeleteOne(ctx, bson.M{"site_id": siteID})
+	if err != nil {
+		return fmt.Errorf("failed to delete site: %w", err)
+	}
+
+	return nil
+}
+
 // UserSiteConnectionCRUD operations
 type UserSiteConnectionCRUD struct {
 	collection *mongo.Collection

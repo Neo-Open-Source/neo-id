@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -124,9 +123,6 @@ func (c *SiteController) RegisterSite() {
 		}
 	}
 
-	// Debug log
-	fmt.Printf("DEBUG RegisterSite: user.UnifiedID=%s, user.Role=%s, normalized role=%s\n", user.UnifiedID, user.Role, role)
-
 	plan := strings.ToLower(strings.TrimSpace(requestData.Plan))
 	// Always assign plan by role if not explicitly set to something else
 	if plan == "" {
@@ -138,22 +134,18 @@ func (c *SiteController) RegisterSite() {
 		default:
 			plan = "free"
 		}
-		fmt.Printf("DEBUG Assigned plan=%s for role=%s (empty input)\n", plan, role)
 	} else {
 		// If plan is provided, still ensure admin gets at least enterprise
 		switch role {
 		case "admin":
 			if plan != "enterprise" {
 				plan = "enterprise"
-				fmt.Printf("DEBUG Overrode plan to enterprise for admin (was provided)\n")
 			}
 		case "moderator":
 			if plan != "enterprise" && plan != "pro" {
 				plan = "pro"
-				fmt.Printf("DEBUG Overrode plan to pro for moderator (was provided)\n")
 			}
 		}
-		fmt.Printf("DEBUG Using provided/overridden plan=%s for role=%s\n", plan, role)
 	}
 
 	// Generate unique site_id and API keys
@@ -242,7 +234,93 @@ func (c *SiteController) GetMySites() {
 	c.ServeJSON()
 }
 
-// GetSiteInfo returns site information
+// DeleteSite allows site owners to delete their sites and admins to delete any site
+func (c *SiteController) DeleteSite() {
+	user, err := c.getAuthenticatedUser()
+	if err != nil || user == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Authentication required",
+		}
+		c.ServeJSON()
+		return
+	}
+
+	var requestData struct {
+		SiteID string `json:"site_id"`
+	}
+
+	body, err := io.ReadAll(c.Ctx.Request.Body)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Failed to read request body",
+		}
+		c.ServeJSON()
+		return
+	}
+
+	if err := json.Unmarshal(body, &requestData); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Invalid request body",
+		}
+		c.ServeJSON()
+		return
+	}
+
+	if requestData.SiteID == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{
+			"error": "site_id is required",
+		}
+		c.ServeJSON()
+		return
+	}
+
+	// Get site
+	siteCRUD := models.NewSiteCRUD()
+	site, err := siteCRUD.GetSiteBySiteID(requestData.SiteID)
+	if err != nil || site == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Site not found",
+		}
+		c.ServeJSON()
+		return
+	}
+
+	// Check permissions: owner or admin
+	role := strings.ToLower(strings.TrimSpace(user.Role))
+	isOwner := strings.EqualFold(user.UnifiedID, site.OwnerEmail)
+	isAdmin := role == "admin"
+
+	if !isOwner && !isAdmin {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Permission denied: only site owners or admins can delete sites",
+		}
+		c.ServeJSON()
+		return
+	}
+
+	// Delete the site
+	if err := siteCRUD.DeleteSite(requestData.SiteID); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Failed to delete site: " + err.Error(),
+		}
+		c.ServeJSON()
+		return
+	}
+
+	c.Data["json"] = map[string]interface{}{
+		"message": "Site deleted successfully",
+		"site_id": requestData.SiteID,
+	}
+	c.ServeJSON()
+}
+
 func (c *SiteController) GetSiteInfo() {
 	site, err := c.authenticateSite()
 	if err != nil || site == nil {
@@ -307,6 +385,15 @@ func (c *SiteController) SiteLogin() {
 		return
 	}
 
+	if err := isAllowedRedirectURL(requestData.RedirectURL, site); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Invalid redirect_url: " + err.Error(),
+		}
+		c.ServeJSON()
+		return
+	}
+
 	// Generate login URL with site context
 	loginURL := "/login?" +
 		"site_id=" + site.SiteID + "&" +
@@ -347,6 +434,15 @@ func (c *SiteController) SiteCallback() {
 		return
 	}
 
+	if err := isAllowedRedirectURL(redirectURL, site); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Invalid redirect_url: " + err.Error(),
+		}
+		c.ServeJSON()
+		return
+	}
+
 	// Get user info from session (user should be authenticated by now)
 	user, err := c.getAuthenticatedUser()
 	if err != nil || user == nil {
@@ -380,7 +476,15 @@ func (c *SiteController) SiteCallback() {
 		return
 	}
 
-	redirectURLWithToken := redirectURL + "?token=" + accessToken + "&state=" + state
+	redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, state)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{
+			"error": "Invalid redirect_url: " + err.Error(),
+		}
+		c.ServeJSON()
+		return
+	}
 	c.Redirect(redirectURLWithToken, http.StatusTemporaryRedirect)
 }
 

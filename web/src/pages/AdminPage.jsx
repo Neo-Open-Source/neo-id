@@ -29,6 +29,8 @@ import {
   MenuItem
 } from '@mui/material'
 
+import DeleteIcon from '@mui/icons-material/Delete'
+
 import { clearTokens } from '../api/client'
 import {
   getProfile,
@@ -216,6 +218,33 @@ export default function AdminPage() {
     }
   }
 
+  const onDeleteSite = async (siteId) => {
+    if (!window.confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
+      return
+    }
+    setError('')
+    setInfo('')
+    try {
+      const token = localStorage.getItem('access_token')
+      const response = await fetch('/api/site/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ site_id: siteId })
+      })
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to delete site')
+      }
+      setInfo('Site deleted successfully')
+      await loadSites()
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to delete site')
+    }
+  }
+
   return (
     <>
       <AppBar position="static" color="default" elevation={1}>
@@ -347,6 +376,7 @@ export default function AdminPage() {
                           <TableCell>Active</TableCell>
                           <TableCell>Owner</TableCell>
                           <TableCell>API Key</TableCell>
+                          <TableCell align="right">Actions</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -359,11 +389,14 @@ export default function AdminPage() {
                             <TableCell>{s.is_active ? 'yes' : 'no'}</TableCell>
                             <TableCell>{s.owner_email}</TableCell>
                             <TableCell>{s.api_key}</TableCell>
+                            <TableCell align="right">
+                              <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => onDeleteSite(s.site_id)}>Delete</Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                         {sites.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={7}>No sites</TableCell>
+                            <TableCell colSpan={8}>No sites</TableCell>
                           </TableRow>
                         )}
                       </TableBody>

@@ -21,6 +21,7 @@ import {
 import LogoutIcon from '@mui/icons-material/Logout'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import AddBusinessIcon from '@mui/icons-material/AddBusiness'
+import DeleteIcon from '@mui/icons-material/Delete'
 
 import { clearTokens, getAccessToken } from '../api/client'
 import {
@@ -136,6 +137,30 @@ export default function DashboardPage() {
     await load()
   }
 
+  const onDeleteSite = async (siteId) => {
+    if (!window.confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
+      return
+    }
+    try {
+      const response = await fetch('/api/site/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ site_id: siteId })
+      })
+      if (!response.ok) {
+        const err = await response.json()
+        alert(err.error || 'Failed to delete site')
+        return
+      }
+      await load()
+    } catch (e) {
+      alert('Failed to delete site')
+    }
+  }
+
   return (
     <>
       <AppBar position="sticky" color="transparent" elevation={0}>
@@ -226,6 +251,9 @@ export default function DashboardPage() {
                             primary={`${s.name} (${s.domain})`}
                             secondary={`site_id: ${s.site_id} • plan: ${s.plan} • api_key: ${s.api_key} • api_secret: ${s.api_secret}`}
                           />
+                          <ListItemSecondaryAction>
+                            <Button color="error" startIcon={<DeleteIcon />} onClick={() => onDeleteSite(s.site_id)}>Delete</Button>
+                          </ListItemSecondaryAction>
                         </ListItem>
                       ))}
                       {mySites.length === 0 && (

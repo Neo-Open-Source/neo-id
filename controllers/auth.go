@@ -662,6 +662,26 @@ func (c *AuthController) Login() {
 	siteID := c.GetString("site_id")
 	redirectURL := c.GetString("redirect_url")
 	siteState := c.GetString("site_state")
+	if siteID != "" && redirectURL != "" {
+		siteCRUD := models.NewSiteCRUD()
+		site, err := siteCRUD.GetSiteBySiteID(siteID)
+		if err != nil || site == nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+			c.Data["json"] = map[string]interface{}{
+				"error": "Invalid site_id",
+			}
+			c.ServeJSON()
+			return
+		}
+		if err := isAllowedRedirectURL(redirectURL, site); err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+			c.Data["json"] = map[string]interface{}{
+				"error": "Invalid redirect_url: " + err.Error(),
+			}
+			c.ServeJSON()
+			return
+		}
+	}
 	if siteID != "" {
 		oauthSess.Values["site_id"] = siteID
 	}
@@ -1058,9 +1078,37 @@ func (c *AuthController) Callback() {
 	siteState, _ := oauthSess.Values["site_state"].(string)
 
 	if siteID != "" && redirectURL != "" {
+		siteCRUD := models.NewSiteCRUD()
+		site, err := siteCRUD.GetSiteBySiteID(siteID)
+		if err != nil || site == nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+			c.Data["json"] = map[string]interface{}{
+				"error": "Invalid site_id",
+			}
+			c.ServeJSON()
+			return
+		}
+		if err := isAllowedRedirectURL(redirectURL, site); err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+			c.Data["json"] = map[string]interface{}{
+				"error": "Invalid redirect_url: " + err.Error(),
+			}
+			c.ServeJSON()
+			return
+		}
+
 		deleteOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request)
+		redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, siteState)
+		if err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+			c.Data["json"] = map[string]interface{}{
+				"error": "Invalid redirect_url: " + err.Error(),
+			}
+			c.ServeJSON()
+			return
+		}
 		// Return standard Neo ID access token (contains unified_id) so the app can call its API
-		c.Redirect(redirectURL+"?token="+accessToken+"&state="+siteState, http.StatusTemporaryRedirect)
+		c.Redirect(redirectURLWithToken, http.StatusTemporaryRedirect)
 		return
 	}
 

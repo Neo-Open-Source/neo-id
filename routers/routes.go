@@ -54,6 +54,7 @@ func InitRoutes() {
 	web.Router("/api/site/verify", &controllers.SiteController{}, "post:VerifySiteToken")
 	web.Router("/api/site/info", &controllers.SiteController{}, "get:GetSiteInfo")
 	web.Router("/api/site/my", &controllers.SiteController{}, "get:GetMySites")
+	web.Router("/api/site/delete", &controllers.SiteController{}, "post:DeleteSite")
 
 	// Dashboard routes (serve frontend)
 	web.Router("/", &controllers.MainController{}, "get:Get")
