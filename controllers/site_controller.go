@@ -48,6 +48,48 @@ func (c *SiteController) authenticateSite() (*models.Site, error) {
 	return site, nil
 }
 
+// buildAllowedOrigins creates appropriate allowed origins based on domain type
+func buildAllowedOrigins(domain string) []string {
+	lower := strings.ToLower(domain)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		// Web domain with scheme
+		return []string{domain, "http://localhost:3000"}
+	} else if strings.Contains(domain, "://") {
+		// Custom scheme like "neomovies://auth/callback" - no web origins needed
+		return []string{"http://localhost:3000"}
+	} else if strings.Contains(domain, ":") && !strings.Contains(domain, "/") {
+		// Custom scheme like "neomovies:" - no web origins needed
+		return []string{"http://localhost:3000"}
+	} else {
+		// Plain web domain
+		return []string{"https://" + domain, "http://localhost:3000"}
+	}
+}
+
+// buildRedirectURI creates appropriate redirect URI based on domain type
+func buildRedirectURI(domain string) string {
+	lower := strings.ToLower(domain)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		// Web domain with scheme
+		return domain + "/auth/callback"
+	} else if strings.Contains(domain, "://") {
+		// Custom scheme like "neomovies://auth/callback" - use as-is or append /auth/callback
+		if strings.HasSuffix(domain, "/") {
+			return domain + "auth/callback"
+		}
+		return domain + "/auth/callback"
+	} else if strings.Contains(domain, ":") && !strings.Contains(domain, "/") {
+		// Custom scheme like "neomovies:" - append //auth/callback
+		if strings.HasSuffix(domain, ":") {
+			return domain + "//auth/callback"
+		}
+		return domain + "://auth/callback"
+	} else {
+		// Plain web domain
+		return "https://" + domain + "/auth/callback"
+	}
+}
+
 // RegisterSite allows new sites to register
 func (c *SiteController) RegisterSite() {
 	user, err := c.getAuthenticatedUser()
@@ -106,16 +148,23 @@ func (c *SiteController) RegisterSite() {
 		return
 	}
 
-	// Normalize domain input (accept "example.com" or "https://example.com/..."; store only host)
+	// Normalize domain input
+	// For web: accept "example.com" or "https://example.com/..."; store only host
+	// For mobile apps: keep custom scheme as-is (e.g., "neomovies:" or "neomovies")
 	normalizedDomain := strings.TrimSpace(requestData.Domain)
-	if strings.HasPrefix(strings.ToLower(normalizedDomain), "http://") || strings.HasPrefix(strings.ToLower(normalizedDomain), "https://") {
+	lowerDomain := strings.ToLower(normalizedDomain)
+	if strings.HasPrefix(lowerDomain, "http://") || strings.HasPrefix(lowerDomain, "https://") {
 		if u, err := url.Parse(normalizedDomain); err == nil {
 			if u.Host != "" {
 				normalizedDomain = u.Host
 			}
 		}
-	}
-	if strings.Contains(normalizedDomain, "/") {
+	} else if strings.Contains(normalizedDomain, "://") {
+		// Custom scheme like "neomovies://auth/callback" - keep as-is
+	} else if strings.Contains(normalizedDomain, ":") && !strings.Contains(normalizedDomain, "/") {
+		// Likely a custom scheme like "neomovies:" - keep as-is
+	} else if strings.Contains(normalizedDomain, "/") {
+		// Assume web domain without scheme, prepend https:// to parse
 		if u, err := url.Parse("https://" + normalizedDomain); err == nil {
 			if u.Host != "" {
 				normalizedDomain = u.Host
@@ -162,8 +211,8 @@ func (c *SiteController) RegisterSite() {
 		APISecret:      apiSecret,
 		Description:    requestData.Description,
 		LogoURL:        requestData.LogoURL,
-		AllowedOrigins: []string{"https://" + normalizedDomain, "http://localhost:3000"},
-		RedirectURI:    "https://" + normalizedDomain + "/auth/callback",
+		AllowedOrigins: buildAllowedOrigins(normalizedDomain),
+		RedirectURI:    buildRedirectURI(normalizedDomain),
 		IsActive:       true,
 		OwnerEmail:     requestData.OwnerEmail,
 		Plan:           plan,
