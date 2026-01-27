@@ -42,13 +42,32 @@ func hostsFromAllowedOrigins(origins []string) map[string]struct{} {
 		if err != nil {
 			continue
 		}
-		h := strings.ToLower(strings.TrimSpace(u.Host))
+		h := strings.ToLower(strings.TrimSpace(u.Hostname()))
 		if h == "" {
 			continue
 		}
 		hosts[h] = struct{}{}
 	}
 	return hosts
+}
+
+func isWildcardHostAllowed(hostname string, allowed string) bool {
+	hostname = strings.ToLower(strings.TrimSpace(hostname))
+	allowed = strings.ToLower(strings.TrimSpace(allowed))
+	if hostname == "" || allowed == "" {
+		return false
+	}
+	if strings.HasPrefix(allowed, "*.") {
+		suffix := strings.TrimPrefix(allowed, "*.")
+		if suffix == "" {
+			return false
+		}
+		if hostname == suffix {
+			return false
+		}
+		return strings.HasSuffix(hostname, "."+suffix)
+	}
+	return hostname == allowed
 }
 
 // isAllowedRedirectURL validates redirect URLs for OAuth flows.
@@ -67,7 +86,7 @@ func isAllowedRedirectURL(redirectURL string, site *models.Site) error {
 	}
 
 	scheme := strings.ToLower(parsed.Scheme)
-	host := parsed.Host
+	hostname := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
 
 	// Allow any custom app scheme (non-http/https) for registered sites
 	if scheme != "http" && scheme != "https" {
@@ -91,18 +110,29 @@ func isAllowedRedirectURL(redirectURL string, site *models.Site) error {
 		// Add default localhost for development
 		allowedOrigins = append(allowedOrigins, "http://localhost:3000", "http://localhost:8080", "http://localhost:8081")
 
-		// Check if host matches any allowed origin
+		// Check if host matches any allowed origin (exact or wildcard)
 		for _, allowedOrigin := range allowedOrigins {
-			allowedURL, err := url.Parse(allowedOrigin)
-			if err != nil {
+			allowedOrigin = strings.TrimSpace(allowedOrigin)
+			if allowedOrigin == "" {
 				continue
 			}
-			if host == allowedURL.Host {
+			allowedHost := ""
+			if strings.Contains(allowedOrigin, "://") {
+				allowedURL, err := url.Parse(allowedOrigin)
+				if err != nil {
+					continue
+				}
+				allowedHost = allowedURL.Hostname()
+			} else {
+				allowedHost = allowedOrigin
+			}
+			allowedHost = strings.ToLower(strings.TrimSpace(allowedHost))
+			if isWildcardHostAllowed(hostname, allowedHost) {
 				return nil
 			}
 		}
 
-		return fmt.Errorf("redirect host not allowed: %s", host)
+		return fmt.Errorf("redirect host not allowed: %s", hostname)
 	}
 
 	return fmt.Errorf("unsupported redirect scheme: %s", scheme)

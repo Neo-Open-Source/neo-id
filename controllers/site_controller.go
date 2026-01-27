@@ -62,8 +62,26 @@ func buildAllowedOrigins(domain string) []string {
 		return []string{"http://localhost:3000"}
 	} else {
 		// Plain web domain
-		return []string{"https://" + domain, "http://localhost:3000"}
+		return []string{"https://" + domain, "https://www." + domain, "http://localhost:3000"}
 	}
+}
+
+func mergeAllowedOrigins(base []string, extra []string) []string {
+	out := []string{}
+	seen := map[string]struct{}{}
+	for _, v := range append(base, extra...) {
+		vv := strings.TrimSpace(v)
+		if vv == "" {
+			continue
+		}
+		key := strings.ToLower(vv)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, vv)
+	}
+	return out
 }
 
 // buildRedirectURI creates appropriate redirect URI based on domain type
@@ -112,12 +130,13 @@ func (c *SiteController) RegisterSite() {
 	}
 
 	var requestData struct {
-		Name        string `json:"name"`
-		Domain      string `json:"domain"`
-		Description string `json:"description"`
-		LogoURL     string `json:"logo_url"`
-		OwnerEmail  string `json:"owner_email"`
-		Plan        string `json:"plan"`
+		Name        string   `json:"name"`
+		Domain      string   `json:"domain"`
+		Description string   `json:"description"`
+		LogoURL     string   `json:"logo_url"`
+		OwnerEmail  string   `json:"owner_email"`
+		Plan        string   `json:"plan"`
+		Allowed     []string `json:"allowed_origins"`
 	}
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
@@ -202,6 +221,11 @@ func (c *SiteController) RegisterSite() {
 	apiKey := generateAPIKey()
 	apiSecret := generateAPISecret()
 
+	allowedOrigins := buildAllowedOrigins(normalizedDomain)
+	if len(requestData.Allowed) > 0 {
+		allowedOrigins = mergeAllowedOrigins(allowedOrigins, requestData.Allowed)
+	}
+
 	// Create site
 	site := &models.Site{
 		SiteID:         siteID,
@@ -211,7 +235,7 @@ func (c *SiteController) RegisterSite() {
 		APISecret:      apiSecret,
 		Description:    requestData.Description,
 		LogoURL:        requestData.LogoURL,
-		AllowedOrigins: buildAllowedOrigins(normalizedDomain),
+		AllowedOrigins: allowedOrigins,
 		RedirectURI:    buildRedirectURI(normalizedDomain),
 		IsActive:       true,
 		OwnerEmail:     requestData.OwnerEmail,
