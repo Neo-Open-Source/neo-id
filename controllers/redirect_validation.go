@@ -138,13 +138,16 @@ func isAllowedRedirectURL(redirectURL string, site *models.Site) error {
 	return fmt.Errorf("unsupported redirect scheme: %s", scheme)
 }
 
-func withTokenAndState(raw string, token string, state string) (string, error) {
+func withTokenAndState(raw string, token string, refreshToken string, state string) (string, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return "", fmt.Errorf("invalid redirect_url")
 	}
 	q := u.Query()
 	q.Set("token", token)
+	if strings.TrimSpace(refreshToken) != "" {
+		q.Set("refresh_token", refreshToken)
+	}
 	q.Set("state", state)
 	u.RawQuery = q.Encode()
 	return u.String(), nil

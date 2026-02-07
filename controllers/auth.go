@@ -1098,7 +1098,7 @@ func (c *AuthController) Callback() {
 		}
 
 		deleteOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request)
-		redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, siteState)
+		redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, refreshToken, siteState)
 		if err != nil {
 			c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 			c.Data["json"] = map[string]interface{}{

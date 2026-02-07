@@ -540,6 +540,7 @@ func (c *SiteController) SiteCallback() {
 
 	// Redirect back to site with the Neo ID access token (contains unified_id)
 	accessToken := strings.TrimSpace(c.GetString("token"))
+	refreshToken := strings.TrimSpace(c.GetString("refresh_token"))
 	if accessToken == "" {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 		c.Data["json"] = map[string]interface{}{
@@ -549,7 +550,7 @@ func (c *SiteController) SiteCallback() {
 		return
 	}
 
-	redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, state)
+	redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, refreshToken, state)
 	if err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 		c.Data["json"] = map[string]interface{}{

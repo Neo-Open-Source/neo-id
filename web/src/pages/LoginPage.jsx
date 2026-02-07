@@ -56,7 +56,8 @@ export default function LoginPage() {
         const cb = `/api/site/callback?site_id=${encodeURIComponent(siteId)}` +
           `&redirect_url=${encodeURIComponent(redirectUrl)}` +
           `&state=${encodeURIComponent(siteState || '')}` +
-          `&token=${encodeURIComponent(data.access_token)}`
+          `&token=${encodeURIComponent(data.access_token)}` +
+          `&refresh_token=${encodeURIComponent(data.refresh_token || '')}`
         window.location.href = cb
         return
       }
