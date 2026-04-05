@@ -35,11 +35,13 @@ func main() {
 	// Serve static files from Vercel build output
 	if _, err := os.Stat("static"); err == nil {
 		web.SetStaticPath("/assets", "static/app/assets")
-		web.SetStaticPath("/avatars", "static/avatars")
+		// Avatars: try dist first (Vite build), then static/avatars (local dev)
+		if _, err2 := os.Stat("static/app/avatars"); err2 == nil {
+			web.SetStaticPath("/avatars", "static/app/avatars")
+		} else {
+			web.SetStaticPath("/avatars", "static/avatars")
+		}
 	}
-
-	// Serve favicon
-	web.Router("/favicon.ico", &controllers.MainController{}, "get:Favicon")
 
 	port := web.AppConfig.DefaultInt("httpport", 8080)
 	fmt.Printf("Unified ID Service starting on port %d\n", port)
