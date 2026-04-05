@@ -168,29 +168,38 @@ func (c *SiteController) RegisterSite() {
 		return
 	}
 
-	// Normalize domain input
-	// For web: accept "example.com" or "https://example.com/..."; store only host
-	// For mobile apps: keep custom scheme as-is (e.g., "neomovies:" or "neomovies")
-	normalizedDomain := strings.TrimSpace(requestData.Domain)
-	lowerDomain := strings.ToLower(normalizedDomain)
-	if strings.HasPrefix(lowerDomain, "http://") || strings.HasPrefix(lowerDomain, "https://") {
-		if u, err := url.Parse(normalizedDomain); err == nil {
-			if u.Host != "" {
-				normalizedDomain = u.Host
+	// Normalize domain input — support comma-separated list of domains
+	rawDomains := strings.Split(strings.TrimSpace(requestData.Domain), ",")
+	var normalizedDomains []string
+	for _, d := range rawDomains {
+		d = strings.TrimSpace(d)
+		if d == "" {
+			continue
+		}
+		lowerD := strings.ToLower(d)
+		if strings.HasPrefix(lowerD, "http://") || strings.HasPrefix(lowerD, "https://") {
+			if u, err := url.Parse(d); err == nil && u.Host != "" {
+				d = u.Host
+			}
+		} else if strings.Contains(d, "://") {
+			// custom scheme — keep as-is
+		} else if strings.Contains(d, ":") && !strings.Contains(d, "/") {
+			// custom scheme like "myapp:" — keep as-is
+		} else if strings.Contains(d, "/") {
+			if u, err := url.Parse("https://" + d); err == nil && u.Host != "" {
+				d = u.Host
 			}
 		}
-	} else if strings.Contains(normalizedDomain, "://") {
-		// Custom scheme like "neomovies://auth/callback" - keep as-is
-	} else if strings.Contains(normalizedDomain, ":") && !strings.Contains(normalizedDomain, "/") {
-		// Likely a custom scheme like "neomovies:" - keep as-is
-	} else if strings.Contains(normalizedDomain, "/") {
-		// Assume web domain without scheme, prepend https:// to parse
-		if u, err := url.Parse("https://" + normalizedDomain); err == nil {
-			if u.Host != "" {
-				normalizedDomain = u.Host
-			}
-		}
+		normalizedDomains = append(normalizedDomains, d)
 	}
+	if len(normalizedDomains) == 0 {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "domain is required"}
+		c.ServeJSON()
+		return
+	}
+	// Primary domain is the first one
+	normalizedDomain := normalizedDomains[0]
 
 	plan := strings.ToLower(strings.TrimSpace(requestData.Plan))
 	// Always assign plan by role if not explicitly set to something else
@@ -223,6 +232,10 @@ func (c *SiteController) RegisterSite() {
 	apiSecret := generateAPISecret()
 
 	allowedOrigins := buildAllowedOrigins(normalizedDomain)
+	// Add all extra domains from the comma-separated list
+	for _, d := range normalizedDomains[1:] {
+		allowedOrigins = mergeAllowedOrigins(allowedOrigins, buildAllowedOrigins(d))
+	}
 	if len(requestData.Allowed) > 0 {
 		allowedOrigins = mergeAllowedOrigins(allowedOrigins, requestData.Allowed)
 	}

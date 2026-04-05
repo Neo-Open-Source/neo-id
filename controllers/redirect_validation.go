@@ -67,7 +67,19 @@ func isWildcardHostAllowed(hostname string, allowed string) bool {
 		}
 		return strings.HasSuffix(hostname, "."+suffix)
 	}
-	return hostname == allowed
+	if hostname == allowed {
+		return true
+	}
+	// Allow www. subdomain if base domain matches
+	// e.g. allowed=neomovies.ru → www.neomovies.ru is also allowed
+	if hostname == "www."+allowed {
+		return true
+	}
+	// Allow base domain if www. variant is allowed
+	if "www."+hostname == allowed {
+		return true
+	}
+	return false
 }
 
 // isAllowedRedirectURL validates redirect URLs for OAuth flows.

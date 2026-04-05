@@ -156,8 +156,8 @@ export default function RegisterSitePage() {
                     value={form.domain}
                     onChange={onChange('domain')}
                     disabled={!allowed}
-                    placeholder="example.com"
-                    helperText="Web domain or custom scheme (e.g. myapp://)"
+                    placeholder="neomovies.ru, www.neomovies.ru, api.neomovies.ru"
+                    helperText="Comma-separated domains or custom scheme (e.g. myapp://)"
                   />
                   <TextField
                     label="Owner email"
