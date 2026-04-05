@@ -92,6 +92,20 @@ func init() {
 
 	// CORS for browser-based API calls (e.g. NeoMovies Web -> Neo ID)
 	web.InsertFilter("/api/*", web.BeforeRouter, corsFilter)
+	// Handle OPTIONS preflight for all API routes
+	web.InsertFilter("/api/*", web.BeforeRouter, func(ctx *webctx.Context) {
+		if ctx.Input.Method() == http.MethodOptions {
+			origin := ctx.Input.Header("Origin")
+			if origin != "" {
+				ctx.Output.Header("Access-Control-Allow-Origin", origin)
+				ctx.Output.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH")
+				ctx.Output.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
+				ctx.Output.Header("Access-Control-Max-Age", "86400")
+			}
+			ctx.Output.SetStatus(http.StatusNoContent)
+			_, _ = ctx.ResponseWriter.Write([]byte{})
+		}
+	})
 
 	// Store the app instance
 	app = web.BeeApp

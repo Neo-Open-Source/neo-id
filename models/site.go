@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -98,15 +99,25 @@ func (sc *SiteCRUD) GetSiteByAPIKey(apiKey string) (*Site, error) {
 	ctx := context.Background()
 	var site Site
 
+	// Try exact match first
 	err := sc.collection.FindOne(ctx, bson.M{"api_key": apiKey}).Decode(&site)
-	if err == mongo.ErrNoDocuments {
-		return nil, nil
+	if err == nil {
+		return &site, nil
 	}
-	if err != nil {
+	if err != mongo.ErrNoDocuments {
 		return nil, fmt.Errorf("failed to get site: %w", err)
 	}
 
-	return &site, nil
+	// Try trimmed match (handles copy-paste whitespace issues)
+	trimmed := strings.TrimSpace(apiKey)
+	if trimmed != apiKey {
+		err = sc.collection.FindOne(ctx, bson.M{"api_key": trimmed}).Decode(&site)
+		if err == nil {
+			return &site, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // GetSiteByDomain gets site by domain

@@ -27,11 +27,11 @@ type SiteController struct {
 
 // authenticateSite authenticates a site using API key
 func (c *SiteController) authenticateSite() (*models.Site, error) {
-	apiKey := c.Ctx.Request.Header.Get("X-API-Key")
+	apiKey := strings.TrimSpace(c.Ctx.Request.Header.Get("X-API-Key"))
 	if apiKey == "" {
-		apiKey = c.Ctx.Request.Header.Get("Authorization")
-		if apiKey != "" {
-			apiKey = strings.TrimPrefix(apiKey, "Bearer ")
+		auth := c.Ctx.Request.Header.Get("Authorization")
+		if auth != "" {
+			apiKey = strings.TrimSpace(strings.TrimPrefix(auth, "Bearer "))
 		}
 	}
 
