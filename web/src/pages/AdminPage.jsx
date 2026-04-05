@@ -1,77 +1,58 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Container,
-  Stack,
-  Card,
-  CardContent,
-  Divider,
-  Tabs,
-  Tab,
-  TextField,
-  Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControlLabel,
-  Checkbox,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Select,
-  MenuItem
+  Box, Stack, Typography, Button, TextField, Alert, Collapse,
+  Tabs, Tab, Select, MenuItem, Chip, Dialog, DialogTitle,
+  DialogContent, DialogActions, FormControlLabel, Checkbox,
+  Avatar, Drawer, IconButton, useMediaQuery, useTheme
 } from '@mui/material'
-
-import DeleteIcon from '@mui/icons-material/Delete'
-
 import { clearTokens } from '../api/client'
+import ThemeToggle from '../components/ThemeToggle.jsx'
 import {
-  getProfile,
-  adminGetUsers,
-  adminSetUserRole,
-  adminBanUser,
-  adminUnbanUser,
-  adminGetServices,
-  adminCreateService,
-  adminGetSites
+  getProfile, adminGetUsers, adminSetUserRole, adminBanUser,
+  adminUnbanUser, adminGetServices, adminCreateService, adminGetSites
 } from '../api/endpoints'
 
-function TabPanel({ value, index, children }) {
-  if (value !== index) return null
-  return children
+function MenuIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  )
+}
+
+const ROLE_COLORS = {
+  admin: '#111111',
+  moderator: '#555555',
+  developer: '#2563eb',
+  user: '#999999'
 }
 
 export default function AdminPage() {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [tab, setTab] = useState(0)
-  const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
+  const [msg, setMsg] = useState({ type: '', text: '' })
 
   const allowed = useMemo(() => {
     const role = (profile?.role || 'user').toLowerCase()
     return role === 'admin' || role === 'moderator'
   }, [profile])
 
-  const logout = () => {
-    clearTokens()
-    navigate('/login')
+  const notify = (type, text) => {
+    setMsg({ type, text })
+    setTimeout(() => setMsg({ type: '', text: '' }), 4000)
   }
 
-  // Users state
+  const logout = () => { clearTokens(); navigate('/login') }
+
+  // Users
   const [users, setUsers] = useState([])
   const [usersSearch, setUsersSearch] = useState('')
   const [usersLoading, setUsersLoading] = useState(false)
   const [usersBannedOnly, setUsersBannedOnly] = useState(false)
   const [usersPage, setUsersPage] = useState(1)
-  const [usersLimit, setUsersLimit] = useState(20)
+  const [usersLimit] = useState(20)
   const [usersPages, setUsersPages] = useState(1)
 
   const [banDialogOpen, setBanDialogOpen] = useState(false)
@@ -79,14 +60,12 @@ export default function AdminPage() {
   const [banReason, setBanReason] = useState('')
   const [banDuration, setBanDuration] = useState('permanent')
 
-  // Services state
+  // Services
   const [services, setServices] = useState([])
-  const [servicesLoading, setServicesLoading] = useState(false)
   const [newService, setNewService] = useState({ name: '', display_name: '', description: '' })
 
-  // Sites state
+  // Sites
   const [sites, setSites] = useState([])
-  const [sitesLoading, setSitesLoading] = useState(false)
 
   const loadProfile = async () => {
     const p = await getProfile()
@@ -97,38 +76,22 @@ export default function AdminPage() {
   const loadUsers = async () => {
     setUsersLoading(true)
     try {
-      const res = await adminGetUsers({
-        page: usersPage,
-        limit: usersLimit,
-        search: usersSearch || undefined,
-        banned: usersBannedOnly ? 'true' : undefined
-      })
+      const res = await adminGetUsers({ page: usersPage, limit: usersLimit, search: usersSearch || undefined, banned: usersBannedOnly ? 'true' : undefined })
       setUsers(res.users || [])
-      const pages = res?.pagination?.pages || 1
-      setUsersPages(pages)
+      setUsersPages(res?.pagination?.pages || 1)
     } finally {
       setUsersLoading(false)
     }
   }
 
   const loadServices = async () => {
-    setServicesLoading(true)
-    try {
-      const res = await adminGetServices()
-      setServices(res.services || [])
-    } finally {
-      setServicesLoading(false)
-    }
+    const res = await adminGetServices()
+    setServices(res.services || [])
   }
 
   const loadSites = async () => {
-    setSitesLoading(true)
-    try {
-      const res = await adminGetSites()
-      setSites(res.sites || [])
-    } finally {
-      setSitesLoading(false)
-    }
+    const res = await adminGetSites()
+    setSites(res.sites || [])
   }
 
   useEffect(() => {
@@ -137,344 +100,335 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!allowed) return
-    if (tab === 0) {
-      loadUsers().catch((e) => setError(e?.response?.data?.error || e?.message || 'Failed to load users'))
-    } else if (tab === 1) {
-      loadServices().catch((e) => setError(e?.response?.data?.error || e?.message || 'Failed to load services'))
-    } else {
-      loadSites().catch((e) => setError(e?.response?.data?.error || e?.message || 'Failed to load sites'))
-    }
+    if (tab === 0) loadUsers().catch((e) => notify('error', e?.message || 'Failed'))
+    else if (tab === 1) loadServices().catch((e) => notify('error', e?.message || 'Failed'))
+    else loadSites().catch((e) => notify('error', e?.message || 'Failed'))
   }, [allowed, tab])
 
   useEffect(() => {
-    if (!allowed) return
-    if (tab !== 0) return
-    loadUsers().catch((e) => setError(e?.response?.data?.error || e?.message || 'Failed to load users'))
-  }, [allowed, tab, usersPage, usersLimit, usersBannedOnly])
+    if (!allowed || tab !== 0) return
+    loadUsers().catch((e) => notify('error', e?.message || 'Failed'))
+  }, [usersPage, usersBannedOnly])
 
   const onChangeRole = async (user_id, role) => {
-    setError('')
-    setInfo('')
-    try {
-      await adminSetUserRole(user_id, role)
-      setInfo('Role updated')
-      await loadUsers()
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to update role')
-    }
-  }
-
-  const openBanDialog = (user_id) => {
-    setBanUserId(user_id)
-    setBanReason('')
-    setBanDuration('permanent')
-    setBanDialogOpen(true)
+    try { await adminSetUserRole(user_id, role); notify('success', 'Role updated'); await loadUsers() }
+    catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
   }
 
   const confirmBan = async () => {
-    setError('')
-    setInfo('')
-    if (!banUserId) return
-    if (!banReason.trim()) {
-      setError('Ban reason is required')
-      return
-    }
+    if (!banReason.trim()) { notify('error', 'Reason is required'); return }
     try {
       await adminBanUser(banUserId, banReason.trim(), banDuration)
-      setInfo('User banned')
+      notify('success', 'User banned')
       setBanDialogOpen(false)
       await loadUsers()
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to ban user')
-    }
+    } catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
   }
 
   const onUnban = async (user_id) => {
-    setError('')
-    setInfo('')
-    try {
-      await adminUnbanUser(user_id)
-      setInfo('User unbanned')
-      await loadUsers()
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to unban user')
-    }
+    try { await adminUnbanUser(user_id); notify('success', 'User unbanned'); await loadUsers() }
+    catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
   }
 
   const onCreateService = async () => {
-    setError('')
-    setInfo('')
     try {
-      await adminCreateService({
-        name: newService.name,
-        display_name: newService.display_name,
-        description: newService.description
-      })
-      setInfo('Service created')
+      await adminCreateService(newService)
+      notify('success', 'Service created')
       setNewService({ name: '', display_name: '', description: '' })
       await loadServices()
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to create service')
-    }
+    } catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
   }
 
   const onDeleteSite = async (siteId) => {
-    if (!window.confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
-      return
-    }
-    setError('')
-    setInfo('')
+    if (!window.confirm('Delete this site?')) return
     try {
-      const token = localStorage.getItem('access_token')
-      const response = await fetch('/api/site/delete', {
+      const token = localStorage.getItem('accessToken')
+      const res = await fetch('/api/site/delete', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ site_id: siteId })
       })
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Failed to delete site')
-      }
-      setInfo('Site deleted successfully')
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+      notify('success', 'Site deleted')
       await loadSites()
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Failed to delete site')
-    }
+    } catch (e) { notify('error', e?.message || 'Failed') }
   }
 
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const SidebarContent = () => (
+    <Box sx={{ width: 220, display: 'flex', flexDirection: 'column', p: 2, height: '100%', bgcolor: 'background.paper' }}>
+      <Box sx={{ px: 1, py: 1.5, mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.3px' }}>Neo ID</Typography>
+        <Typography variant="caption" color="text.secondary">Admin Panel</Typography>
+      </Box>
+      <Stack spacing={0.5} sx={{ flex: 1 }}>
+        <Button onClick={() => { navigate('/dashboard'); setDrawerOpen(false) }} sx={{ justifyContent: 'flex-start', px: 1.5, py: 0.75, borderRadius: 1.5, fontSize: '0.875rem', color: 'text.secondary', '&:hover': { bgcolor: 'action.hover', color: 'text.primary' } }}>
+          Dashboard
+        </Button>
+      </Stack>
+      <Box sx={{ pb: 1 }}><ThemeToggle /></Box>
+      <Button onClick={logout} sx={{ justifyContent: 'flex-start', px: 1.5, py: 0.75, borderRadius: 1.5, fontSize: '0.875rem', color: 'error.main', '&:hover': { bgcolor: 'error.main', color: '#fff', opacity: 0.9 } }}>
+        Sign out
+      </Button>
+    </Box>
+  )
+
   return (
-    <>
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar>
-          <Typography sx={{ flexGrow: 1, fontWeight: 700 }} variant="h6">Neo ID Admin</Typography>
-          <Button onClick={() => navigate('/dashboard')}>Dashboard</Button>
-          <Button color="error" onClick={logout}>Logout</Button>
-        </Toolbar>
-      </AppBar>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      {/* Mobile top bar */}
+      {isMobile && (
+        <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', px: 2, py: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>Neo ID · Admin</Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ThemeToggle />
+            <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ color: 'text.primary' }}>
+              <MenuIcon />
+            </IconButton>
+          </Stack>
+        </Box>
+      )}
 
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Stack spacing={2}>
-          {error && <Alert severity="error">{error}</Alert>}
-          {info && <Alert severity="success">{info}</Alert>}
+      {/* Desktop sidebar */}
+      {!isMobile && (
+        <Box sx={{ width: 220, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider', position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
+          <SidebarContent />
+        </Box>
+      )}
 
-          {!allowed && (
-            <Alert severity="warning">
-              Admin/Moderator access required
-            </Alert>
-          )}
+      {/* Mobile drawer */}
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)} PaperProps={{ sx: { bgcolor: 'background.paper', width: 240 } }}>
+        <SidebarContent />
+      </Drawer>
 
-          {allowed && (
-            <Card>
-              <CardContent>
-                <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-                  <Tab label="Users" />
-                  <Tab label="Services" />
-                  <Tab label="Sites" />
+      {/* Content */}
+      <Box sx={{ flex: 1, p: { xs: 2, md: 4 }, pt: { xs: 9, md: 4 } }}>
+        <Collapse in={!!msg.text}>
+          <Alert severity={msg.type || 'info'} sx={{ mb: 3, py: 0.5 }}>{msg.text}</Alert>
+        </Collapse>
+
+        {!allowed ? (
+          <Alert severity="warning">Admin or Moderator access required</Alert>
+        ) : (
+          <Box>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Admin Panel</Typography>
+            </Box>
+
+            <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, overflow: 'hidden' }}>
+              <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 3 }}>
+                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ minHeight: 48 }}>
+                  <Tab label="Users" sx={{ minHeight: 48, fontSize: '0.875rem' }} />
+                  <Tab label="Services" sx={{ minHeight: 48, fontSize: '0.875rem' }} />
+                  <Tab label="Sites" sx={{ minHeight: 48, fontSize: '0.875rem' }} />
                 </Tabs>
-                <Divider sx={{ my: 2 }} />
+              </Box>
 
-                <TabPanel value={tab} index={0}>
+              <Box sx={{ p: { xs: 2, md: 3 } }}>
+                {/* Users tab */}
+                {tab === 0 && (
                   <Stack spacing={2}>
-                    <Stack direction="row" spacing={2} alignItems="center">
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
                       <TextField
-                        label="Search"
+                        placeholder="Search by email or name..."
+                        size="small"
                         value={usersSearch}
                         onChange={(e) => setUsersSearch(e.target.value)}
-                        fullWidth
+                        onKeyDown={(e) => e.key === 'Enter' && loadUsers()}
+                        sx={{ flex: 1 }}
                       />
-                      <FormControlLabel
-                        control={<Checkbox checked={usersBannedOnly} onChange={(e) => { setUsersPage(1); setUsersBannedOnly(e.target.checked) }} />}
-                        label="Banned only"
-                      />
-                      <Select
-                        size="small"
-                        value={usersLimit}
-                        onChange={(e) => { setUsersPage(1); setUsersLimit(Number(e.target.value)) }}
-                      >
-                        <MenuItem value={10}>10</MenuItem>
-                        <MenuItem value={20}>20</MenuItem>
-                        <MenuItem value={50}>50</MenuItem>
-                      </Select>
-                      <Button variant="contained" disabled={usersLoading} onClick={() => { setUsersPage(1); loadUsers() }}>
-                        Refresh
-                      </Button>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <FormControlLabel
+                          control={<Checkbox size="small" checked={usersBannedOnly} onChange={(e) => { setUsersPage(1); setUsersBannedOnly(e.target.checked) }} />}
+                          label={<Typography variant="body2">Banned</Typography>}
+                          sx={{ m: 0 }}
+                        />
+                        <Button variant="outlined" size="small" disabled={usersLoading} onClick={() => { setUsersPage(1); loadUsers() }}>
+                          Search
+                        </Button>
+                      </Stack>
                     </Stack>
 
-                    <Stack direction="row" spacing={2} alignItems="center" justifyContent="flex-end">
-                      <Typography color="text.secondary">Page {usersPage} / {usersPages}</Typography>
-                      <Button disabled={usersLoading || usersPage <= 1} onClick={() => setUsersPage((p) => Math.max(1, p - 1))}>Prev</Button>
-                      <Button disabled={usersLoading || usersPage >= usersPages} onClick={() => setUsersPage((p) => p + 1)}>Next</Button>
+                    {/* Compact user rows */}
+                    <Stack spacing={0}>
+                      {users.map((u, i) => (
+                        <Box
+                          key={u.unified_id}
+                          sx={{
+                            display: 'flex', alignItems: 'center', gap: 1.5,
+                            py: 1.25, px: 1,
+                            borderBottom: i < users.length - 1 ? '1px solid' : 'none',
+                            borderColor: 'divider',
+                            borderRadius: i === 0 ? '8px 8px 0 0' : i === users.length - 1 ? '0 0 8px 8px' : 0,
+                            '&:hover': { bgcolor: 'action.hover' },
+                            transition: 'background 0.1s'
+                          }}
+                        >
+                          {/* Avatar */}
+                          <Avatar
+                            src={u.avatar || ''}
+                            imgProps={{ referrerPolicy: 'no-referrer', crossOrigin: 'anonymous' }}
+                            sx={{ width: 32, height: 32, bgcolor: 'action.selected', fontSize: '0.75rem', color: 'text.primary', flexShrink: 0 }}
+                          >
+                            {(u.display_name || u.email || '?')[0].toUpperCase()}
+                          </Avatar>
+
+                          {/* Name + email */}
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.2 }} noWrap>
+                              {u.display_name || '—'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                              {u.email}
+                            </Typography>
+                          </Box>
+
+                          {/* Status chip */}
+                          <Box sx={{ flexShrink: 0, display: { xs: 'none', sm: 'block' } }}>
+                            {u.is_banned
+                              ? <Chip label="Banned" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'error.main', color: '#fff', borderRadius: 1 }} />
+                              : <Chip label="Active" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'success.main', color: '#fff', borderRadius: 1 }} />
+                            }
+                          </Box>
+
+                          {/* Role select */}
+                          <Select
+                            size="small"
+                            value={u.role || 'User'}
+                            onChange={(e) => onChangeRole(u.unified_id, e.target.value)}
+                            sx={{ fontSize: '0.75rem', height: 28, minWidth: 100, flexShrink: 0 }}
+                          >
+                            <MenuItem value="User">User</MenuItem>
+                            <MenuItem value="Developer">Developer</MenuItem>
+                            <MenuItem value="Moderator">Moderator</MenuItem>
+                            <MenuItem value="Admin">Admin</MenuItem>
+                          </Select>
+
+                          {/* Ban/Unban */}
+                          {!u.is_banned ? (
+                            <Button
+                              size="small" color="error"
+                              onClick={() => { setBanUserId(u.unified_id); setBanReason(''); setBanDuration('permanent'); setBanDialogOpen(true) }}
+                              sx={{ fontSize: '0.72rem', height: 28, flexShrink: 0, minWidth: 'auto', px: 1 }}
+                            >
+                              Ban
+                            </Button>
+                          ) : (
+                            <Button
+                              size="small"
+                              onClick={() => onUnban(u.unified_id)}
+                              sx={{ fontSize: '0.72rem', height: 28, flexShrink: 0, minWidth: 'auto', px: 1 }}
+                            >
+                              Unban
+                            </Button>
+                          )}
+                        </Box>
+                      ))}
+                      {users.length === 0 && (
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+                          No users found
+                        </Typography>
+                      )}
                     </Stack>
 
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Unified ID</TableCell>
-                          <TableCell>Email</TableCell>
-                          <TableCell>Name</TableCell>
-                          <TableCell>Role</TableCell>
-                          <TableCell>Banned</TableCell>
-                          <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {users.map((u) => (
-                          <TableRow key={u.unified_id}>
-                            <TableCell>{u.unified_id}</TableCell>
-                            <TableCell>{u.email}</TableCell>
-                            <TableCell>{u.display_name}</TableCell>
-                            <TableCell>
-                              <Select
-                                size="small"
-                                value={(u.role || 'User')}
-                                onChange={(e) => onChangeRole(u.unified_id, e.target.value)}
-                              >
-                                <MenuItem value="User">User</MenuItem>
-                                <MenuItem value="Developer">Developer</MenuItem>
-                                <MenuItem value="Moderator">Moderator</MenuItem>
-                                <MenuItem value="Admin">Admin</MenuItem>
-                              </Select>
-                            </TableCell>
-                            <TableCell>{u.is_banned ? 'yes' : 'no'}</TableCell>
-                            <TableCell align="right">
-                              {!u.is_banned ? (
-                                <Button color="error" onClick={() => openBanDialog(u.unified_id)}>Ban</Button>
-                              ) : (
-                                <Button onClick={() => onUnban(u.unified_id)}>Unban</Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {users.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={6}>No users</TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
+                      <Typography variant="caption" color="text.secondary">Page {usersPage} / {usersPages}</Typography>
+                      <Button size="small" variant="outlined" disabled={usersLoading || usersPage <= 1} onClick={() => setUsersPage((p) => Math.max(1, p - 1))}>Prev</Button>
+                      <Button size="small" variant="outlined" disabled={usersLoading || usersPage >= usersPages} onClick={() => setUsersPage((p) => p + 1)}>Next</Button>
+                    </Stack>
                   </Stack>
-                </TabPanel>
-
-                <TabPanel value={tab} index={2}>
+                )}
+                {/* Services tab */}
+                {tab === 1 && (
                   <Stack spacing={2}>
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <Button variant="contained" disabled={sitesLoading} onClick={() => loadSites()}>
-                        Refresh
-                      </Button>
+                    <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 2.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 2 }}>Create service</Typography>
+                      <Stack spacing={1.5}>
+                        <TextField label="Name" size="small" value={newService.name} onChange={(e) => setNewService({ ...newService, name: e.target.value })} />
+                        <TextField label="Display name" size="small" value={newService.display_name} onChange={(e) => setNewService({ ...newService, display_name: e.target.value })} />
+                        <TextField label="Description" size="small" value={newService.description} onChange={(e) => setNewService({ ...newService, description: e.target.value })} />
+                        <Button variant="contained" size="small" onClick={onCreateService} sx={{ alignSelf: 'flex-start', px: 2 }}>Create</Button>
+                      </Stack>
+                    </Box>
+
+                    <Stack spacing={0}>
+                      {services.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>No services</Typography>
+                      ) : services.map((s, i) => (
+                        <Box key={s.name} sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.25, px: 1, borderBottom: i < services.length - 1 ? '1px solid' : 'none', borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' } }}>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.82rem' }}>{s.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">{s.display_name}</Typography>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ flex: 1, display: { xs: 'none', md: 'block' } }}>{s.description}</Typography>
+                          <Chip
+                            label={s.is_active ? 'Active' : 'Inactive'}
+                            size="small"
+                            sx={{ height: 20, fontSize: '0.65rem', bgcolor: s.is_active ? 'success.main' : 'action.selected', color: s.is_active ? '#fff' : 'text.secondary', border: 'none', borderRadius: 1, flexShrink: 0 }}
+                          />
+                        </Box>
+                      ))}
                     </Stack>
-
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Site ID</TableCell>
-                          <TableCell>Name</TableCell>
-                          <TableCell>Domain</TableCell>
-                          <TableCell>Plan</TableCell>
-                          <TableCell>Active</TableCell>
-                          <TableCell>Owner</TableCell>
-                          <TableCell>API Key</TableCell>
-                          <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {sites.map((s) => (
-                          <TableRow key={s.site_id}>
-                            <TableCell>{s.site_id}</TableCell>
-                            <TableCell>{s.name}</TableCell>
-                            <TableCell>{s.domain}</TableCell>
-                            <TableCell>{s.plan}</TableCell>
-                            <TableCell>{s.is_active ? 'yes' : 'no'}</TableCell>
-                            <TableCell>{s.owner_email}</TableCell>
-                            <TableCell>{s.api_key}</TableCell>
-                            <TableCell align="right">
-                              <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => onDeleteSite(s.site_id)}>Delete</Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {sites.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={8}>No sites</TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
                   </Stack>
-                </TabPanel>
+                )}
 
-                <TabPanel value={tab} index={1}>
+                {/* Sites tab */}
+                {tab === 2 && (
                   <Stack spacing={2}>
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <Button variant="contained" disabled={servicesLoading} onClick={() => loadServices()}>
-                        Refresh
-                      </Button>
+                    <Stack direction="row" justifyContent="flex-end">
+                      <Button variant="outlined" size="small" onClick={loadSites}>Refresh</Button>
                     </Stack>
 
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Typography variant="subtitle1">Create service</Typography>
-                        <Stack spacing={2} sx={{ mt: 2 }}>
-                          <TextField label="Name" value={newService.name} onChange={(e) => setNewService({ ...newService, name: e.target.value })} />
-                          <TextField label="Display name" value={newService.display_name} onChange={(e) => setNewService({ ...newService, display_name: e.target.value })} />
-                          <TextField label="Description" value={newService.description} onChange={(e) => setNewService({ ...newService, description: e.target.value })} />
-                          <Button variant="contained" onClick={onCreateService}>Create</Button>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Name</TableCell>
-                          <TableCell>Display name</TableCell>
-                          <TableCell>Description</TableCell>
-                          <TableCell>Active</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {services.map((s) => (
-                          <TableRow key={s.name}>
-                            <TableCell>{s.name}</TableCell>
-                            <TableCell>{s.display_name}</TableCell>
-                            <TableCell>{s.description}</TableCell>
-                            <TableCell>{s.is_active ? 'yes' : 'no'}</TableCell>
-                          </TableRow>
-                        ))}
-                        {services.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={4}>No services</TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
+                    <Stack spacing={0}>
+                      {sites.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>No sites</Typography>
+                      ) : sites.map((s, i) => (
+                        <Box key={s.site_id} sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.25, px: 1, borderBottom: i < sites.length - 1 ? '1px solid' : 'none', borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' } }}>
+                          <Box sx={{ flex: 1.5, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>{s.name}</Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>{s.domain}</Typography>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} noWrap>{s.owner_email}</Typography>
+                          <Chip label={s.plan} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderRadius: 1, flexShrink: 0 }} />
+                          <Chip
+                            label={s.is_active ? 'Active' : 'Inactive'}
+                            size="small"
+                            sx={{ height: 20, fontSize: '0.65rem', bgcolor: s.is_active ? 'success.main' : 'action.selected', color: s.is_active ? '#fff' : 'text.secondary', border: 'none', borderRadius: 1, flexShrink: 0 }}
+                          />
+                          <Button size="small" color="error" onClick={() => onDeleteSite(s.site_id)} sx={{ fontSize: '0.72rem', height: 28, flexShrink: 0, minWidth: 'auto', px: 1 }}>
+                            Delete
+                          </Button>
+                        </Box>
+                      ))}
+                    </Stack>
                   </Stack>
-                </TabPanel>
-              </CardContent>
-            </Card>
-          )}
+                )}
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Box>
 
-          <Dialog open={banDialogOpen} onClose={() => setBanDialogOpen(false)} fullWidth maxWidth="sm">
-            <DialogTitle>Ban user</DialogTitle>
-            <DialogContent>
-              <Stack spacing={2} sx={{ mt: 1 }}>
-                <TextField label="User ID" value={banUserId} disabled />
-                <TextField label="Reason" value={banReason} onChange={(e) => setBanReason(e.target.value)} />
-                <Select value={banDuration} onChange={(e) => setBanDuration(e.target.value)}>
-                  <MenuItem value="permanent">Permanent</MenuItem>
-                  <MenuItem value="168h">7 days</MenuItem>
-                  <MenuItem value="720h">30 days</MenuItem>
-                </Select>
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setBanDialogOpen(false)}>Cancel</Button>
-              <Button color="error" variant="contained" onClick={confirmBan}>Ban</Button>
-            </DialogActions>
-          </Dialog>
-        </Stack>
-      </Container>
-    </>
+      {/* Ban dialog */}
+      <Dialog open={banDialogOpen} onClose={() => setBanDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600, fontSize: '1rem', pb: 1 }}>Ban user</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField label="Reason" size="small" value={banReason} onChange={(e) => setBanReason(e.target.value)} fullWidth />
+            <Select size="small" value={banDuration} onChange={(e) => setBanDuration(e.target.value)} fullWidth>
+              <MenuItem value="permanent">Permanent</MenuItem>
+              <MenuItem value="168h">7 days</MenuItem>
+              <MenuItem value="720h">30 days</MenuItem>
+            </Select>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button size="small" onClick={() => setBanDialogOpen(false)}>Cancel</Button>
+          <Button size="small" color="error" variant="contained" onClick={confirmBan}>Ban</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   )
 }

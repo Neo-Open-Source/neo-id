@@ -35,8 +35,11 @@ func main() {
 	// Serve static files from Vercel build output
 	if _, err := os.Stat("static"); err == nil {
 		web.SetStaticPath("/assets", "static/app/assets")
-		// Serve index.html for all non-API routes (already handled by routers.InitRoutes SPA fallback)
+		web.SetStaticPath("/avatars", "static/avatars")
 	}
+
+	// Serve favicon
+	web.Router("/favicon.ico", &controllers.MainController{}, "get:Favicon")
 
 	port := web.AppConfig.DefaultInt("httpport", 8080)
 	fmt.Printf("Unified ID Service starting on port %d\n", port)

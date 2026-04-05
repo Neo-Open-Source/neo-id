@@ -39,6 +39,12 @@ type User struct {
 	Location  string `bson:"location,omitempty" json:"location,omitempty"`
 	Bio       string `bson:"bio,omitempty" json:"bio,omitempty"`
 
+	// MFA / TOTP
+	TOTPSecret            string `bson:"totp_secret,omitempty" json:"-"`
+	TOTPEnabled           bool   `bson:"totp_enabled,omitempty" json:"totp_enabled,omitempty"`
+	EmailMFAEnabled       bool   `bson:"email_mfa_enabled,omitempty" json:"email_mfa_enabled,omitempty"`
+	RefreshDurationMonths int    `bson:"refresh_duration_months,omitempty" json:"refresh_duration_months,omitempty"`
+
 	// Status
 	IsBanned    bool       `bson:"is_banned" json:"is_banned"`
 	BannedUntil *time.Time `bson:"banned_until,omitempty" json:"banned_until,omitempty"`
@@ -80,6 +86,14 @@ type Session struct {
 	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
 	IPAddress string             `bson:"ip_address,omitempty" json:"ip_address,omitempty"`
 	UserAgent string             `bson:"user_agent,omitempty" json:"user_agent,omitempty"`
+	Country   string             `bson:"country,omitempty" json:"country,omitempty"`
+	City      string             `bson:"city,omitempty" json:"city,omitempty"`
+
+	// Refresh token
+	RefreshToken          string    `bson:"refresh_token,omitempty" json:"refresh_token,omitempty"`
+	RefreshExpiresAt      time.Time `bson:"refresh_expires_at,omitempty" json:"refresh_expires_at,omitempty"`
+	RefreshDurationMonths int       `bson:"refresh_duration_months,omitempty" json:"refresh_duration_months,omitempty"`
+	LastUsedAt            time.Time `bson:"last_used_at,omitempty" json:"last_used_at,omitempty"`
 }
 
 // UserCRUD operations

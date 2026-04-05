@@ -36,3 +36,17 @@ func (c *MainController) Get() {
 	c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
 	io.Copy(c.Ctx.ResponseWriter, file)
 }
+
+// Favicon serves the favicon.ico
+func (c *MainController) Favicon() {
+	paths := []string{"static/app/favicon.ico", "static/favicon.ico"}
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			c.Ctx.ResponseWriter.Header().Set("Content-Type", "image/x-icon")
+			c.Ctx.ResponseWriter.Header().Set("Cache-Control", "public, max-age=86400")
+			http.ServeFile(c.Ctx.ResponseWriter, c.Ctx.Request, p)
+			return
+		}
+	}
+	c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
+}

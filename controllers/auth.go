@@ -146,23 +146,61 @@ func generateEmailVerificationCode() (string, error) {
 	return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
+func buildMFACodeHTML(code string) string {
+	escapedCode := html.EscapeString(code)
+	return `<!doctype html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:480px;background:#ffffff;border:1px solid #e5e5e5;border-radius:12px;padding:40px 32px;" cellpadding="0" cellspacing="0">
+      <tr><td>
+        <div style="font-size:18px;font-weight:700;color:#111111;letter-spacing:-0.3px;margin-bottom:24px;">Neo ID</div>
+        <div style="font-size:22px;font-weight:700;color:#111111;letter-spacing:-0.5px;margin-bottom:8px;">Your login code</div>
+        <div style="font-size:14px;color:#666666;line-height:1.5;margin-bottom:32px;">Use this code to sign in. It expires in 10 minutes. If you didn't request this, you can safely ignore this email.</div>
+        <div style="background:#f5f5f5;border:1px solid #e5e5e5;border-radius:8px;padding:24px;text-align:center;margin-bottom:32px;">
+          <div style="font-size:11px;font-weight:600;color:#999999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">Login code</div>
+          <div style="font-size:40px;font-weight:700;color:#111111;letter-spacing:0.25em;">` + escapedCode + `</div>
+        </div>
+        <div style="font-size:12px;color:#999999;line-height:1.5;">This code is valid for 10 minutes and can only be used once.</div>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`
+}
+
 func buildEmailVerificationHTML(code string, verifyURL string) string {
 	escapedCode := html.EscapeString(code)
 	escapedURL := html.EscapeString(verifyURL)
-	return "<!doctype html><html><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" /></head><body style=\"margin:0;padding:0;background:#0f0f10;color:#ffffff;font-family:Inter,Arial,sans-serif;\">" +
-		"<div style=\"max-width:520px;margin:0 auto;padding:28px 18px;\">" +
-		"<div style=\"background:#151517;border:1px solid #2a2a2d;border-radius:16px;padding:22px;\">" +
-		"<div style=\"font-size:22px;font-weight:800;letter-spacing:-0.3px;\">Neo <span style=\"color:#ff0000;\">ID</span></div>" +
-		"<div style=\"margin-top:10px;color:rgba(255,255,255,0.80);font-size:14px;line-height:20px;\">Use this code to verify your email. You can copy it from your phone and paste it on your computer.</div>" +
-		"<div style=\"margin-top:16px;background:#0f0f10;border:1px solid #2a2a2d;border-radius:14px;padding:14px;text-align:center;\">" +
-		"<div style=\"color:rgba(255,255,255,0.70);font-size:12px;text-transform:uppercase;letter-spacing:0.12em;\">Verification code</div>" +
-		"<div style=\"margin-top:6px;font-size:32px;font-weight:900;letter-spacing:0.18em;\">" + escapedCode + "</div>" +
-		"</div>" +
-		"<div style=\"margin-top:16px;text-align:center;\">" +
-		"<a href=\"" + escapedURL + "\" style=\"display:inline-block;padding:12px 16px;background:#1976d2;color:#fff;border-radius:12px;text-decoration:none;font-weight:800;\">Verify by link</a>" +
-		"</div>" +
-		"<div style=\"margin-top:14px;color:rgba(255,255,255,0.60);font-size:12px;line-height:18px;\">If you didn't request this, you can ignore this email.</div>" +
-		"</div></div></body></html>"
+	return `<!doctype html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:480px;background:#ffffff;border:1px solid #e5e5e5;border-radius:12px;padding:40px 32px;" cellpadding="0" cellspacing="0">
+      <tr><td>
+        <div style="font-size:18px;font-weight:700;color:#111111;letter-spacing:-0.3px;margin-bottom:24px;">Neo ID</div>
+        <div style="font-size:22px;font-weight:700;color:#111111;letter-spacing:-0.5px;margin-bottom:8px;">Verify your email</div>
+        <div style="font-size:14px;color:#666666;line-height:1.5;margin-bottom:32px;">Enter this code to confirm your email address and activate your account.</div>
+        <div style="background:#f5f5f5;border:1px solid #e5e5e5;border-radius:8px;padding:24px;text-align:center;margin-bottom:24px;">
+          <div style="font-size:11px;font-weight:600;color:#999999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">Verification code</div>
+          <div style="font-size:40px;font-weight:700;color:#111111;letter-spacing:0.25em;">` + escapedCode + `</div>
+          <div style="font-size:12px;color:#999999;margin-top:10px;">Expires in 30 minutes</div>
+        </div>
+        <div style="text-align:center;margin-bottom:32px;">
+          <a href="` + escapedURL + `" style="display:inline-block;padding:12px 24px;background:#111111;color:#ffffff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Verify by link instead</a>
+        </div>
+        <div style="font-size:12px;color:#999999;line-height:1.5;">If you didn't create a Neo ID account, you can safely ignore this email.</div>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`
 }
 
 func (c *AuthController) VerifyEmail() {
@@ -285,7 +323,25 @@ func (c *AuthController) VerifyEmailCode() {
 		return
 	}
 
-	c.Data["json"] = map[string]interface{}{"verified": true}
+	// Auto-login: issue tokens immediately after email verification
+	accessToken, refreshToken, err := generateTokens(user.UnifiedID, user.Email)
+	if err != nil {
+		// Verification succeeded but token generation failed — still return verified
+		c.Data["json"] = map[string]interface{}{"verified": true}
+		c.ServeJSON()
+		return
+	}
+
+	sessionCRUD := models.NewSessionCRUD()
+	verifySess := makeSession(accessToken, user.UnifiedID, getRealIP(c.Ctx.Request), c.Ctx.Request.UserAgent(), user.RefreshDurationMonths, refreshToken, time.Now().AddDate(0, max(user.RefreshDurationMonths, 1), 0))
+	_ = sessionCRUD.CreateSession(verifySess)
+	createSessionWithGeo(verifySess)
+
+	c.Data["json"] = map[string]interface{}{
+		"verified":      true,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	}
 	c.ServeJSON()
 }
 
@@ -478,8 +534,11 @@ func (c *AuthController) PasswordRegister() {
 
 func (c *AuthController) PasswordLogin() {
 	var requestBody struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email       string `json:"email"`
+		Password    string `json:"password"`
+		SiteID      string `json:"site_id"`
+		RedirectURL string `json:"redirect_url"`
+		SiteState   string `json:"site_state"`
 	}
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
@@ -533,6 +592,157 @@ func (c *AuthController) PasswordLogin() {
 		return
 	}
 
+	// Password correct — check if TOTP is enabled
+	if user.TOTPEnabled {
+		c.Data["json"] = map[string]interface{}{
+			"totp_required": true,
+			"email":         user.Email,
+		}
+		c.ServeJSON()
+		return
+	}
+
+	// Check if email MFA is enabled
+	if user.EmailMFAEnabled {
+		mfaCode, err := generateEmailVerificationCode()
+		if err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+			c.Data["json"] = map[string]interface{}{"error": "Failed to generate login code"}
+			c.ServeJSON()
+			return
+		}
+		mfaCRUD := models.NewMFACodeCRUD()
+		_ = mfaCRUD.DeleteByEmail(user.Email)
+		exp := time.Now().Add(10 * time.Minute)
+		_ = mfaCRUD.Create(&models.MFACode{
+			UserID:      user.UnifiedID,
+			Email:       user.Email,
+			Code:        mfaCode,
+			ExpiresAt:   exp,
+			SiteID:      requestBody.SiteID,
+			RedirectURL: requestBody.RedirectURL,
+			SiteState:   requestBody.SiteState,
+		})
+		htmlBody := buildMFACodeHTML(mfaCode)
+		if err := sendResendEmail(user.Email, "Your login code", htmlBody); err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+			c.Data["json"] = map[string]interface{}{"error": err.Error()}
+			c.ServeJSON()
+			return
+		}
+		c.Data["json"] = map[string]interface{}{
+			"mfa_required": true,
+			"email":        user.Email,
+		}
+		c.ServeJSON()
+		return
+	}
+
+	// No MFA — issue tokens directly
+	months := user.RefreshDurationMonths
+	if months < 1 || months > 9 {
+		months = 1
+	}
+	accessToken, refreshToken, refreshExp, err := generateTokensWithDuration(user.UnifiedID, user.Email, months)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to generate tokens"}
+		c.ServeJSON()
+		return
+	}
+
+	sessionCRUD := models.NewSessionCRUD()
+	newSess := &models.Session{
+		Token:                 accessToken,
+		UserID:                user.UnifiedID,
+		ExpiresAt:             time.Now().Add(24 * time.Hour),
+		IPAddress:             getRealIP(c.Ctx.Request),
+		UserAgent:             c.Ctx.Request.UserAgent(),
+		RefreshToken:          refreshToken,
+		RefreshExpiresAt:      refreshExp,
+		RefreshDurationMonths: months,
+		LastUsedAt:            time.Now(),
+	}
+	_ = sessionCRUD.CreateSession(newSess)
+	createSessionWithGeo(newSess)
+
+	resp := map[string]interface{}{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	}
+	if requestBody.SiteID != "" {
+		resp["site_id"] = requestBody.SiteID
+		resp["redirect_url"] = requestBody.RedirectURL
+		resp["site_state"] = requestBody.SiteState
+	}
+	c.Data["json"] = resp
+	c.ServeJSON()
+}
+
+// MFAVerify verifies the login code sent to email and issues tokens
+func (c *AuthController) MFAVerify() {
+	var requestBody struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+
+	body, err := io.ReadAll(c.Ctx.Request.Body)
+	if err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to read request body"}
+		c.ServeJSON()
+		return
+	}
+	if err := json.Unmarshal(body, &requestBody); err != nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Invalid request body"}
+		c.ServeJSON()
+		return
+	}
+
+	email := strings.TrimSpace(strings.ToLower(requestBody.Email))
+	code := strings.TrimSpace(requestBody.Code)
+	if email == "" || code == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "email and code are required"}
+		c.ServeJSON()
+		return
+	}
+
+	mfaCRUD := models.NewMFACodeCRUD()
+	pending, err := mfaCRUD.GetByEmail(email)
+	if err != nil || pending == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "No pending login code. Please sign in again."}
+		c.ServeJSON()
+		return
+	}
+
+	if pending.Code != code {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "Invalid code"}
+		c.ServeJSON()
+		return
+	}
+
+	_ = mfaCRUD.MarkUsed(pending.ID)
+
+	userCRUD := models.NewUserCRUD()
+	user, err := userCRUD.GetUserByUnifiedID(pending.UserID)
+	if err != nil || user == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "User not found"}
+		c.ServeJSON()
+		return
+	}
+
+	if user.IsBanned {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
+		c.Data["json"] = map[string]interface{}{"error": "Account is banned"}
+		c.ServeJSON()
+		return
+	}
+
 	accessToken, refreshToken, err := generateTokens(user.UnifiedID, user.Email)
 	if err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
@@ -542,18 +752,22 @@ func (c *AuthController) PasswordLogin() {
 	}
 
 	sessionCRUD := models.NewSessionCRUD()
-	_ = sessionCRUD.CreateSession(&models.Session{
-		Token:     accessToken,
-		UserID:    user.UnifiedID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-		IPAddress: c.Ctx.Request.RemoteAddr,
-		UserAgent: c.Ctx.Request.UserAgent(),
-	})
+	mfaSess := makeSession(accessToken, user.UnifiedID, getRealIP(c.Ctx.Request), c.Ctx.Request.UserAgent(), user.RefreshDurationMonths, refreshToken, time.Now().AddDate(0, max(user.RefreshDurationMonths, 1), 0))
+	_ = sessionCRUD.CreateSession(mfaSess)
+	createSessionWithGeo(mfaSess)
 
-	c.Data["json"] = map[string]interface{}{
+	resp := map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 	}
+	// Pass back site context so the frontend can redirect properly
+	if pending.SiteID != "" {
+		resp["site_id"] = pending.SiteID
+		resp["redirect_url"] = pending.RedirectURL
+		resp["site_state"] = pending.SiteState
+	}
+
+	c.Data["json"] = resp
 	c.ServeJSON()
 }
 
@@ -895,7 +1109,7 @@ func (c *AuthController) Callback() {
 			Token:     accessToken,
 			UserID:    unifiedUser.UnifiedID,
 			ExpiresAt: time.Now().Add(24 * time.Hour),
-			IPAddress: c.Ctx.Request.RemoteAddr,
+			IPAddress: getRealIP(c.Ctx.Request),
 			UserAgent: c.Ctx.Request.UserAgent(),
 		}
 		_ = sessionCRUD.CreateSession(session)
@@ -1044,7 +1258,7 @@ func (c *AuthController) Callback() {
 		Token:     accessToken,
 		UserID:    unifiedUser.UnifiedID,
 		ExpiresAt: time.Now().Add(24 * time.Hour), // 24 hours
-		IPAddress: c.Ctx.Request.RemoteAddr,
+		IPAddress: getRealIP(c.Ctx.Request),
 		UserAgent: c.Ctx.Request.UserAgent(),
 	}
 
@@ -1148,59 +1362,103 @@ func (c *AuthController) Logout() {
 	c.ServeJSON()
 }
 
-// RefreshToken refreshes JWT token
+// RefreshToken refreshes JWT token with rolling refresh — extends refresh token on each use
 func (c *AuthController) RefreshToken() {
 	var requestBody struct {
 		RefreshToken string `json:"refresh_token"`
 	}
 
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &requestBody); err != nil {
-		c.Data["json"] = map[string]interface{}{
-			"error": "Invalid request body",
-		}
+	body, _ := io.ReadAll(c.Ctx.Request.Body)
+	if err := json.Unmarshal(body, &requestBody); err != nil || requestBody.RefreshToken == "" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+		c.Data["json"] = map[string]interface{}{"error": "refresh_token is required"}
 		c.ServeJSON()
 		return
 	}
 
-	// Validate refresh token
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(requestBody.RefreshToken, claims, func(token *jwt.Token) (interface{}, error) {
-		secret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))
-		return []byte(secret), nil
-	})
-
-	if err != nil || !token.Valid {
-		c.Data["json"] = map[string]interface{}{
-			"error": "Invalid refresh token",
+	// Look up session by refresh token
+	sessionCRUD := models.NewSessionCRUD()
+	sess, err := sessionCRUD.GetSessionByRefreshToken(requestBody.RefreshToken)
+	if err != nil || sess == nil {
+		// Fallback: try JWT validation for legacy tokens
+		claims := &Claims{}
+		tok, err2 := jwt.ParseWithClaims(requestBody.RefreshToken, claims, func(t *jwt.Token) (interface{}, error) {
+			return []byte(firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))), nil
+		})
+		if err2 != nil || !tok.Valid {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+			c.Data["json"] = map[string]interface{}{"error": "Invalid or expired refresh token"}
+			c.ServeJSON()
+			return
 		}
+		// Legacy path — issue new tokens with default 1 month refresh
+		userCRUD := models.NewUserCRUD()
+		user, _ := userCRUD.GetUserByUnifiedID(claims.UnifiedID)
+		if user == nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+			c.Data["json"] = map[string]interface{}{"error": "User not found"}
+			c.ServeJSON()
+			return
+		}
+		accessToken, newRefresh, refreshExp, _ := generateTokensWithDuration(user.UnifiedID, user.Email, 1)
+		newSess := &models.Session{
+			Token:                 accessToken,
+			UserID:                user.UnifiedID,
+			ExpiresAt:             time.Now().Add(24 * time.Hour),
+			IPAddress:             getRealIP(c.Ctx.Request),
+			UserAgent:             c.Ctx.Request.UserAgent(),
+			RefreshToken:          newRefresh,
+			RefreshExpiresAt:      refreshExp,
+			RefreshDurationMonths: 1,
+			LastUsedAt:            time.Now(),
+		}
+		_ = sessionCRUD.CreateSession(newSess)
+		c.Data["json"] = map[string]interface{}{"access_token": accessToken, "refresh_token": newRefresh}
 		c.ServeJSON()
 		return
 	}
 
-	// Get user
 	userCRUD := models.NewUserCRUD()
-	user, err := userCRUD.GetUserByUnifiedID(claims.UnifiedID)
-	if err != nil || user == nil {
-		c.Data["json"] = map[string]interface{}{
-			"error": "User not found",
-		}
+	user, err := userCRUD.GetUserByUnifiedID(sess.UserID)
+	if err != nil || user == nil || user.IsBanned {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+		c.Data["json"] = map[string]interface{}{"error": "User not found or banned"}
 		c.ServeJSON()
 		return
 	}
 
-	// Generate new tokens
-	accessToken, refreshToken, err := generateTokens(user.UnifiedID, user.Email)
+	months := sess.RefreshDurationMonths
+	if months < 1 {
+		months = 1
+	}
+
+	// Rolling refresh: generate new access + refresh tokens, keep same duration
+	newAccess, newRefresh, newRefreshExp, err := generateTokensWithDuration(user.UnifiedID, user.Email, months)
 	if err != nil {
-		c.Data["json"] = map[string]interface{}{
-			"error": "Failed to generate tokens: " + err.Error(),
-		}
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+		c.Data["json"] = map[string]interface{}{"error": "Failed to generate tokens"}
 		c.ServeJSON()
 		return
 	}
+
+	// Delete old session, create new one
+	_ = sessionCRUD.DeleteSession(sess.Token)
+	newSess := &models.Session{
+		Token:                 newAccess,
+		UserID:                user.UnifiedID,
+		ExpiresAt:             time.Now().Add(24 * time.Hour),
+		IPAddress:             getRealIP(c.Ctx.Request),
+		UserAgent:             c.Ctx.Request.UserAgent(),
+		RefreshToken:          newRefresh,
+		RefreshExpiresAt:      newRefreshExp,
+		RefreshDurationMonths: months,
+		LastUsedAt:            time.Now(),
+	}
+	_ = sessionCRUD.CreateSession(newSess)
 
 	c.Data["json"] = map[string]interface{}{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
+		"access_token":  newAccess,
+		"refresh_token": newRefresh,
 	}
 	c.ServeJSON()
 }
@@ -1225,13 +1483,18 @@ func generateUnifiedID() string {
 	return "uid_" + uuid.New().String()
 }
 
-func generateTokens(unifiedID, email string) (string, string, error) {
-	jwtSecret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))
-	if jwtSecret == "" {
-		jwtSecret = "default-secret-key" // Change in production
+// generateTokensWithDuration generates access + refresh tokens with given refresh duration in months
+func generateTokensWithDuration(unifiedID, email string, refreshMonths int) (accessToken, refreshToken string, refreshExp time.Time, err error) {
+	jwtSecret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", "default-secret-key"))
+
+	if refreshMonths < 1 {
+		refreshMonths = 1
+	}
+	if refreshMonths > 9 {
+		refreshMonths = 9
 	}
 
-	// Access token (24 hours)
+	// Access token — 24 hours
 	accessClaims := &Claims{
 		UnifiedID: unifiedID,
 		Email:     email,
@@ -1240,28 +1503,29 @@ func generateTokens(unifiedID, email string) (string, string, error) {
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessTokenString, err := accessToken.SignedString([]byte(jwtSecret))
+	aTok := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	accessToken, err = aTok.SignedString([]byte(jwtSecret))
 	if err != nil {
-		return "", "", err
+		return
 	}
 
-	// Refresh token (30 days)
+	// Refresh token — N months (absolute expiry, not rolling in JWT itself)
+	refreshExp = time.Now().AddDate(0, refreshMonths, 0)
 	refreshClaims := &Claims{
 		UnifiedID: unifiedID,
 		Email:     email,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(refreshExp),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
+	rTok := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshToken, err = rTok.SignedString([]byte(jwtSecret))
+	return
+}
 
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshTokenString, err := refreshToken.SignedString([]byte(jwtSecret))
-	if err != nil {
-		return "", "", err
-	}
-
-	return accessTokenString, refreshTokenString, nil
+// generateTokens is the legacy wrapper — defaults to 1 month refresh
+func generateTokens(unifiedID, email string) (string, string, error) {
+	a, r, _, err := generateTokensWithDuration(unifiedID, email, 1)
+	return a, r, err
 }

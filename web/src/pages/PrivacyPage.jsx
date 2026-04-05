@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
             <Stack spacing={2}>
               <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: -0.5 }}>Privacy Policy</Typography>
-              <Typography color="text.secondary">Last updated: {new Date().toISOString().slice(0, 10)}</Typography>
+              <Typography color="text.secondary">Last updated: April 5, 2026</Typography>
               <Divider />
 
               <Stack spacing={1}>

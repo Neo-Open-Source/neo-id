@@ -137,6 +137,7 @@ func (c *SiteController) RegisterSite() {
 		OwnerEmail  string   `json:"owner_email"`
 		Plan        string   `json:"plan"`
 		Allowed     []string `json:"allowed_origins"`
+		WebhookURL  string   `json:"webhook_url"`
 	}
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
@@ -237,6 +238,7 @@ func (c *SiteController) RegisterSite() {
 		LogoURL:        requestData.LogoURL,
 		AllowedOrigins: allowedOrigins,
 		RedirectURI:    buildRedirectURI(normalizedDomain),
+		WebhookURL:     strings.TrimSpace(requestData.WebhookURL),
 		IsActive:       true,
 		OwnerEmail:     requestData.OwnerEmail,
 		Plan:           plan,
@@ -437,6 +439,7 @@ func (c *SiteController) SiteLogin() {
 	var requestData struct {
 		RedirectURL string `json:"redirect_url"`
 		State       string `json:"state"`
+		Mode        string `json:"mode"` // "popup" | "redirect"
 	}
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
@@ -472,6 +475,9 @@ func (c *SiteController) SiteLogin() {
 		"site_id=" + site.SiteID + "&" +
 		"redirect_url=" + requestData.RedirectURL + "&" +
 		"site_state=" + requestData.State
+	if requestData.Mode == "popup" {
+		loginURL += "&mode=popup"
+	}
 
 	c.Data["json"] = map[string]interface{}{
 		"login_url": loginURL,
@@ -538,6 +544,10 @@ func (c *SiteController) SiteCallback() {
 		return
 	}
 
+	// Also add to user's connected_services list (shows in Neo ID dashboard)
+	userCRUD := models.NewUserCRUD()
+	_ = userCRUD.AddConnectedService(user.UnifiedID, site.Name)
+
 	// Redirect back to site with the Neo ID access token (contains unified_id)
 	accessToken := strings.TrimSpace(c.GetString("token"))
 	refreshToken := strings.TrimSpace(c.GetString("refresh_token"))
@@ -559,6 +569,27 @@ func (c *SiteController) SiteCallback() {
 		c.ServeJSON()
 		return
 	}
+
+	// Popup mode: send postMessage to opener and close window
+	mode := c.GetString("mode")
+	if mode == "popup" {
+		origin := strings.TrimRight(redirectURL, "/")
+		// Extract origin from redirect URL
+		if u, err := url.Parse(redirectURL); err == nil {
+			origin = u.Scheme + "://" + u.Host
+		}
+		html := `<!doctype html><html><head><meta charset="utf-8"></head><body><script>
+(function(){
+  var data={type:"neo_id_auth",access_token:"` + accessToken + `",refresh_token:"` + refreshToken + `",state:"` + state + `"};
+  if(window.opener){window.opener.postMessage(data,"` + origin + `");window.close();}
+  else{window.location.replace("` + redirectURLWithToken + `");}
+})();
+</script></body></html>`
+		c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
+		c.Ctx.ResponseWriter.Write([]byte(html))
+		return
+	}
+
 	c.Redirect(redirectURLWithToken, http.StatusTemporaryRedirect)
 }
 
@@ -747,4 +778,43 @@ func (c *SiteController) verifySiteToken(tokenString string) (string, string, er
 	}
 
 	return claims.UserID, claims.SiteID, nil
+}
+
+// UserDeleted handles notification from a site that a user deleted their account there.
+// Removes the site from the user's connected_services in Neo ID.
+// POST /api/site/user-deleted
+func (c *SiteController) UserDeleted() {
+	site, err := c.authenticateSite()
+	if err != nil || site == nil {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+		c.Data["json"] = map[string]interface{}{"error": "Unauthorized"}
+		c.ServeJSON()
+		return
+	}
+
+	var body struct {
+		UnifiedID string `json:"unified_id"`
+		Email     string `json:"email"`
+	}
+	raw, _ := io.ReadAll(c.Ctx.Request.Body)
+	_ = json.Unmarshal(raw, &body)
+
+	userCRUD := models.NewUserCRUD()
+	var user *models.User
+
+	if body.UnifiedID != "" {
+		user, _ = userCRUD.GetUserByUnifiedID(body.UnifiedID)
+	}
+	if user == nil && body.Email != "" {
+		user, _ = userCRUD.GetUserByEmail(body.Email)
+	}
+
+	if user != nil {
+		_ = userCRUD.RemoveConnectedService(user.UnifiedID, site.Name)
+		connCRUD := models.NewUserSiteConnectionCRUD()
+		_ = connCRUD.DisconnectUserFromSite(user.UnifiedID, site.SiteID)
+	}
+
+	c.Data["json"] = map[string]interface{}{"ok": true}
+	c.ServeJSON()
 }

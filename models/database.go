@@ -28,6 +28,8 @@ const (
 	ServiceAppsCollection = "service_apps"
 	SessionsCollection    = "sessions"
 	SitesCollection       = "sites"
+	AuthCodesCollection   = "auth_codes"
+	MFACodesCollection    = "mfa_codes"
 )
 
 // InitDatabase initializes MongoDB connection
@@ -120,6 +122,26 @@ func createIndexes() error {
 
 	if _, err := serviceAppsCol.Indexes().CreateMany(ctx, serviceAppsIndexes); err != nil {
 		return fmt.Errorf("failed to create service apps indexes: %w", err)
+	}
+
+	// MFA codes collection indexes
+	mfaCodesCol := GetCollection(MFACodesCollection)
+	mfaIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "email", Value: 1}}},
+		{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+	}
+	if _, err := mfaCodesCol.Indexes().CreateMany(ctx, mfaIndexes); err != nil {
+		return fmt.Errorf("failed to create mfa_codes indexes: %w", err)
+	}
+
+	// Auth codes collection indexes (OIDC)
+	authCodesCol := GetCollection(AuthCodesCollection)
+	authCodesIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "code", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+	}
+	if _, err := authCodesCol.Indexes().CreateMany(ctx, authCodesIndexes); err != nil {
+		return fmt.Errorf("failed to create auth_codes indexes: %w", err)
 	}
 
 	return nil

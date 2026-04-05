@@ -22,8 +22,9 @@ type Site struct {
 	LogoURL     string             `bson:"logo_url" json:"logo_url"`
 
 	// Configuration
-	AllowedOrigins []string `bson:"allowed_origins" json:"allowed_origins"` // CORS allowed origins
-	RedirectURI    string   `bson:"redirect_uri" json:"redirect_uri"`       // OAuth redirect URI
+	AllowedOrigins []string `bson:"allowed_origins" json:"allowed_origins"`             // CORS allowed origins
+	RedirectURI    string   `bson:"redirect_uri" json:"redirect_uri"`                   // OAuth redirect URI
+	WebhookURL     string   `bson:"webhook_url,omitempty" json:"webhook_url,omitempty"` // Called on disconnect
 
 	// Status
 	IsActive  bool      `bson:"is_active" json:"is_active"`
@@ -288,4 +289,19 @@ func (usc *UserSiteConnectionCRUD) UpdateLastAccess(userID, siteID string) error
 	)
 
 	return err
+}
+
+// GetAllActiveSites returns all active registered sites
+func (sc *SiteCRUD) GetAllActiveSites() ([]Site, error) {
+	ctx := context.Background()
+	cursor, err := sc.collection.Find(ctx, bson.M{"is_active": true})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var sites []Site
+	if err := cursor.All(ctx, &sites); err != nil {
+		return nil, err
+	}
+	return sites, nil
 }
