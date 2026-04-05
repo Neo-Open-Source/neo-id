@@ -431,8 +431,8 @@ func (c *SiteController) SiteLogin() {
 	if origin != "" {
 		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
 		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "false")
+		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
+		c.Ctx.ResponseWriter.Header().Set("Vary", "Origin")
 	}
 	if c.Ctx.Request.Method == "OPTIONS" {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusNoContent)
@@ -442,8 +442,19 @@ func (c *SiteController) SiteLogin() {
 	site, err := c.authenticateSite()
 	if err != nil || site == nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+		// Debug: show key prefix to help diagnose
+		apiKey := strings.TrimSpace(c.Ctx.Request.Header.Get("X-API-Key"))
+		if apiKey == "" {
+			auth := c.Ctx.Request.Header.Get("Authorization")
+			apiKey = strings.TrimSpace(strings.TrimPrefix(auth, "Bearer "))
+		}
+		prefix := apiKey
+		if len(prefix) > 10 {
+			prefix = prefix[:10] + "..."
+		}
 		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - invalid API key",
+			"error":      "Unauthorized - invalid API key",
+			"key_prefix": prefix,
 		}
 		c.ServeJSON()
 		return

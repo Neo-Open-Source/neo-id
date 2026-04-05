@@ -98,6 +98,7 @@ func init() {
 			origin := ctx.Input.Header("Origin")
 			if origin != "" {
 				ctx.Output.Header("Access-Control-Allow-Origin", origin)
+				ctx.Output.Header("Vary", "Origin")
 				ctx.Output.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH")
 				ctx.Output.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
 				ctx.Output.Header("Access-Control-Max-Age", "86400")
