@@ -42,7 +42,7 @@ export default function LoginPage() {
   const siteId = params.get('site_id') || ''
   const redirectUrl = params.get('redirect_url') || ''
   const siteState = params.get('site_state') || ''
-  const mode = params.get('mode') || '' // 'popup' for popup window flow
+  const popupMode = params.get('mode') || '' // 'popup' for popup window flow
 
   useEffect(() => {
     if (params.get('verified') === '1') setInfo('Email verified. You can sign in now.')
@@ -63,7 +63,7 @@ export default function LoginPage() {
     const rurl = data.redirect_url || redirectUrl
     const ss = data.site_state || siteState
     if (sid && rurl) {
-      const modeParam = mode === 'popup' ? '&mode=popup' : ''
+      const modeParam = popupMode === 'popup' ? '&mode=popup' : ''
       window.location.href = `/api/site/callback?site_id=${encodeURIComponent(sid)}&redirect_url=${encodeURIComponent(rurl)}&state=${encodeURIComponent(ss)}&token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}${modeParam}`
       return
     }
