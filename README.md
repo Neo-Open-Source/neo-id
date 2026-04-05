@@ -91,8 +91,6 @@ npm run dev
 ## TODO
 - [ ] Нормальное логирование + аудит действий админа
 - [ ] Rate limiting на auth endpoints
-- [ ] MFA/2FA (TOTP)
-- [ ] Улучшить CORS/allowed origins (шаблоны + отдельные окружения)
 - [ ] Тесты для auth flows (register/login/verify/refresh)
 
 ## Лицензия

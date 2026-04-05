@@ -64,7 +64,7 @@ func InitRoutes() {
 
 	// Site management routes (new SaaS model)
 	web.Router("/api/site/register", &controllers.SiteController{}, "post:RegisterSite")
-	web.Router("/api/site/login", &controllers.SiteController{}, "post:SiteLogin")
+	web.Router("/api/site/login", &controllers.SiteController{}, "post:SiteLogin;options:SiteLogin")
 	web.Router("/api/site/callback", &controllers.SiteController{}, "get:SiteCallback")
 	web.Router("/api/site/verify", &controllers.SiteController{}, "post:VerifySiteToken")
 	web.Router("/api/site/info", &controllers.SiteController{}, "get:GetSiteInfo")

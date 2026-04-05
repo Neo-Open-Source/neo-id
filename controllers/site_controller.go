@@ -426,6 +426,19 @@ func (c *SiteController) GetSiteInfo() {
 
 // SiteLogin handles login requests from integrated sites
 func (c *SiteController) SiteLogin() {
+	// Allow CORS for browser-to-Neo-ID direct calls
+	origin := c.Ctx.Request.Header.Get("Origin")
+	if origin != "" {
+		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "false")
+	}
+	if c.Ctx.Request.Method == "OPTIONS" {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	site, err := c.authenticateSite()
 	if err != nil || site == nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
