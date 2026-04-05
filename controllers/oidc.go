@@ -98,6 +98,7 @@ func (c *OIDCController) Authorize() {
 	nonce := strings.TrimSpace(c.GetString("nonce"))
 	codeChallenge := strings.TrimSpace(c.GetString("code_challenge"))
 	codeChallengeMethod := strings.TrimSpace(c.GetString("code_challenge_method"))
+	mode := strings.TrimSpace(c.GetString("mode")) // "popup"
 
 	// Validate required params
 	if clientID == "" || redirectURI == "" {
@@ -127,7 +128,70 @@ func (c *OIDCController) Authorize() {
 		return
 	}
 
-	// Store OIDC params in session so login page can pick them up
+	// Check if user already has a valid session (token in Authorization header or cookie)
+	existingUser := c.tryGetExistingUser()
+	if existingUser != nil {
+		// User already logged in — issue auth code immediately, no login needed
+		code := generateAuthCode()
+		authCodeCRUD := models.NewAuthCodeCRUD()
+		_ = authCodeCRUD.Create(&models.AuthCode{
+			Code:                code,
+			ClientID:            clientID,
+			UserID:              existingUser.UnifiedID,
+			RedirectURI:         redirectURI,
+			Scope:               scope,
+			Nonce:               nonce,
+			CodeChallenge:       codeChallenge,
+			CodeChallengeMethod: codeChallengeMethod,
+			ExpiresAt:           time.Now().Add(10 * time.Minute),
+		})
+
+		// Also connect user to site
+		_ = models.NewUserCRUD().AddConnectedService(existingUser.UnifiedID, site.Name)
+		connCRUD := models.NewUserSiteConnectionCRUD()
+		_ = connCRUD.ConnectUserToSite(existingUser.UnifiedID, clientID, site.Name)
+
+		q := url.Values{}
+		q.Set("code", code)
+		if state != "" {
+			q.Set("state", state)
+		}
+
+		finalURL := redirectURI + "?" + q.Encode()
+
+		// Popup mode: send postMessage
+		if mode == "popup" {
+			origin := redirectURI
+			if u, err2 := url.Parse(redirectURI); err2 == nil {
+				origin = u.Scheme + "://" + u.Host
+			}
+			// Get tokens for postMessage
+			accessToken, refreshToken, _, _ := generateTokensWithDuration(existingUser.UnifiedID, existingUser.Email, existingUser.RefreshDurationMonths)
+			if accessToken == "" {
+				accessToken, refreshToken, _ = generateTokens(existingUser.UnifiedID, existingUser.Email)
+			}
+			sessionCRUD := models.NewSessionCRUD()
+			sess2 := makeSession(accessToken, existingUser.UnifiedID, getRealIP(c.Ctx.Request), c.Ctx.Request.UserAgent(), existingUser.RefreshDurationMonths, refreshToken, time.Now().AddDate(0, max(existingUser.RefreshDurationMonths, 1), 0))
+			_ = sessionCRUD.CreateSession(sess2)
+			createSessionWithGeo(sess2)
+
+			html := `<!doctype html><html><head><meta charset="utf-8"></head><body><script>
+(function(){
+  var data={type:"neo_id_auth",access_token:"` + accessToken + `",refresh_token:"` + refreshToken + `",state:"` + state + `"};
+  if(window.opener){window.opener.postMessage(data,"` + origin + `");window.close();}
+  else{window.location.replace("` + finalURL + `");}
+})();
+</script></body></html>`
+			c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
+			c.Ctx.ResponseWriter.Write([]byte(html))
+			return
+		}
+
+		c.Redirect(finalURL, http.StatusFound)
+		return
+	}
+
+	// No existing session — store OIDC params and redirect to login
 	sess, _ := getOAuthCookieSession(c.Ctx.Request)
 	sess.Values["oidc_client_id"] = clientID
 	sess.Values["oidc_redirect_uri"] = redirectURI
@@ -138,14 +202,60 @@ func (c *OIDCController) Authorize() {
 	sess.Values["oidc_code_challenge_method"] = codeChallengeMethod
 	_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, sess)
 
-	// Redirect to login with OIDC context
 	q := url.Values{}
 	q.Set("oidc", "1")
 	q.Set("client_id", clientID)
 	if state != "" {
 		q.Set("state", state)
 	}
+	if mode != "" {
+		q.Set("mode", mode)
+	}
 	c.Redirect("/login?"+q.Encode(), http.StatusFound)
+}
+
+// tryGetExistingUser checks if there's a valid session from Authorization header or cookie
+func (c *OIDCController) tryGetExistingUser() *models.User {
+	// Try Authorization header
+	token := strings.TrimPrefix(c.Ctx.Request.Header.Get("Authorization"), "Bearer ")
+	token = strings.TrimSpace(token)
+
+	// Try cookie
+	if token == "" {
+		if cookie, err := c.Ctx.Request.Cookie("unified_id_session"); err == nil {
+			token = cookie.Value
+		}
+	}
+	// Try query param (for popup redirect)
+	if token == "" {
+		token = strings.TrimSpace(c.GetString("token"))
+	}
+
+	if token == "" {
+		return nil
+	}
+
+	claims := &Claims{}
+	tok, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
+		secret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))
+		return []byte(secret), nil
+	})
+	if err != nil || !tok.Valid {
+		return nil
+	}
+
+	sessionCRUD := models.NewSessionCRUD()
+	sess, err := sessionCRUD.GetSessionByToken(token)
+	if err != nil || sess == nil {
+		return nil
+	}
+
+	userCRUD := models.NewUserCRUD()
+	user, err := userCRUD.GetUserByUnifiedID(claims.UnifiedID)
+	if err != nil || user == nil || user.IsBanned {
+		return nil
+	}
+	return user
 }
 
 // ─── Token ────────────────────────────────────────────────────────────────────

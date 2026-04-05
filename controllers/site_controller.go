@@ -508,10 +508,13 @@ func (c *SiteController) SiteLogin() {
 	}
 
 	// Generate login URL with site context
-	loginURL := "/login?" +
-		"site_id=" + site.SiteID + "&" +
-		"redirect_url=" + requestData.RedirectURL + "&" +
-		"site_state=" + requestData.State
+	// Use /authorize which checks existing session first
+	loginURL := "/authorize?" +
+		"client_id=" + site.SiteID +
+		"&redirect_uri=" + url.QueryEscape(requestData.RedirectURL) +
+		"&response_type=code" +
+		"&scope=openid+profile+email" +
+		"&state=" + url.QueryEscape(requestData.State)
 	if requestData.Mode == "popup" {
 		loginURL += "&mode=popup"
 	}
