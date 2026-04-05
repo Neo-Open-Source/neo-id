@@ -9,6 +9,14 @@
       "destination": "/api/index"
     },
     {
+      "source": "/oauth/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/.well-known/(.*)",
+      "destination": "/api/index"
+    },
+    {
       "source": "/((?!avatars|assets|favicon\\.ico).*)",
       "destination": "/index.html"
     }
