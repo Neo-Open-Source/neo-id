@@ -88,6 +88,8 @@ func InitRoutes() {
 	web.Router("/.well-known/openid-configuration", &controllers.OIDCController{}, "get:Discovery")
 	web.Router("/.well-known/jwks.json", &controllers.OIDCController{}, "get:JWKS")
 	web.Router("/oauth/authorize", &controllers.OIDCController{}, "get:Authorize")
+	// Backward-compatible alias used by older integrations.
+	web.Router("/authorize", &controllers.OIDCController{}, "get:Authorize")
 	web.Router("/oauth/token", &controllers.OIDCController{}, "post:Token;options:Token")
 	web.Router("/oauth/userinfo", &controllers.OIDCController{}, "get:UserInfo;post:UserInfo")
 	web.Router("/oauth/revoke", &controllers.OIDCController{}, "post:Revoke")

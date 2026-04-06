@@ -66,7 +66,7 @@ func (c *SiteController) SiteLogin() {
 		return
 	}
 
-	loginURL := "/authorize?" +
+	loginURL := "/oauth/authorize?" +
 		"client_id=" + site.SiteID +
 		"&redirect_uri=" + url.QueryEscape(requestData.RedirectURL) +
 		"&response_type=code" +
