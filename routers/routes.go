@@ -46,6 +46,7 @@ func InitRoutes() {
 	web.Router("/api/user/mfa/totp/verify", &controllers.TOTPController{}, "post:Verify")
 	web.Router("/api/user/mfa/totp/disable", &controllers.TOTPController{}, "post:Disable")
 	web.Router("/api/user/mfa/email/toggle", &controllers.UserController{}, "post:ToggleEmailMFA")
+	web.Router("/api/user/mfa/email/send-code", &controllers.UserController{}, "post:SendMFACode")
 
 	// Session management
 	web.Router("/api/user/sessions", &controllers.UserController{}, "get:GetSessions")
@@ -98,6 +99,7 @@ func InitRoutes() {
 	web.Router("/verify", &controllers.MainController{}, "get:Get")
 	web.Router("/setup", &controllers.MainController{}, "get:Get")
 	web.Router("/consent", &controllers.MainController{}, "get:Get")
+	web.Router("/2fa", &controllers.MainController{}, "get:Get")
 	web.Router("/dashboard", &controllers.MainController{}, "get:Get")
 	web.Router("/admin", &controllers.MainController{}, "get:Get")
 	web.Router("/services", &controllers.MainController{}, "get:Get")

@@ -123,7 +123,42 @@ func (c *UserController) SetRefreshDuration() {
 	c.ServeJSON()
 }
 
-// ToggleEmailMFA enables or disables email MFA for login.
+// SendMFACode sends a verification code to the user's email for settings actions (enable/disable MFA).
+// POST /api/user/mfa/email/send-code
+func (c *UserController) SendMFACode() {
+	user, err := c.authenticateUser()
+	if err != nil || user == nil {
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+		return
+	}
+
+	code, err := generateEmailVerificationCode()
+	if err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate code")
+		return
+	}
+
+	mfaCRUD := models.NewMFACodeCRUD()
+	_ = mfaCRUD.DeleteByEmail(user.Email)
+	exp := time.Now().Add(10 * time.Minute)
+	_ = mfaCRUD.Create(&models.MFACode{
+		UserID:    user.UnifiedID,
+		Email:     user.Email,
+		Code:      code,
+		ExpiresAt: exp,
+	})
+
+	htmlBody := buildMFACodeHTML(code)
+	if err := sendResendEmail(user.Email, "Your verification code", htmlBody); err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to send email: "+err.Error())
+		return
+	}
+
+	c.Data["json"] = map[string]interface{}{"sent": true}
+	c.ServeJSON()
+}
+
+// Disabling requires a valid TOTP code (if TOTP enabled) or an email MFA code.
 func (c *UserController) ToggleEmailMFA() {
 	user, err := c.authenticateUser()
 	if err != nil || user == nil {
@@ -132,14 +167,34 @@ func (c *UserController) ToggleEmailMFA() {
 	}
 
 	var body struct {
-		Enabled bool `json:"enabled"`
+		Enabled bool   `json:"enabled"`
+		Code    string `json:"code"`
 	}
 	raw, _ := io.ReadAll(c.Ctx.Request.Body)
 	_ = json.Unmarshal(raw, &body)
 
+	// Disabling requires verification
+	if !body.Enabled && user.EmailMFAEnabled {
+		code := strings.TrimSpace(body.Code)
+		if code == "" {
+			respondError(&c.Controller, http.StatusBadRequest, "code_required", "code is required to disable email MFA")
+			return
+		}
+		// Accept TOTP code if TOTP is enabled
+		if user.TOTPEnabled && verifyTOTPCode(code, user.TOTPSecret) {
+			goto disable
+		}
+		// Accept email MFA code
+		if verifyEmailMFACodeExpiry(user.Email, code) {
+			goto disable
+		}
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_code", "Invalid verification code")
+		return
+	}
+
+disable:
 	user.EmailMFAEnabled = body.Enabled
 	_ = models.NewUserCRUD().UpdateUser(user)
-
 	c.Data["json"] = map[string]interface{}{"email_mfa_enabled": user.EmailMFAEnabled}
 	c.ServeJSON()
 }

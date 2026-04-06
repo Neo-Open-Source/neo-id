@@ -109,8 +109,8 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
           </Stack>
         </Card>
 
-        <TOTPSection totpEnabled={profile?.totp_enabled} />
-        <EmailMFASection emailMfaEnabled={profile?.email_mfa_enabled} />
+        <TOTPSection totpEnabled={profile?.totp_enabled} emailMfaEnabled={profile?.email_mfa_enabled} />
+        <EmailMFASection emailMfaEnabled={profile?.email_mfa_enabled} totpEnabled={profile?.totp_enabled} />
         <SessionsSection currentRefreshMonths={profile?.refresh_duration_months || 1} />
 
         <Card>

@@ -13,6 +13,7 @@ import DocsPage from './pages/DocsPage.jsx'
 import TermsPage from './pages/TermsPage.jsx'
 import PrivacyPage from './pages/PrivacyPage.jsx'
 import ConsentPage from './pages/ConsentPage.jsx'
+import TwoFAPage from './pages/TwoFAPage.jsx'
 
 function makeTheme(mode) {
   const dark = mode === 'dark'
@@ -151,6 +152,7 @@ function ThemedApp() {
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/consent" element={<ConsentPage />} />
+        <Route path="/2fa" element={<TwoFAPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/admin" element={<AdminPage />} />

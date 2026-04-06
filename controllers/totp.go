@@ -127,7 +127,7 @@ func (c *TOTPController) Verify() {
 	c.ServeJSON()
 }
 
-// Disable turns off TOTP (requires valid TOTP code as confirmation)
+// Disable turns off TOTP. Requires a valid TOTP code OR an email MFA code (if email MFA is enabled).
 func (c *TOTPController) Disable() {
 	user, err := c.authenticateUser()
 	if err != nil || user == nil {
@@ -147,15 +147,22 @@ func (c *TOTPController) Disable() {
 		return
 	}
 
-	if !totp.Validate(strings.TrimSpace(body.Code), user.TOTPSecret) {
-		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid code")
-		return
+	code := strings.TrimSpace(body.Code)
+	// Accept TOTP code
+	if totp.Validate(code, user.TOTPSecret) {
+		goto disable
 	}
+	// Accept email MFA code if email MFA is enabled
+	if user.EmailMFAEnabled && verifyEmailMFACodeExpiry(user.Email, code) {
+		goto disable
+	}
+	respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid code")
+	return
 
+disable:
 	user.TOTPEnabled = false
 	user.TOTPSecret = ""
 	_ = models.NewUserCRUD().UpdateUser(user)
-
 	c.Data["json"] = map[string]interface{}{"disabled": true}
 	c.ServeJSON()
 }

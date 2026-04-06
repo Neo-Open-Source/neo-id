@@ -186,8 +186,16 @@ export const STOCK_AVATARS = [
   '/avatars/zoltan-tasi-yanhwFwyoaU-unsplash.jpg',
 ]
 
-export async function toggleEmailMFA(enabled) {
-  const res = await api.post('/api/user/mfa/email/toggle', { enabled })
+export async function toggleEmailMFA(enabled, code) {
+  const res = await api.post('/api/user/mfa/email/toggle', {
+    enabled,
+    ...(code ? { code } : {}),
+  })
+  return res.data
+}
+
+export async function sendMFACode() {
+  const res = await api.post('/api/user/mfa/email/send-code')
   return res.data
 }
 

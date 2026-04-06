@@ -1,16 +1,16 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Box, Stack, Typography, Button, Alert, TextField } from '@mui/material'
-import { totpSetup, totpVerifyEnable, totpDisable } from '../api/endpoints'
+import { totpSetup } from '../api/endpoints'
 
-export default function TOTPSection({ totpEnabled: initialEnabled }) {
+export default function TOTPSection({ totpEnabled: initialEnabled, emailMfaEnabled }) {
+  const navigate = useNavigate()
   const [enabled, setEnabled] = useState(initialEnabled)
-  const [step, setStep] = useState('idle') // idle | setup | disable
+  const [step, setStep] = useState('idle') // idle | setup
   const [setupData, setSetupData] = useState(null)
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const inputRef = useRef()
 
   const onStartSetup = async () => {
     setLoading(true)
@@ -19,7 +19,6 @@ export default function TOTPSection({ totpEnabled: initialEnabled }) {
       const data = await totpSetup()
       setSetupData(data)
       setStep('setup')
-      setTimeout(() => inputRef.current?.focus(), 100)
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to set up TOTP')
     } finally {
@@ -27,43 +26,13 @@ export default function TOTPSection({ totpEnabled: initialEnabled }) {
     }
   }
 
-  const onVerifyEnable = async () => {
-    if (code.trim().length < 6) return
-    setLoading(true)
-    setError('')
-    try {
-      await totpVerifyEnable(code.trim())
-      setEnabled(true)
-      setStep('idle')
-      setSetupData(null)
-      setCode('')
-      setSuccess('Authenticator app enabled')
-      setTimeout(() => setSuccess(''), 4000)
-    } catch (e) {
-      setError(e?.response?.data?.error || 'Invalid code')
-      setCode('')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const onDisable = async () => {
-    if (code.trim().length < 6) return
-    setLoading(true)
-    setError('')
-    try {
-      await totpDisable(code.trim())
-      setEnabled(false)
-      setStep('idle')
-      setCode('')
-      setSuccess('Authenticator app disabled')
-      setTimeout(() => setSuccess(''), 4000)
-    } catch (e) {
-      setError(e?.response?.data?.error || 'Invalid code')
-      setCode('')
-    } finally {
-      setLoading(false)
-    }
+  const goTo2FA = (action) => {
+    sessionStorage.setItem('2fa_action', action)
+    sessionStorage.setItem('2fa_back', '/dashboard')
+    sessionStorage.setItem('2fa_code_type', 'totp')
+    if (emailMfaEnabled) sessionStorage.setItem('2fa_has_both', '1')
+    else sessionStorage.removeItem('2fa_has_both')
+    navigate('/2fa')
   }
 
   const onCancel = () => { setStep('idle'); setCode(''); setError(''); setSetupData(null) }
@@ -78,7 +47,12 @@ export default function TOTPSection({ totpEnabled: initialEnabled }) {
               {enabled ? 'Two-factor authentication is enabled' : 'Add an extra layer of security to your account'}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, py: 0.5, borderRadius: 6, bgcolor: enabled ? 'success.main' : 'action.hover', border: '1px solid', borderColor: enabled ? 'success.main' : 'divider' }}>
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 0.75,
+            px: 1.5, py: 0.5, borderRadius: 6,
+            bgcolor: enabled ? 'success.main' : 'action.hover',
+            border: '1px solid', borderColor: enabled ? 'success.main' : 'divider',
+          }}>
             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: enabled ? '#fff' : 'text.disabled' }} />
             <Typography variant="caption" sx={{ fontWeight: 600, color: enabled ? '#fff' : 'text.secondary', fontSize: '0.7rem' }}>
               {enabled ? 'ON' : 'OFF'}
@@ -87,38 +61,31 @@ export default function TOTPSection({ totpEnabled: initialEnabled }) {
         </Stack>
 
         {error && <Alert severity="error" sx={{ py: 0.5 }}>{error}</Alert>}
-        {success && <Alert severity="success" sx={{ py: 0.5 }}>{success}</Alert>}
 
-        {/* Idle state */}
+        {/* Idle */}
         {step === 'idle' && !enabled && (
           <Button variant="outlined" size="small" onClick={onStartSetup} disabled={loading} sx={{ alignSelf: 'flex-start' }}>
             {loading ? 'Setting up...' : 'Set up authenticator'}
           </Button>
         )}
         {step === 'idle' && enabled && (
-          <Button variant="outlined" size="small" color="error" onClick={() => { setStep('disable'); setTimeout(() => inputRef.current?.focus(), 100) }} sx={{ alignSelf: 'flex-start' }}>
+          <Button variant="outlined" size="small" color="error" onClick={() => goTo2FA('totp_disable')} sx={{ alignSelf: 'flex-start' }}>
             Disable
           </Button>
         )}
 
-        {/* Setup flow */}
+        {/* Setup — show QR, then redirect to /2fa for code entry */}
         {step === 'setup' && setupData && (
           <Stack spacing={2}>
             <Typography variant="body2" color="text.secondary">
-              Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+              Scan this QR code with your authenticator app, then click Continue to enter the confirmation code.
             </Typography>
 
-            {/* QR code */}
             <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-              <Box
-                component="img"
-                src={setupData.qr_code}
-                alt="TOTP QR Code"
-                sx={{ width: 160, height: 160, border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1, bgcolor: '#fff' }}
-              />
+              <Box component="img" src={setupData.qr_code} alt="TOTP QR Code"
+                sx={{ width: 160, height: 160, border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1, bgcolor: '#fff' }} />
             </Box>
 
-            {/* Manual key */}
             <Box sx={{ bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 1.5 }}>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                 Manual entry key
@@ -128,56 +95,14 @@ export default function TOTPSection({ totpEnabled: initialEnabled }) {
               </Typography>
             </Box>
 
-            <Typography variant="body2" color="text.secondary">
-              After scanning, enter the 6-digit code from your app to confirm
-            </Typography>
-
-            <Stack direction="row" spacing={1.5} alignItems="flex-end">
-              <TextField
-                inputRef={inputRef}
-                label="Verification code"
-                size="small"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                inputProps={{ inputMode: 'numeric', maxLength: 6 }}
-                onKeyDown={(e) => e.key === 'Enter' && onVerifyEnable()}
-                sx={{ flex: 1 }}
-              />
-              <Button variant="contained" size="small" disabled={loading || code.trim().length < 6} onClick={onVerifyEnable} sx={{ height: 40, px: 2, flexShrink: 0 }}>
-                Confirm
+            <Stack direction="row" spacing={1}>
+              <Button variant="contained" size="small" onClick={() => goTo2FA('totp_enable')} sx={{ px: 2 }}>
+                Continue →
+              </Button>
+              <Button variant="text" size="small" onClick={onCancel} sx={{ color: 'text.secondary' }}>
+                Cancel
               </Button>
             </Stack>
-
-            <Button variant="text" size="small" onClick={onCancel} sx={{ color: 'text.secondary', alignSelf: 'flex-start' }}>
-              Cancel
-            </Button>
-          </Stack>
-        )}
-
-        {/* Disable flow */}
-        {step === 'disable' && (
-          <Stack spacing={1.5}>
-            <Typography variant="body2" color="text.secondary">
-              Enter the code from your authenticator app to disable 2FA
-            </Typography>
-            <Stack direction="row" spacing={1.5} alignItems="flex-end">
-              <TextField
-                inputRef={inputRef}
-                label="Authenticator code"
-                size="small"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                inputProps={{ inputMode: 'numeric', maxLength: 6 }}
-                onKeyDown={(e) => e.key === 'Enter' && onDisable()}
-                sx={{ flex: 1 }}
-              />
-              <Button variant="contained" size="small" color="error" disabled={loading || code.trim().length < 6} onClick={onDisable} sx={{ height: 40, px: 2, flexShrink: 0 }}>
-                Disable
-              </Button>
-            </Stack>
-            <Button variant="text" size="small" onClick={onCancel} sx={{ color: 'text.secondary', alignSelf: 'flex-start' }}>
-              Cancel
-            </Button>
           </Stack>
         )}
       </Stack>
