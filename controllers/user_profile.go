@@ -35,20 +35,23 @@ func (c *UserController) GetProfile() {
 	}
 
 	c.Data["json"] = map[string]interface{}{
-		"unified_id":         user.UnifiedID,
-		"email":              user.Email,
-		"display_name":       user.DisplayName,
-		"avatar":             user.Avatar,
-		"role":               user.Role,
-		"oauth_providers":    user.OAuthProviders,
-		"has_password":       user.PasswordHash != "",
-		"first_name":         user.FirstName,
-		"last_name":          user.LastName,
-		"location":           user.Location,
-		"bio":                user.Bio,
-		"connected_services": user.ConnectedServices,
-		"created_at":         user.CreatedAt,
-		"last_login":         user.LastLogin,
+		"unified_id":              user.UnifiedID,
+		"email":                   user.Email,
+		"display_name":            user.DisplayName,
+		"avatar":                  user.Avatar,
+		"role":                    user.Role,
+		"oauth_providers":         user.OAuthProviders,
+		"has_password":            user.PasswordHash != "",
+		"first_name":              user.FirstName,
+		"last_name":               user.LastName,
+		"location":                user.Location,
+		"bio":                     user.Bio,
+		"connected_services":      user.ConnectedServices,
+		"created_at":              user.CreatedAt,
+		"last_login":              user.LastLogin,
+		"totp_enabled":            user.TOTPEnabled,
+		"email_mfa_enabled":       user.EmailMFAEnabled,
+		"refresh_duration_months": user.RefreshDurationMonths,
 	}
 	c.ServeJSON()
 }
