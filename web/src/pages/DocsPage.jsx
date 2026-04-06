@@ -94,7 +94,7 @@ function Content({ active }) {
           <P>Unified identity and authentication service. Provides OAuth 2.0 / OpenID Connect, email/password auth, MFA, session management, and a SaaS site-integration API.</P>
 
           <Section title="Base URL">
-            <Code block>https://id.neomovies.ru</Code>
+            <Code block>https://id.example.com</Code>
           </Section>
 
           <Section title="Authentication">
@@ -461,11 +461,11 @@ grant_type=authorization_code
           <Endpoint method="GET" path="/api/user/services" desc="List connected services and available services" />
 
           <Endpoint method="POST" path="/api/user/services/connect" desc="Connect a service">
-            <Code block>{`{ "service": "neomovies" }`}</Code>
+            <Code block>{`{ "service": "demo_service" }`}</Code>
           </Endpoint>
 
           <Endpoint method="POST" path="/api/user/services/disconnect" desc="Disconnect a service">
-            <Code block>{`{ "service": "neomovies" }`}</Code>
+            <Code block>{`{ "service": "demo_service" }`}</Code>
           </Endpoint>
         </Box>
       )}
@@ -564,7 +564,7 @@ grant_type=authorization_code
   "event": "user.disconnected",
   "unified_id": "uid_...",
   "email": "user@example.com",
-  "service": "neomovies"
+  "service": "demo_service"
 }`}</Code>
             <P>Your server should delete or deactivate the user's local account.</P>
           </Section>

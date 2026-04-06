@@ -71,7 +71,7 @@ func isWildcardHostAllowed(hostname string, allowed string) bool {
 		return true
 	}
 	// Allow www. subdomain if base domain matches
-	// e.g. allowed=neomovies.ru → www.neomovies.ru is also allowed
+	// e.g. allowed=example.com → www.example.com is also allowed
 	if hostname == "www."+allowed {
 		return true
 	}
@@ -85,7 +85,7 @@ func isWildcardHostAllowed(hostname string, allowed string) bool {
 // isAllowedRedirectURL validates redirect URLs for OAuth flows.
 // Allows:
 // - HTTPS URLs matching allowed origins for registered sites.
-// - Any custom app scheme for registered sites (e.g., neomovies://, myapp://).
+// - Any custom app scheme for registered sites (e.g., myapp://, anotherapp://).
 // Does NOT allow open redirects to arbitrary http/https hosts.
 func isAllowedRedirectURL(redirectURL string, site *models.Site) error {
 	if redirectURL == "" {

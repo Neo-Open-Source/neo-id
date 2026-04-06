@@ -226,7 +226,12 @@ func (c *OIDCController) Consent() {
 		if months < 1 {
 			months = 1
 		}
-		accessToken, refreshToken, refreshExp, _ := generateTokensWithDuration(user.UnifiedID, user.Email, months)
+		accessToken, refreshToken, refreshExp, err := generateTokensWithDuration(user.UnifiedID, user.Email, months)
+		if err != nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]string{"error": "failed to generate session tokens"})
+			return
+		}
 		sessionCRUD := models.NewSessionCRUD()
 		sess := makeSession(accessToken, user.UnifiedID, "", "", months, refreshToken, refreshExp)
 		enforceSessionLimit(user.UnifiedID)

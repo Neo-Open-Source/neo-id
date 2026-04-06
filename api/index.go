@@ -32,7 +32,8 @@ func isAllowedOrigin(origin string, allowed map[string]struct{}) bool {
 	if host == "" {
 		return false
 	}
-	if host == "neomovies.ru" || strings.HasSuffix(host, ".neomovies.ru") {
+	primaryDomain := strings.ToLower(strings.TrimSpace(os.Getenv("APP_PRIMARY_DOMAIN")))
+	if primaryDomain != "" && (host == primaryDomain || strings.HasSuffix(host, "."+primaryDomain)) {
 		return true
 	}
 	if strings.HasSuffix(host, ".vercel.app") {
@@ -47,7 +48,10 @@ func corsFilter(ctx *webctx.Context) {
 		return
 	}
 
-	allowedRaw := web.AppConfig.DefaultString("allowed_origins", "")
+	allowedRaw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
+	if allowedRaw == "" {
+		allowedRaw = web.AppConfig.DefaultString("allowed_origins", "")
+	}
 	allowed := map[string]struct{}{}
 	for _, v := range strings.Split(allowedRaw, ",") {
 		vv := strings.TrimSpace(v)
@@ -90,13 +94,33 @@ func init() {
 	// Initialize routers
 	routers.InitRoutes()
 
-	// CORS for browser-based API calls (e.g. NeoMovies Web -> Neo ID)
+	// CORS for browser-based API calls.
 	web.InsertFilter("/api/*", web.BeforeRouter, corsFilter)
 	// Handle OPTIONS preflight for all API routes
 	web.InsertFilter("/api/*", web.BeforeRouter, func(ctx *webctx.Context) {
 		if ctx.Input.Method() == http.MethodOptions {
 			origin := ctx.Input.Header("Origin")
 			if origin != "" {
+				allowedRaw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
+				if allowedRaw == "" {
+					allowedRaw = web.AppConfig.DefaultString("allowed_origins", "")
+				}
+				allowed := map[string]struct{}{}
+				for _, v := range strings.Split(allowedRaw, ",") {
+					vv := strings.TrimSpace(v)
+					if vv != "" {
+						allowed[vv] = struct{}{}
+					}
+				}
+				allowed["http://localhost:3000"] = struct{}{}
+				allowed["http://localhost:5173"] = struct{}{}
+
+				if !isAllowedOrigin(origin, allowed) {
+					ctx.Output.SetStatus(http.StatusNoContent)
+					_, _ = ctx.ResponseWriter.Write([]byte{})
+					return
+				}
+
 				ctx.Output.Header("Access-Control-Allow-Origin", origin)
 				ctx.Output.Header("Vary", "Origin")
 				ctx.Output.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH")

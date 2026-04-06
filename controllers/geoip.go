@@ -137,11 +137,10 @@ func totpValidate(code, secret string) bool {
 	return totpValidateCode(code, secret)
 }
 
-// setAuthCookie sets a cross-subdomain cookie with the access token
-// so popup windows on id.neomovies.ru can detect existing sessions
+// setAuthCookie sets a cross-subdomain cookie with the access token.
 func setAuthCookie(w http.ResponseWriter, token string) {
 	baseURL := strings.TrimSpace(os.Getenv("BASE_URL"))
-	// Extract root domain for cookie (e.g. id.neomovies.ru → .neomovies.ru)
+	// Extract root domain for cookie (e.g. id.example.com -> .example.com)
 	cookieDomain := ""
 	if baseURL != "" {
 		if u, err := url.Parse(baseURL); err == nil {
@@ -164,7 +163,7 @@ func setAuthCookie(w http.ResponseWriter, token string) {
 		Value:    token,
 		Path:     "/",
 		MaxAge:   3600 * 24 * 30,
-		HttpOnly: false, // must be readable by JS for popup detection
+		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	}

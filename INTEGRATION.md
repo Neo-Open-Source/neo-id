@@ -11,7 +11,7 @@ All business logic and data live on your side.
 
 ## Register your service
 
-1. Go to `https://id.neomovies.ru` → Dashboard → Services → New client
+1. Go to `https://id.example.com` → Dashboard → Services → New client
 2. You'll receive `site_id`, `api_key`, `api_secret`
 3. Set your `redirect_uri` (web URL or mobile deep link)
 
@@ -24,7 +24,7 @@ Best for most apps. No OIDC required.
 **Step 1 — get login URL**
 
 ```js
-const res = await fetch('https://id.neomovies.ru/api/service/login', {
+const res = await fetch('https://id.example.com/api/service/login', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ GET https://yourapp.com/auth/callback?token=<access_token>&state=<state>
 **Step 4 — verify token on your server**
 
 ```js
-const res = await fetch('https://id.neomovies.ru/api/service/verify', {
+const res = await fetch('https://id.example.com/api/service/verify', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -75,7 +75,7 @@ if (valid) {
 
 Use this if you need standard OpenID Connect compatibility (e.g. existing OIDC libraries).
 
-Discovery document: `GET https://id.neomovies.ru/.well-known/openid-configuration`
+Discovery document: `GET https://id.example.com/.well-known/openid-configuration`
 
 ```
 GET /oauth/authorize
@@ -183,7 +183,7 @@ const express = require('express')
 const axios   = require('axios')
 const app     = express()
 
-const NEO_ID  = 'https://id.neomovies.ru'
+const NEO_ID  = 'https://id.example.com'
 const API_KEY = process.env.NEO_ID_API_KEY
 
 // Redirect to Neo ID login
@@ -239,7 +239,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
 ## Go example (simple flow)
 
 ```go
-neoID := "https://id.neomovies.ru"
+neoID := "https://id.example.com"
 apiKey := os.Getenv("NEO_ID_API_KEY")
 
 // Get login URL

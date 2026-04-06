@@ -51,7 +51,7 @@ type User struct {
 	BanReason   string     `bson:"ban_reason,omitempty" json:"ban_reason,omitempty"`
 
 	// Connected services
-	ConnectedServices []string `bson:"connected_services" json:"connected_services"` // neomovies, neome
+	ConnectedServices []string `bson:"connected_services" json:"connected_services"` // example_service_a, example_service_b
 
 	// Timestamps
 	CreatedAt time.Time  `bson:"created_at" json:"created_at"`
@@ -69,7 +69,7 @@ type OAuthProvider struct {
 // Service represents a connected service (NeoMovies, NeoMe)
 type Service struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Name        string             `bson:"name" json:"name"` // neomovies, neome
+	Name        string             `bson:"name" json:"name"` // example_service_a, example_service_b
 	DisplayName string             `bson:"display_name" json:"display_name"`
 	Description string             `bson:"description" json:"description"`
 	LogoURL     string             `bson:"logo_url" json:"logo_url"`

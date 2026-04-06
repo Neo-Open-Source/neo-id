@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -41,7 +42,10 @@ func generateUnifiedID() string {
 
 // generateTokensWithDuration generates access + refresh tokens with given refresh duration in months
 func generateTokensWithDuration(unifiedID, email string, refreshMonths int) (accessToken, refreshToken string, refreshExp time.Time, err error) {
-	jwtSecret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", "default-secret-key"))
+	jwtSecret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))
+	if strings.TrimSpace(jwtSecret) == "" {
+		return "", "", time.Time{}, fmt.Errorf("JWT_SECRET is not configured")
+	}
 
 	if refreshMonths < 1 {
 		refreshMonths = 1

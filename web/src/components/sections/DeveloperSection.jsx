@@ -57,7 +57,7 @@ function MonoField({ label, value, secret }) {
 
 function ServiceCard({ service, onDelete, onEdit, highlight }) {
   const [expanded, setExpanded] = useState(!!highlight)
-  const envSnippet = `NEO_ID_URL=https://id.neomovies.ru\nNEO_ID_SITE_ID=${service.site_id}\nNEO_ID_API_KEY=${service.api_key || ''}`
+  const envSnippet = `NEO_ID_URL=https://id.example.com\nNEO_ID_SITE_ID=${service.site_id}\nNEO_ID_API_KEY=${service.api_key || ''}`
   return (
     <Box sx={{ border: '1px solid', borderColor: highlight ? 'success.main' : 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
@@ -144,7 +144,7 @@ function EditServiceDialog({ service, onClose, onSaved }) {
             minRows={4}
             value={origins}
             onChange={e => setOrigins(e.target.value)}
-            helperText="One origin per line, e.g. https://neomovies.ru"
+            helperText="One origin per line, e.g. https://example.com"
             autoFocus
           />
           <TextField
@@ -202,7 +202,7 @@ function RegisterForm({ onRegistered, notify }) {
       <Stack spacing={1.5}>
         {error && <Alert severity="error" sx={{ py: 0.5 }}>{error}</Alert>}
         <TextField label="Service name" size="small" value={name} onChange={e => setName(e.target.value)} placeholder="NeoMovies" autoFocus />
-        <TextField label="Domain" size="small" value={domain} onChange={e => setDomain(e.target.value)} placeholder="api.neomovies.ru" />
+        <TextField label="Domain" size="small" value={domain} onChange={e => setDomain(e.target.value)} placeholder="api.example.com" />
         <TextField label="Owner email" size="small" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} />
         <TextField label="Webhook URL (optional)" size="small" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder="https://yourapp.com/webhooks/neo-id" />
         <Stack direction="row" spacing={1}>
