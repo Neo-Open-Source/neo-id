@@ -24,6 +24,7 @@ func InitRoutes() {
 	web.Router("/api/auth/verify-email/resend", &controllers.AuthController{}, "post:ResendVerifyEmail")
 	web.Router("/api/auth/logout", &controllers.AuthController{}, "post:Logout")
 	web.Router("/api/auth/refresh", &controllers.AuthController{}, "post:RefreshToken")
+	web.Router("/api/auth/check-token", &controllers.AuthController{}, "post:CheckToken")
 
 	// User routes
 	web.Router("/api/user/profile", &controllers.UserController{}, "get:GetProfile")

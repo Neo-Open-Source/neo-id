@@ -49,30 +49,29 @@ export default function LoginPage() {
     if (params.get('verified') === '1') setInfo('Email verified. You can sign in now.')
   }, [])
 
-  // Auto-complete: if a valid token cookie exists and we have site context, skip login form
+  // Auto-complete: if already logged in to Neo ID, skip login form and go to consent
   useEffect(() => {
     if (!siteId || !redirectUrl) return
+    if (params.get('token')) return // already tried
 
-    // Read Neo ID token from cross-subdomain cookie
-    const getCookie = (name) => {
-      const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
-      return match ? decodeURIComponent(match[1]) : ''
-    }
-    const cookieToken = getCookie('neo_id_token')
-    if (!cookieToken) return
+    const token = localStorage.getItem('accessToken') || ''
+    if (!token) return
 
-    // Try to refresh — if valid, skip login form
-    fetch('/api/auth/refresh', {
+    // Verify token and get consent session directly
+    fetch('/api/auth/check-token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: cookieToken })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        client_id: siteId,
+        redirect_uri: redirectUrl,
+        state: siteState,
+        scope: 'openid profile email',
+        mode: popupMode,
+      }),
     })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.access_token) {
-          const modeParam = popupMode === 'popup' ? '&mode=popup' : ''
-          window.location.href = `/api/site/callback?site_id=${encodeURIComponent(siteId)}&redirect_url=${encodeURIComponent(redirectUrl)}&state=${encodeURIComponent(siteState)}&token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}${modeParam}`
-        }
+        if (data?.consent_url) window.location.replace(data.consent_url)
       })
       .catch(() => {})
   }, [])

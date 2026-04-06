@@ -172,6 +172,12 @@ func (c *OIDCController) tryGetExistingUser() *models.User {
 
 	// Try cookie
 	if token == "" {
+		if cookie, err := c.Ctx.Request.Cookie("neo_id_token"); err == nil {
+			token = cookie.Value
+		}
+	}
+	// Legacy cookie name
+	if token == "" {
 		if cookie, err := c.Ctx.Request.Cookie("unified_id_session"); err == nil {
 			token = cookie.Value
 		}
