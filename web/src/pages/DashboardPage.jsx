@@ -11,7 +11,6 @@ import DeveloperSection from '../components/sections/DeveloperSection.jsx'
 import {
   getProfile, getProviders, unlinkProvider,
   getServices, connectService, disconnectService,
-  listServiceApps, createServiceApp, revokeServiceApp, deleteServiceApp,
   logout,
 } from '../api/endpoints'
 
@@ -38,7 +37,6 @@ export default function DashboardPage() {
   const [services, setServices] = useState({ connected_services: [], available_services: [] })
   const [serviceApps, setServiceApps] = useState([])
   const [msg, setMsg] = useState({ type: '', text: '' })
-  const token = getAccessToken()
 
   useEffect(() => { if (!token) navigate('/login') }, [token, navigate])
 
@@ -65,11 +63,6 @@ export default function DashboardPage() {
     setHasPassword(!!pr.has_password)
     const s = await getServices()
     setServices(s)
-    const role = (p.role || '').toLowerCase()
-    if (['developer', 'admin', 'moderator'].includes(role)) {
-      const apps = await listServiceApps()
-      setServiceApps(apps.service_apps || [])
-    }
   }
 
   useEffect(() => { load().catch(() => navigate('/login')) }, [])
@@ -101,22 +94,6 @@ export default function DashboardPage() {
 
   const onDisconnectService = async (n) => {
     try { await disconnectService(n); await load() }
-    catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
-  }
-
-  const onCreateServiceApp = async (name) => {
-    const d = await createServiceApp(name)
-    await load()
-    return d
-  }
-
-  const onRevokeServiceApp = async (id) => {
-    try { await revokeServiceApp(id); await load() }
-    catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
-  }
-
-  const onDeleteServiceApp = async (id) => {
-    try { await deleteServiceApp(id); await load() }
     catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
   }
 
@@ -180,10 +157,6 @@ export default function DashboardPage() {
         {activeSection === 'developer' && (
           <DeveloperSection
             profile={profile}
-            serviceApps={serviceApps}
-            onCreateApp={onCreateServiceApp}
-            onRevokeApp={onRevokeServiceApp}
-            onDeleteApp={onDeleteServiceApp}
             onNavigateToServices={() => navigate('/services')}
           />
         )}
