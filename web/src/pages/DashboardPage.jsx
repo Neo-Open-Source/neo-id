@@ -35,10 +35,8 @@ export default function DashboardPage() {
   const [providers, setProviders] = useState([])
   const [hasPassword, setHasPassword] = useState(false)
   const [services, setServices] = useState({ connected_services: [], available_services: [] })
-  const [serviceApps, setServiceApps] = useState([])
   const [msg, setMsg] = useState({ type: '', text: '' })
-
-  useEffect(() => { if (!token) navigate('/login') }, [token, navigate])
+  const token = getAccessToken()
 
   // Sync hash ↔ activeSection
   useEffect(() => {
