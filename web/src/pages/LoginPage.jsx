@@ -34,16 +34,17 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(false) // checking existing token
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [totpRequired, setTotpRequired] = useState(false)
 
   const params = new URLSearchParams(window.location.search)
-  const siteId = params.get('site_id') || ''
-  const redirectUrl = params.get('redirect_url') || ''
-  const siteState = params.get('site_state') || ''
+  const siteId = params.get('client_id') || params.get('site_id') || ''
+  const redirectUrl = params.get('redirect_uri') || params.get('redirect_url') || ''
+  const siteState = params.get('state') || params.get('site_state') || ''
   const popupMode = params.get('mode') || ''
-  const passedToken = params.get('token') || '' // existing Neo ID token from popup opener
+  const passedToken = params.get('token') || ''
 
   useEffect(() => {
     if (params.get('verified') === '1') setInfo('Email verified. You can sign in now.')
@@ -51,19 +52,19 @@ export default function LoginPage() {
 
   // Auto-complete: if already logged in to Neo ID, skip login form and go to consent
   useEffect(() => {
-    if (!siteId || !redirectUrl) return
-    if (params.get('token')) return // already tried
+    if (!siteId) return
+    if (params.get('token')) return
 
     const token = localStorage.getItem('accessToken') || ''
     if (!token) return
 
-    // Verify token and get consent session directly
+    setChecking(true)
     fetch('/api/auth/check-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         client_id: siteId,
-        redirect_uri: redirectUrl,
+        redirect_uri: redirectUrl || window.location.origin + '/auth/callback',
         state: siteState,
         scope: 'openid profile email',
         mode: popupMode,
@@ -72,8 +73,9 @@ export default function LoginPage() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.consent_url) window.location.replace(data.consent_url)
+        else setChecking(false)
       })
-      .catch(() => {})
+      .catch(() => setChecking(false))
   }, [])
 
   const oauthLogin = (provider) => {

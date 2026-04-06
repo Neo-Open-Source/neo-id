@@ -155,6 +155,8 @@ func (c *OIDCController) Authorize() {
 	q := url.Values{}
 	q.Set("oidc", "1")
 	q.Set("client_id", clientID)
+	q.Set("redirect_uri", redirectURI)
+	q.Set("scope", scope)
 	if state != "" {
 		q.Set("state", state)
 	}
