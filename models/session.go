@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // SessionCRUD operations
@@ -171,6 +172,54 @@ func (sc *SessionCRUD) DeleteUserSessions(userID string) error {
 		return fmt.Errorf("failed to delete user sessions: %w", err)
 	}
 
+	return nil
+}
+
+// CountUserSessions counts active (non-expired) sessions for a user
+func (sc *SessionCRUD) CountUserSessions(userID string) (int, error) {
+	ctx := context.Background()
+	count, err := sc.collection.CountDocuments(ctx, bson.M{
+		"user_id":    userID,
+		"expires_at": bson.M{"$gt": time.Now()},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count user sessions: %w", err)
+	}
+	return int(count), nil
+}
+
+// DeleteOldestSession deletes the active session with the oldest last_used_at for a user
+func (sc *SessionCRUD) DeleteOldestSession(userID string) error {
+	ctx := context.Background()
+	var oldest Session
+	opts := options.FindOne().SetSort(bson.D{{Key: "last_used_at", Value: 1}})
+	err := sc.collection.FindOne(ctx, bson.M{
+		"user_id":    userID,
+		"expires_at": bson.M{"$gt": time.Now()},
+	}, opts).Decode(&oldest)
+	if err == mongo.ErrNoDocuments {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to find oldest session: %w", err)
+	}
+	_, err = sc.collection.DeleteOne(ctx, bson.M{"_id": oldest.ID})
+	if err != nil {
+		return fmt.Errorf("failed to delete oldest session: %w", err)
+	}
+	return nil
+}
+
+// DeleteUserSessionsExcept deletes all sessions for a user except the one with the given token
+func (sc *SessionCRUD) DeleteUserSessionsExcept(userID, exceptToken string) error {
+	ctx := context.Background()
+	_, err := sc.collection.DeleteMany(ctx, bson.M{
+		"user_id": userID,
+		"token":   bson.M{"$ne": exceptToken},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete user sessions: %w", err)
+	}
 	return nil
 }
 

@@ -26,9 +26,7 @@ type AdminController struct {
 func (c *AdminController) SetUserRole() {
 	actor, err := c.authenticateAdminOrModerator()
 	if err != nil || actor == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "Unauthorized - admin/moderator access required"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - admin/moderator access required")
 		return
 	}
 
@@ -38,44 +36,32 @@ func (c *AdminController) SetUserRole() {
 	}
 	body, err := io.ReadAll(c.Ctx.Request.Body)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to read request body"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "server_error", "Failed to read request body")
 		return
 	}
 	if err := json.Unmarshal(body, &requestData); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "Invalid request body"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
 		return
 	}
 	role := strings.ToLower(strings.TrimSpace(requestData.Role))
 	if requestData.UserID == "" || role == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "user_id and role are required"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "user_id and role are required")
 		return
 	}
 	if role != "admin" && role != "moderator" && role != "developer" && role != "user" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "invalid role"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "invalid role")
 		return
 	}
 
 	userCRUD := models.NewUserCRUD()
 	u, err := userCRUD.GetUserByUnifiedID(requestData.UserID)
 	if err != nil || u == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
-		c.Data["json"] = map[string]interface{}{"error": "user not found"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusNotFound, "not_found", "user not found")
 		return
 	}
 	u.Role = strings.Title(role)
 	if err := userCRUD.UpdateUser(u); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "failed to set role"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "failed to set role")
 		return
 	}
 
@@ -205,11 +191,7 @@ func (c *AdminController) authenticateAdminOrModerator() (*models.User, error) {
 func (c *AdminController) GetUsers() {
 	actor, err := c.authenticateAdminOrModerator()
 	if err != nil || actor == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - admin/moderator access required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - admin/moderator access required")
 		return
 	}
 
@@ -324,11 +306,7 @@ func (c *AdminController) GetUsers() {
 func (c *AdminController) BanUser() {
 	actor, err := c.authenticateAdminOrModerator()
 	if err != nil || actor == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - admin/moderator access required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - admin/moderator access required")
 		return
 	}
 
@@ -340,28 +318,16 @@ func (c *AdminController) BanUser() {
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Failed to read request body",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "server_error", "Failed to read request body")
 		return
 	}
 	if err := json.Unmarshal(body, &requestData); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Invalid request body",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
 		return
 	}
 
 	if requestData.UserID == "" || requestData.Reason == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "user_id and reason are required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "user_id and reason are required")
 		return
 	}
 
@@ -414,11 +380,7 @@ func (c *AdminController) BanUser() {
 func (c *AdminController) UnbanUser() {
 	actor, err := c.authenticateAdminOrModerator()
 	if err != nil || actor == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - admin/moderator access required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - admin/moderator access required")
 		return
 	}
 
@@ -427,29 +389,17 @@ func (c *AdminController) UnbanUser() {
 	}
 	body, err := io.ReadAll(c.Ctx.Request.Body)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Failed to read request body",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "server_error", "Failed to read request body")
 		return
 	}
 
 	if err := json.Unmarshal(body, &requestData); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Invalid request body",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
 		return
 	}
 
 	if requestData.UserID == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "user_id is required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "user_id is required")
 		return
 	}
 
@@ -475,11 +425,7 @@ func (c *AdminController) UnbanUser() {
 func (c *AdminController) GetServices() {
 	actor, err := c.authenticateAdminOrModerator()
 	if err != nil || actor == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - admin/moderator access required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - admin/moderator access required")
 		return
 	}
 
@@ -504,39 +450,23 @@ func (c *AdminController) GetServices() {
 func (c *AdminController) CreateService() {
 	actor, err := c.authenticateAdminOrModerator()
 	if err != nil || actor == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - admin/moderator access required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - admin/moderator access required")
 		return
 	}
 
 	var service models.Service
 	body, err := io.ReadAll(c.Ctx.Request.Body)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Failed to read request body",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "server_error", "Failed to read request body")
 		return
 	}
 	if err := json.Unmarshal(body, &service); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Invalid request body",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
 		return
 	}
 
 	if service.Name == "" || service.DisplayName == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "name and display_name are required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "name and display_name are required")
 		return
 	}
 
@@ -553,11 +483,7 @@ func (c *AdminController) CreateService() {
 	}
 
 	if existingService != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusConflict)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Service already exists",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusConflict, "conflict", "Service already exists")
 		return
 	}
 
@@ -582,11 +508,7 @@ func (c *AdminController) CreateService() {
 func (c *AdminController) GetSites() {
 	actor, err := c.authenticateAdminOrModerator()
 	if err != nil || actor == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - admin/moderator access required",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - admin/moderator access required")
 		return
 	}
 

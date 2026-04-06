@@ -3,23 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import {
   Box, Stack, Typography, Button, TextField, Alert, Collapse,
   Tabs, Tab, Select, MenuItem, Chip, Dialog, DialogTitle,
-  DialogContent, DialogActions, FormControlLabel, Checkbox,
-  Avatar, Drawer, IconButton, useMediaQuery, useTheme
+  DialogContent, DialogActions, FormControlLabel, Checkbox, Avatar
 } from '@mui/material'
 import { clearTokens } from '../api/client'
-import ThemeToggle from '../components/ThemeToggle.jsx'
+import AppLayout from '../components/AppLayout.jsx'
 import {
   getProfile, adminGetUsers, adminSetUserRole, adminBanUser,
   adminUnbanUser, adminGetServices, adminCreateService, adminGetSites
 } from '../api/endpoints'
-
-function MenuIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-  )
-}
 
 const ROLE_COLORS = {
   admin: '#111111',
@@ -154,57 +145,16 @@ export default function AdminPage() {
     } catch (e) { notify('error', e?.message || 'Failed') }
   }
 
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
-  const [drawerOpen, setDrawerOpen] = useState(false)
-
-  const SidebarContent = () => (
-    <Box sx={{ width: 220, display: 'flex', flexDirection: 'column', p: 2, height: '100%', bgcolor: 'background.paper' }}>
-      <Box sx={{ px: 1, py: 1.5, mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.3px' }}>Neo ID</Typography>
-        <Typography variant="caption" color="text.secondary">Admin Panel</Typography>
-      </Box>
-      <Stack spacing={0.5} sx={{ flex: 1 }}>
-        <Button onClick={() => { navigate('/dashboard'); setDrawerOpen(false) }} sx={{ justifyContent: 'flex-start', px: 1.5, py: 0.75, borderRadius: 1.5, fontSize: '0.875rem', color: 'text.secondary', '&:hover': { bgcolor: 'action.hover', color: 'text.primary' } }}>
-          Dashboard
-        </Button>
-      </Stack>
-      <Box sx={{ pb: 1 }}><ThemeToggle /></Box>
-      <Button onClick={logout} sx={{ justifyContent: 'flex-start', px: 1.5, py: 0.75, borderRadius: 1.5, fontSize: '0.875rem', color: 'error.main', '&:hover': { bgcolor: 'error.main', color: '#fff', opacity: 0.9 } }}>
-        Sign out
-      </Button>
-    </Box>
-  )
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* Mobile top bar */}
-      {isMobile && (
-        <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', px: 2, py: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>Neo ID · Admin</Typography>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <ThemeToggle />
-            <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ color: 'text.primary' }}>
-              <MenuIcon />
-            </IconButton>
-          </Stack>
-        </Box>
-      )}
-
-      {/* Desktop sidebar */}
-      {!isMobile && (
-        <Box sx={{ width: 220, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider', position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
-          <SidebarContent />
-        </Box>
-      )}
-
-      {/* Mobile drawer */}
-      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)} PaperProps={{ sx: { bgcolor: 'background.paper', width: 240 } }}>
-        <SidebarContent />
-      </Drawer>
-
-      {/* Content */}
-      <Box sx={{ flex: 1, p: { xs: 2, md: 4 }, pt: { xs: 9, md: 4 } }}>
+    <AppLayout
+      title="Neo ID"
+      subtitle="Admin Panel"
+      mobileTitle="Neo ID · Admin"
+      navItems={[{ label: 'Dashboard', onClick: () => navigate('/dashboard') }]}
+      onLogout={logout}
+    >
+      <Box sx={{ p: { xs: 2, md: 4 } }}>
         <Collapse in={!!msg.text}>
           <Alert severity={msg.type || 'info'} sx={{ mb: 3, py: 0.5 }}>{msg.text}</Alert>
         </Collapse>
@@ -409,7 +359,6 @@ export default function AdminPage() {
             </Box>
           </Box>
         )}
-      </Box>
 
       {/* Ban dialog */}
       <Dialog open={banDialogOpen} onClose={() => setBanDialogOpen(false)} maxWidth="xs" fullWidth>
@@ -429,6 +378,7 @@ export default function AdminPage() {
           <Button size="small" color="error" variant="contained" onClick={confirmBan}>Ban</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+      </Box>
+    </AppLayout>
   )
 }

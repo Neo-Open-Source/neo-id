@@ -1,18 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Box, Stack, Typography, Button, Chip,
-  Drawer, IconButton, useMediaQuery, useTheme, Select, MenuItem
+  Box, Stack, Typography, Button,
+  useMediaQuery, useTheme, Select, MenuItem
 } from '@mui/material'
-import ThemeToggle from '../components/ThemeToggle.jsx'
-
-function MenuIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-  )
-}
+import AppLayout from '../components/AppLayout.jsx'
 
 const METHOD_COLORS = {
   GET: { bg: '#dbeafe', text: '#1d4ed8' },
@@ -459,93 +451,41 @@ export default function DocsPage() {
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const [active, setActive] = useState('overview')
 
-  const nav = (id) => { setActive(id); setDrawerOpen(false) }
-
-  const NavList = ({ onClose }) => (
-    <Stack spacing={0.25}>
-      <Button
-        onClick={() => { navigate('/dashboard'); onClose?.() }}
-        sx={{ justifyContent: 'flex-start', px: 1.5, py: 0.6, borderRadius: 1.5, fontSize: '0.8rem', color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' } }}
-      >
-        ← Dashboard
-      </Button>
-      <Box sx={{ my: 1, height: '1px', bgcolor: 'divider' }} />
-      {SECTIONS.map((s) => (
-        <Button
-          key={s.id}
-          onClick={() => { nav(s.id); onClose?.() }}
-          sx={{
-            justifyContent: 'flex-start', px: 1.5, py: 0.6, borderRadius: 1.5, fontSize: '0.8rem',
-            fontWeight: active === s.id ? 600 : 400,
-            color: active === s.id ? 'text.primary' : 'text.secondary',
-            bgcolor: active === s.id ? 'action.selected' : 'transparent',
-            '&:hover': { bgcolor: 'action.hover', color: 'text.primary' }
-          }}
-        >
-          {s.label}
-        </Button>
-      ))}
-    </Stack>
-  )
+  const navItems = [
+    { label: '← Dashboard', onClick: () => navigate('/dashboard') },
+    ...SECTIONS.map((s) => ({
+      label: s.label,
+      onClick: () => setActive(s.id),
+      active: active === s.id,
+    })),
+  ]
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* Mobile top bar */}
+    <AppLayout
+      title="Neo ID"
+      subtitle="Documentation"
+      navItems={navItems}
+      sidebarWidth={200}
+      mobileTitle="Docs"
+    >
+      {/* Mobile section picker */}
       {isMobile && (
-        <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', px: 2, py: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Docs</Typography>
-            {/* Section picker on mobile */}
-            <Select
-              size="small"
-              value={active}
-              onChange={(e) => setActive(e.target.value)}
-              sx={{ fontSize: '0.8rem', height: 30, minWidth: 130 }}
-            >
-              {SECTIONS.map((s) => <MenuItem key={s.id} value={s.id}>{s.label}</MenuItem>)}
-            </Select>
-          </Stack>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <ThemeToggle />
-            <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ color: 'text.primary' }}>
-              <MenuIcon />
-            </IconButton>
-          </Stack>
+        <Box sx={{ px: 2, pt: 1, pb: 0 }}>
+          <Select
+            size="small"
+            value={active}
+            onChange={(e) => setActive(e.target.value)}
+            sx={{ fontSize: '0.8rem', height: 30, minWidth: 160 }}
+          >
+            {SECTIONS.map((s) => <MenuItem key={s.id} value={s.id}>{s.label}</MenuItem>)}
+          </Select>
         </Box>
       )}
-
-      {/* Desktop sidebar */}
-      {!isMobile && (
-        <Box sx={{ width: 200, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider', minHeight: '100vh', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
-          <Box sx={{ p: 2 }}>
-            <Box sx={{ px: 1, py: 1.5, mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.3px' }}>Neo ID</Typography>
-              <Typography variant="caption" color="text.secondary">Documentation</Typography>
-            </Box>
-            <NavList />
-            <Box sx={{ mt: 2 }}><ThemeToggle /></Box>
-          </Box>
-        </Box>
-      )}
-
-      {/* Mobile drawer */}
-      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)} PaperProps={{ sx: { bgcolor: 'background.paper', width: 220 } }}>
-        <Box sx={{ p: 2 }}>
-          <Box sx={{ px: 1, py: 1.5, mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Neo ID</Typography>
-            <Typography variant="caption" color="text.secondary">Documentation</Typography>
-          </Box>
-          <NavList onClose={() => setDrawerOpen(false)} />
-        </Box>
-      </Drawer>
-
-      {/* Content */}
-      <Box sx={{ flex: 1, p: { xs: 2, md: 5 }, pt: { xs: 9, md: 5 }, maxWidth: 780, minWidth: 0 }}>
+      <Box sx={{ p: { xs: 2, md: 5 }, maxWidth: 780, minWidth: 0 }}>
         <Content active={active} />
       </Box>
-    </Box>
+    </AppLayout>
   )
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"unified-id/controllers"
 	"unified-id/models"
@@ -24,10 +25,29 @@ func main() {
 
 	controllers.InitOAuthProviders()
 
+	// Initialize RSA KeyManager for RS256 JWT signing
+	km, err := controllers.NewKeyManager()
+	if err != nil {
+		log.Fatal("Failed to initialize KeyManager:", err)
+	}
+	controllers.GlobalKeyManager = km
+
 	// Initialize database connection
 	if err := models.InitDatabase(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
+
+	// Cleanup expired sessions every 24 hours
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			sessionCRUD := models.NewSessionCRUD()
+			if err := sessionCRUD.CleanupExpiredSessions(); err != nil {
+				log.Printf("CleanupExpiredSessions error: %v", err)
+			}
+		}
+	}()
 
 	// Initialize routers
 	routers.InitRoutes()

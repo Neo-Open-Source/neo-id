@@ -205,3 +205,24 @@ export async function setRefreshDuration(months) {
   const res = await api.post('/api/user/sessions/refresh-duration', { months })
   return res.data
 }
+
+// Admin clients (OIDC) management
+export async function adminListClients() {
+  const res = await api.get('/api/admin/clients')
+  return res.data
+}
+
+export async function adminCreateClient(payload) {
+  const res = await api.post('/api/admin/clients', payload)
+  return res.data
+}
+
+export async function adminUpdateClient(clientId, payload) {
+  const res = await api.patch(`/api/admin/clients/${clientId}`, payload)
+  return res.data
+}
+
+export async function adminDeleteClient(clientId) {
+  const res = await api.delete(`/api/admin/clients/${clientId}`)
+  return res.data
+}

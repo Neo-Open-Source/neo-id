@@ -63,3 +63,13 @@ func (a *AuthCodeCRUD) MarkUsed(id primitive.ObjectID) error {
 	_, err := a.collection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"used": true}})
 	return err
 }
+
+// DeleteByClientID deletes all auth codes for a given client (site_id).
+func (a *AuthCodeCRUD) DeleteByClientID(clientID string) error {
+	ctx := context.Background()
+	_, err := a.collection.DeleteMany(ctx, bson.M{"client_id": clientID})
+	if err != nil {
+		return fmt.Errorf("failed to delete auth codes for client %s: %w", clientID, err)
+	}
+	return nil
+}

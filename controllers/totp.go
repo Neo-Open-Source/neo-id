@@ -49,9 +49,7 @@ func (c *TOTPController) authenticateUser() (*models.User, error) {
 func (c *TOTPController) Setup() {
 	user, err := c.authenticateUser()
 	if err != nil || user == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "Unauthorized"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized")
 		return
 	}
 
@@ -61,25 +59,19 @@ func (c *TOTPController) Setup() {
 		AccountName: user.Email,
 	})
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to generate TOTP secret"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate TOTP secret")
 		return
 	}
 
 	// Generate QR code PNG → base64
 	img, err := key.Image(200, 200)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to generate QR code"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate QR code")
 		return
 	}
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to encode QR code"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to encode QR code")
 		return
 	}
 	qrBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
@@ -103,9 +95,7 @@ func (c *TOTPController) Setup() {
 func (c *TOTPController) Verify() {
 	user, err := c.authenticateUser()
 	if err != nil || user == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "Unauthorized"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized")
 		return
 	}
 
@@ -116,23 +106,17 @@ func (c *TOTPController) Verify() {
 	_ = json.Unmarshal(raw, &body)
 
 	if strings.TrimSpace(body.Code) == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "code is required"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "code is required")
 		return
 	}
 	if user.TOTPSecret == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "TOTP not set up. Call /setup first."}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "TOTP not set up. Call /setup first.")
 		return
 	}
 
 	valid := totp.Validate(strings.TrimSpace(body.Code), user.TOTPSecret)
 	if !valid {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "Invalid code"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid code")
 		return
 	}
 
@@ -147,9 +131,7 @@ func (c *TOTPController) Verify() {
 func (c *TOTPController) Disable() {
 	user, err := c.authenticateUser()
 	if err != nil || user == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "Unauthorized"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized")
 		return
 	}
 
@@ -166,9 +148,7 @@ func (c *TOTPController) Disable() {
 	}
 
 	if !totp.Validate(strings.TrimSpace(body.Code), user.TOTPSecret) {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "Invalid code"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid code")
 		return
 	}
 
@@ -197,44 +177,35 @@ func (c *TOTPController) LoginVerify() {
 	email := strings.TrimSpace(strings.ToLower(body.Email))
 	code := strings.TrimSpace(body.Code)
 	if email == "" || code == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "email and code are required"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "email and code are required")
 		return
 	}
 
 	userCRUD := models.NewUserCRUD()
 	user, err := userCRUD.GetUserByEmail(email)
 	if err != nil || user == nil || !user.TOTPEnabled {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "TOTP not enabled for this account"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "TOTP not enabled for this account")
 		return
 	}
 
 	if !totp.Validate(code, user.TOTPSecret) {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "Invalid code"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid code")
 		return
 	}
 
 	if user.IsBanned {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
-		c.Data["json"] = map[string]interface{}{"error": "Account is banned"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusForbidden, "access_denied", "Account is banned")
 		return
 	}
 
 	accessToken, refreshToken, err := generateTokens(user.UnifiedID, user.Email)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to generate tokens"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate tokens")
 		return
 	}
 
 	sessionCRUD := models.NewSessionCRUD()
+	enforceSessionLimit(user.UnifiedID)
 	_ = sessionCRUD.CreateSession(&models.Session{
 		Token:     accessToken,
 		UserID:    user.UnifiedID,

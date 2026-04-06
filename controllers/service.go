@@ -37,9 +37,8 @@ func (c *ServiceController) verifyServiceToken() (string, error) {
 	return app.Name, nil
 }
 
-// verifyUserToken verifies user JWT token
-func (c *ServiceController) verifyUserToken() (*models.User, error) {
-	token := c.Ctx.Request.Header.Get("X-User-Token")
+// verifyUserToken verifies user JWT token from the provided token string
+func (c *ServiceController) verifyUserToken(token string) (*models.User, error) {
 	if token == "" {
 		return nil, nil // No user token provided
 	}
@@ -76,49 +75,34 @@ func (c *ServiceController) verifyUserToken() (*models.User, error) {
 	return user, nil
 }
 
-// VerifyToken verifies a user token for services
+// VerifyToken verifies a user token for services.
+// Accepts {"token": "..."} in the request body.
 func (c *ServiceController) VerifyToken() {
 	// Verify service token
 	serviceName, err := c.verifyServiceToken()
 	if err != nil || serviceName == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - invalid service token",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - invalid service token")
 		return
 	}
 
 	var requestData struct {
-		UserToken string `json:"user_token"`
+		Token string `json:"token"`
 	}
 
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &requestData); err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Invalid request body",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
 		return
 	}
 
-	if requestData.UserToken == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{
-			"error": "user_token is required",
-		}
-		c.ServeJSON()
+	if requestData.Token == "" {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "token is required")
 		return
 	}
 
-	// Verify user token
-	user, err := c.verifyUserToken()
+	// Verify user token from body
+	user, err := c.verifyUserToken(requestData.Token)
 	if err != nil || user == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Unauthorized - invalid user token",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_token", "Unauthorized - invalid user token")
 		return
 	}
 
@@ -132,11 +116,7 @@ func (c *ServiceController) VerifyToken() {
 	}
 
 	if !isConnected {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
-		c.Data["json"] = map[string]interface{}{
-			"error": "Service not connected to user account",
-		}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusForbidden, "forbidden", "Service not connected to user account")
 		return
 	}
 
@@ -166,7 +146,8 @@ func (c *ServiceController) GetUserInfo() {
 	}
 
 	// Verify user token from header
-	user, err := c.verifyUserToken()
+	userToken := c.Ctx.Request.Header.Get("X-User-Token")
+	user, err := c.verifyUserToken(userToken)
 	if err != nil || user == nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
 		c.Data["json"] = map[string]interface{}{

@@ -42,10 +42,39 @@ export default function LoginPage() {
   const siteId = params.get('site_id') || ''
   const redirectUrl = params.get('redirect_url') || ''
   const siteState = params.get('site_state') || ''
-  const popupMode = params.get('mode') || '' // 'popup' for popup window flow
+  const popupMode = params.get('mode') || ''
+  const passedToken = params.get('token') || '' // existing Neo ID token from popup opener
 
   useEffect(() => {
     if (params.get('verified') === '1') setInfo('Email verified. You can sign in now.')
+  }, [])
+
+  // Auto-complete: if a valid token cookie exists and we have site context, skip login form
+  useEffect(() => {
+    if (!siteId || !redirectUrl) return
+
+    // Read Neo ID token from cross-subdomain cookie
+    const getCookie = (name) => {
+      const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
+      return match ? decodeURIComponent(match[1]) : ''
+    }
+    const cookieToken = getCookie('neo_id_token')
+    if (!cookieToken) return
+
+    // Try to refresh — if valid, skip login form
+    fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: cookieToken })
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.access_token) {
+          const modeParam = popupMode === 'popup' ? '&mode=popup' : ''
+          window.location.href = `/api/site/callback?site_id=${encodeURIComponent(siteId)}&redirect_url=${encodeURIComponent(redirectUrl)}&state=${encodeURIComponent(siteState)}&token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}${modeParam}`
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const oauthLogin = (provider) => {

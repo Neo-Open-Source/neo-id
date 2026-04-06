@@ -7,11 +7,12 @@ import LoginPage from './pages/LoginPage.jsx'
 import VerifyPage from './pages/VerifyPage.jsx'
 import SetupPage from './pages/SetupPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
-import RegisterSitePage from './pages/RegisterSitePage.jsx'
+import ServicesPage from './pages/ServicesPage.jsx'
 import AdminPage from './pages/AdminPage.jsx'
 import DocsPage from './pages/DocsPage.jsx'
 import TermsPage from './pages/TermsPage.jsx'
 import PrivacyPage from './pages/PrivacyPage.jsx'
+import ConsentPage from './pages/ConsentPage.jsx'
 
 function makeTheme(mode) {
   const dark = mode === 'dark'
@@ -149,8 +150,9 @@ function ThemedApp() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/setup" element={<SetupPage />} />
+        <Route path="/consent" element={<ConsentPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/register" element={<RegisterSitePage />} />
+        <Route path="/services" element={<ServicesPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/terms" element={<TermsPage />} />

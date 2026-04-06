@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 	"unified-id/models"
@@ -106,6 +109,22 @@ func makeSession(token, userID, ip, ua string, months int, refreshToken string, 
 	return s
 }
 
+// enforceSessionLimit ensures a user has fewer than 10 active sessions.
+// If the limit is reached, the oldest session is deleted. Errors are logged but do not block session creation.
+func enforceSessionLimit(userID string) {
+	sessionCRUD := models.NewSessionCRUD()
+	count, err := sessionCRUD.CountUserSessions(userID)
+	if err != nil {
+		log.Printf("enforceSessionLimit: count error for user %s: %v", userID, err)
+		return
+	}
+	if count >= 10 {
+		if err := sessionCRUD.DeleteOldestSession(userID); err != nil {
+			log.Printf("enforceSessionLimit: delete oldest error for user %s: %v", userID, err)
+		}
+	}
+}
+
 func max(a, b int) int {
 	if a > b {
 		return a
@@ -116,4 +135,46 @@ func max(a, b int) int {
 // totpValidate is a package-level wrapper so user.go can call it without importing pquerna/otp
 func totpValidate(code, secret string) bool {
 	return totpValidateCode(code, secret)
+}
+
+// setAuthCookie sets a cross-subdomain cookie with the access token
+// so popup windows on id.neomovies.ru can detect existing sessions
+func setAuthCookie(w http.ResponseWriter, token string) {
+	baseURL := strings.TrimSpace(os.Getenv("BASE_URL"))
+	// Extract root domain for cookie (e.g. id.neomovies.ru → .neomovies.ru)
+	cookieDomain := ""
+	if baseURL != "" {
+		if u, err := url.Parse(baseURL); err == nil {
+			host := u.Hostname()
+			parts := strings.Split(host, ".")
+			if len(parts) >= 2 {
+				cookieDomain = "." + strings.Join(parts[len(parts)-2:], ".")
+			}
+		}
+	}
+
+	secure := strings.HasPrefix(strings.ToLower(baseURL), "https://")
+	sameSite := "Lax"
+	if secure {
+		sameSite = "None"
+	}
+
+	cookie := &http.Cookie{
+		Name:     "neo_id_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   3600 * 24 * 30,
+		HttpOnly: false, // must be readable by JS for popup detection
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	}
+	if secure {
+		cookie.SameSite = http.SameSiteNoneMode
+	}
+	if cookieDomain != "" {
+		cookie.Domain = cookieDomain
+	}
+
+	_ = sameSite // used above
+	http.SetCookie(w, cookie)
 }

@@ -1,0 +1,51 @@
+# 2026/04/06 21:50:42.696682 [TestPropertyP11_SessionLimit] [rapid] draw n: 11
+# 2026/04/06 21:50:42.696691 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696693 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696694 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696695 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696702 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696703 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696704 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696711 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696712 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696713 [TestPropertyP11_SessionLimit] [rapid] draw offset: 1
+# 2026/04/06 21:50:42.696714 [TestPropertyP11_SessionLimit] [rapid] draw offset: 0
+# 2026/04/06 21:50:42.696716 [TestPropertyP11_SessionLimit] oldest session was not removed: remaining min LastUsedAt 2024-01-01 00:00:00 +0000 UTC is before evicted 2024-01-01 00:00:01 +0000 UTC
+# 
+v0.4.8#667383948793645096
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0

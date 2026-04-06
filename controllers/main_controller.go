@@ -19,17 +19,13 @@ func (c *MainController) Get() {
 		// Try alternative path
 		indexFile = "static/index.html"
 		if _, err := os.Stat(indexFile); err != nil {
-			c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
-			c.Data["json"] = map[string]interface{}{"error": "Frontend not built"}
-			c.ServeJSON()
+			respondError(&c.Controller, http.StatusNotFound, "not_found", "Frontend not built")
 			return
 		}
 	}
 	file, err := os.Open(indexFile)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-		c.Data["json"] = map[string]interface{}{"error": "Failed to serve index"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to serve index")
 		return
 	}
 	defer file.Close()

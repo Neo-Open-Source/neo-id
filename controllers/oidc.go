@@ -56,7 +56,7 @@ func (c *OIDCController) Discovery() {
 		"end_session_endpoint":                  base + "/oauth/logout",
 		"response_types_supported":              []string{"code"},
 		"subject_types_supported":               []string{"public"},
-		"id_token_signing_alg_values_supported": []string{"HS256"},
+		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"scopes_supported":                      []string{"openid", "profile", "email"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic"},
 		"claims_supported":                      []string{"sub", "iss", "aud", "exp", "iat", "email", "email_verified", "name", "picture", "given_name", "family_name"},
@@ -67,18 +67,11 @@ func (c *OIDCController) Discovery() {
 	c.ServeJSON()
 }
 
-// JWKS returns the JSON Web Key Set (symmetric key info for HS256)
+// JWKS returns the JSON Web Key Set with the RSA public key for RS256 verification.
 func (c *OIDCController) JWKS() {
-	// For HS256 we don't expose the secret key — clients verify via /oauth/userinfo or /oauth/token introspection.
-	// We still return a valid JWKS structure indicating the algorithm.
 	c.Data["json"] = map[string]interface{}{
 		"keys": []map[string]interface{}{
-			{
-				"kty": "oct",
-				"use": "sig",
-				"alg": "HS256",
-				"kid": "neo-id-hs256",
-			},
+			GlobalKeyManager.PublicKeyJWK(),
 		},
 	}
 	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "*")
@@ -131,63 +124,20 @@ func (c *OIDCController) Authorize() {
 	// Check if user already has a valid session (token in Authorization header or cookie)
 	existingUser := c.tryGetExistingUser()
 	if existingUser != nil {
-		// User already logged in — issue auth code immediately, no login needed
-		code := generateAuthCode()
-		authCodeCRUD := models.NewAuthCodeCRUD()
-		_ = authCodeCRUD.Create(&models.AuthCode{
-			Code:                code,
+		// User already logged in — show consent page instead of issuing code immediately
+		key := newConsentSession(&pendingConsent{
 			ClientID:            clientID,
-			UserID:              existingUser.UnifiedID,
 			RedirectURI:         redirectURI,
 			Scope:               scope,
+			State:               state,
 			Nonce:               nonce,
 			CodeChallenge:       codeChallenge,
 			CodeChallengeMethod: codeChallengeMethod,
+			Mode:                mode,
+			UserID:              existingUser.UnifiedID,
 			ExpiresAt:           time.Now().Add(10 * time.Minute),
 		})
-
-		// Also connect user to site
-		_ = models.NewUserCRUD().AddConnectedService(existingUser.UnifiedID, site.Name)
-		connCRUD := models.NewUserSiteConnectionCRUD()
-		_ = connCRUD.ConnectUserToSite(existingUser.UnifiedID, clientID, site.Name)
-
-		q := url.Values{}
-		q.Set("code", code)
-		if state != "" {
-			q.Set("state", state)
-		}
-
-		finalURL := redirectURI + "?" + q.Encode()
-
-		// Popup mode: send postMessage
-		if mode == "popup" {
-			origin := redirectURI
-			if u, err2 := url.Parse(redirectURI); err2 == nil {
-				origin = u.Scheme + "://" + u.Host
-			}
-			// Get tokens for postMessage
-			accessToken, refreshToken, _, _ := generateTokensWithDuration(existingUser.UnifiedID, existingUser.Email, existingUser.RefreshDurationMonths)
-			if accessToken == "" {
-				accessToken, refreshToken, _ = generateTokens(existingUser.UnifiedID, existingUser.Email)
-			}
-			sessionCRUD := models.NewSessionCRUD()
-			sess2 := makeSession(accessToken, existingUser.UnifiedID, getRealIP(c.Ctx.Request), c.Ctx.Request.UserAgent(), existingUser.RefreshDurationMonths, refreshToken, time.Now().AddDate(0, max(existingUser.RefreshDurationMonths, 1), 0))
-			_ = sessionCRUD.CreateSession(sess2)
-			createSessionWithGeo(sess2)
-
-			html := `<!doctype html><html><head><meta charset="utf-8"></head><body><script>
-(function(){
-  var data={type:"neo_id_auth",access_token:"` + accessToken + `",refresh_token:"` + refreshToken + `",state:"` + state + `"};
-  if(window.opener){window.opener.postMessage(data,"` + origin + `");window.close();}
-  else{window.location.replace("` + finalURL + `");}
-})();
-</script></body></html>`
-			c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
-			c.Ctx.ResponseWriter.Write([]byte(html))
-			return
-		}
-
-		c.Redirect(finalURL, http.StatusFound)
+		c.Redirect("/consent?session="+key, http.StatusFound)
 		return
 	}
 
@@ -420,6 +370,7 @@ func (c *OIDCController) processAuthCodeGrant(code, clientID, clientSecret, redi
 
 	// Store session
 	sessionCRUD := models.NewSessionCRUD()
+	enforceSessionLimit(user.UnifiedID)
 	_ = sessionCRUD.CreateSession(&models.Session{
 		Token:     accessToken,
 		UserID:    user.UnifiedID,
@@ -482,6 +433,7 @@ func (c *OIDCController) processRefreshTokenGrant(refreshToken, clientID, client
 	}
 
 	sessionCRUD := models.NewSessionCRUD()
+	enforceSessionLimit(user.UnifiedID)
 	_ = sessionCRUD.CreateSession(&models.Session{
 		Token:     accessToken,
 		UserID:    user.UnifiedID,
@@ -508,10 +460,7 @@ func (c *OIDCController) UserInfo() {
 	token := strings.TrimPrefix(c.Ctx.Request.Header.Get("Authorization"), "Bearer ")
 	token = strings.TrimSpace(token)
 	if token == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Ctx.ResponseWriter.Header().Set("WWW-Authenticate", `Bearer realm="neo-id"`)
-		c.Data["json"] = map[string]interface{}{"error": "unauthorized"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Bearer token required")
 		return
 	}
 
@@ -521,27 +470,21 @@ func (c *OIDCController) UserInfo() {
 		return []byte(secret), nil
 	})
 	if err != nil || !tok.Valid {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "invalid_token"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_token", "Token is invalid or expired")
 		return
 	}
 
 	sessionCRUD := models.NewSessionCRUD()
 	sess, err := sessionCRUD.GetSessionByToken(token)
 	if err != nil || sess == nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "invalid_token"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_token", "Session not found or expired")
 		return
 	}
 
 	userCRUD := models.NewUserCRUD()
 	user, err := userCRUD.GetUserByUnifiedID(claims.UnifiedID)
 	if err != nil || user == nil || user.IsBanned {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "invalid_token"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_token", "User not found or banned")
 		return
 	}
 
@@ -584,9 +527,7 @@ func (c *OIDCController) OIDCCallback() {
 	// Get OIDC params from session
 	sess, err := getOAuthCookieSession(c.Ctx.Request)
 	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "session error"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "session error")
 		return
 	}
 
@@ -599,9 +540,7 @@ func (c *OIDCController) OIDCCallback() {
 	codeChallengeMethod, _ := sess.Values["oidc_code_challenge_method"].(string)
 
 	if clientID == "" || redirectURI == "" {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
-		c.Data["json"] = map[string]interface{}{"error": "no pending OIDC request"}
-		c.ServeJSON()
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "no pending OIDC request")
 		return
 	}
 
@@ -691,9 +630,8 @@ func generateAuthCode() string {
 }
 
 func generateIDToken(user *models.User, site *models.Site, nonce string) (string, error) {
-	secret := firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))
-	if secret == "" {
-		return "", fmt.Errorf("JWT_SECRET not configured")
+	if GlobalKeyManager == nil {
+		return "", fmt.Errorf("KeyManager not initialized")
 	}
 
 	now := time.Now()
@@ -715,9 +653,7 @@ func generateIDToken(user *models.User, site *models.Site, nonce string) (string
 		claims["nonce"] = nonce
 	}
 
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tok.Header["kid"] = "neo-id-hs256"
-	return tok.SignedString([]byte(secret))
+	return GlobalKeyManager.Sign(claims)
 }
 
 func verifyCodeChallenge(verifier, challenge, method string) bool {

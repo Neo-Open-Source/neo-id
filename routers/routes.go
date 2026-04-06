@@ -7,6 +7,9 @@ import (
 )
 
 func InitRoutes() {
+	// Health check
+	web.Router("/api/health", &controllers.AuthController{}, "get:Health")
+
 	// API routes
 	web.Router("/api/auth/login", &controllers.AuthController{}, "get:Login")
 	web.Router("/api/auth/login/:provider", &controllers.AuthController{}, "get:Login")
@@ -49,6 +52,12 @@ func InitRoutes() {
 	web.Router("/api/user/sessions/revoke", &controllers.UserController{}, "post:RevokeSession")
 	web.Router("/api/user/sessions/refresh-duration", &controllers.UserController{}, "post:SetRefreshDuration")
 
+	// Admin client (OIDC) management routes
+	web.Router("/api/admin/clients", &controllers.AdminClientsController{}, "post:CreateClient")
+	web.Router("/api/admin/clients", &controllers.AdminClientsController{}, "get:ListClients")
+	web.Router("/api/admin/clients/:client_id", &controllers.AdminClientsController{}, "delete:DeleteClient")
+	web.Router("/api/admin/clients/:client_id", &controllers.AdminClientsController{}, "patch:UpdateClient")
+
 	// Admin routes
 	web.Router("/api/admin/users", &controllers.AdminController{}, "get:GetUsers")
 	web.Router("/api/admin/users/ban", &controllers.AdminController{}, "post:BanUser")
@@ -63,7 +72,6 @@ func InitRoutes() {
 	web.Router("/api/service/userinfo", &controllers.ServiceController{}, "get:GetUserInfo")
 
 	// Site management routes (new SaaS model)
-	web.Router("/api/site/register", &controllers.SiteController{}, "post:RegisterSite")
 	web.Router("/api/site/login", &controllers.SiteController{}, "post:SiteLogin;options:SiteLogin")
 	web.Router("/api/site/callback", &controllers.SiteController{}, "get:SiteCallback")
 	web.Router("/api/site/verify", &controllers.SiteController{}, "post:VerifySiteToken")
@@ -80,15 +88,19 @@ func InitRoutes() {
 	web.Router("/oauth/userinfo", &controllers.OIDCController{}, "get:UserInfo;post:UserInfo")
 	web.Router("/oauth/revoke", &controllers.OIDCController{}, "post:Revoke")
 	web.Router("/oauth/callback", &controllers.OIDCController{}, "get:OIDCCallback")
+	// Consent
+	web.Router("/api/oauth/consent-info", &controllers.OIDCController{}, "get:ConsentInfo")
+	web.Router("/api/oauth/consent", &controllers.OIDCController{}, "post:Consent")
 
 	// Dashboard routes (serve frontend)
 	web.Router("/", &controllers.MainController{}, "get:Get")
 	web.Router("/login", &controllers.MainController{}, "get:Get")
 	web.Router("/verify", &controllers.MainController{}, "get:Get")
 	web.Router("/setup", &controllers.MainController{}, "get:Get")
+	web.Router("/consent", &controllers.MainController{}, "get:Get")
 	web.Router("/dashboard", &controllers.MainController{}, "get:Get")
-	web.Router("/register", &controllers.MainController{}, "get:Get")
 	web.Router("/admin", &controllers.MainController{}, "get:Get")
+	web.Router("/services", &controllers.MainController{}, "get:Get")
 	web.Router("/docs", &controllers.MainController{}, "get:Get")
 	web.Router("/terms", &controllers.MainController{}, "get:Get")
 	web.Router("/privacy", &controllers.MainController{}, "get:Get")

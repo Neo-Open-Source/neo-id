@@ -23,9 +23,10 @@ type Site struct {
 	LogoURL     string             `bson:"logo_url" json:"logo_url"`
 
 	// Configuration
-	AllowedOrigins []string `bson:"allowed_origins" json:"allowed_origins"`             // CORS allowed origins
-	RedirectURI    string   `bson:"redirect_uri" json:"redirect_uri"`                   // OAuth redirect URI
-	WebhookURL     string   `bson:"webhook_url,omitempty" json:"webhook_url,omitempty"` // Called on disconnect
+	AllowedOrigins []string `bson:"allowed_origins" json:"allowed_origins"`                 // CORS allowed origins
+	RedirectURI    string   `bson:"redirect_uri" json:"redirect_uri"`                       // OAuth redirect URI (legacy, first of RedirectURIs)
+	RedirectURIs   []string `bson:"redirect_uris,omitempty" json:"redirect_uris,omitempty"` // All allowed redirect URIs
+	WebhookURL     string   `bson:"webhook_url,omitempty" json:"webhook_url,omitempty"`     // Called on disconnect
 
 	// Status
 	IsActive  bool      `bson:"is_active" json:"is_active"`
@@ -34,6 +35,7 @@ type Site struct {
 
 	// Owner info
 	OwnerEmail string `bson:"owner_email" json:"owner_email"`
+	OwnerID    string `bson:"owner_id,omitempty" json:"owner_id,omitempty"`
 	Plan       string `bson:"plan" json:"plan"` // free, pro, enterprise
 }
 
