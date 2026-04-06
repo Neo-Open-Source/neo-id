@@ -101,37 +101,9 @@ func (c *AuthController) RefreshToken() {
 	sessionCRUD := models.NewSessionCRUD()
 	sess, err := sessionCRUD.GetSessionByRefreshToken(requestBody.RefreshToken)
 	if err != nil || sess == nil {
-		// Fallback: try JWT validation for legacy tokens
-		claims := &Claims{}
-		tok, err2 := jwt.ParseWithClaims(requestBody.RefreshToken, claims, func(t *jwt.Token) (interface{}, error) {
-			return []byte(firstNonEmpty(os.Getenv("JWT_SECRET"), web.AppConfig.DefaultString("jwt_secret", ""))), nil
-		})
-		if err2 != nil || !tok.Valid {
-			respondError(&c.Controller, http.StatusUnauthorized, "invalid_request", "Invalid or expired refresh token")
-			return
-		}
-		userCRUD := models.NewUserCRUD()
-		user, _ := userCRUD.GetUserByUnifiedID(claims.UnifiedID)
-		if user == nil {
-			respondError(&c.Controller, http.StatusUnauthorized, "not_found", "User not found")
-			return
-		}
-		accessToken, newRefresh, refreshExp, _ := generateTokensWithDuration(user.UnifiedID, user.Email, 1)
-		newSess := &models.Session{
-			Token:                 accessToken,
-			UserID:                user.UnifiedID,
-			ExpiresAt:             time.Now().Add(24 * time.Hour),
-			IPAddress:             getRealIP(c.Ctx.Request),
-			UserAgent:             c.Ctx.Request.UserAgent(),
-			RefreshToken:          newRefresh,
-			RefreshExpiresAt:      refreshExp,
-			RefreshDurationMonths: 1,
-			LastUsedAt:            time.Now(),
-		}
-		enforceSessionLimit(user.UnifiedID)
-		_ = sessionCRUD.CreateSession(newSess)
-		c.Data["json"] = map[string]interface{}{"access_token": accessToken, "refresh_token": newRefresh}
-		c.ServeJSON()
+		// Security: refresh tokens must map to an existing session record.
+		// This prevents revoked sessions from being recreated via old JWT refresh tokens.
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_request", "Invalid or expired refresh token")
 		return
 	}
 
