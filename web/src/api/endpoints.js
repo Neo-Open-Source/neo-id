@@ -75,13 +75,18 @@ export async function disconnectService(service_name) {
   return res.data
 }
 
-export async function registerSite(payload) {
-  const res = await api.post('/api/site/register', payload)
+export async function registerService(payload) {
+  const res = await api.post('/api/service/register', payload)
   return res.data
 }
 
-export async function getMySites() {
-  const res = await api.get('/api/site/my')
+export async function getMyServices() {
+  const res = await api.get('/api/service/my')
+  return res.data
+}
+
+export async function deleteService(site_id) {
+  const res = await api.post('/api/service/delete', { site_id })
   return res.data
 }
 

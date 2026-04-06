@@ -73,6 +73,7 @@ func InitRoutes() {
 	web.Router("/api/service/userinfo", &controllers.ServiceController{}, "get:GetUserInfo")
 
 	// Service management routes
+	web.Router("/api/service/register", &controllers.SiteController{}, "post:RegisterSite")
 	web.Router("/api/service/login", &controllers.SiteController{}, "post:SiteLogin;options:SiteLogin")
 	web.Router("/api/service/callback", &controllers.SiteController{}, "get:SiteCallback")
 	web.Router("/api/service/verify", &controllers.SiteController{}, "post:VerifySiteToken")

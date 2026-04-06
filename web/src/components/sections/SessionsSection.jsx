@@ -79,15 +79,12 @@ export default function SessionsSection({ currentRefreshMonths = 1 }) {
   const [duration, setDuration] = useState(currentRefreshMonths || 1)
   const [durationSaving, setDurationSaving] = useState(false)
   const [durationSaved, setDurationSaved] = useState(false)
-  const durationInitialized = useRef(false)
+  const durationUserSet = useRef(false)
 
-  // Sync duration only on first real profile load (currentRefreshMonths starts as undefined/1)
+  // Sync from profile on first real load, but not after user manually changed it
   useEffect(() => {
-    if (currentRefreshMonths && currentRefreshMonths > 1 && !durationInitialized.current) {
-      durationInitialized.current = true
+    if (!durationUserSet.current && currentRefreshMonths) {
       setDuration(currentRefreshMonths)
-    } else if (currentRefreshMonths && !durationInitialized.current) {
-      durationInitialized.current = true
     }
   }, [currentRefreshMonths])
 
@@ -119,6 +116,7 @@ export default function SessionsSection({ currentRefreshMonths = 1 }) {
   }
 
   const onSaveDuration = async (val) => {
+    durationUserSet.current = true
     setDuration(val)
     setDurationSaving(true)
     try {
