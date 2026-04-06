@@ -90,6 +90,11 @@ export async function deleteService(site_id) {
   return res.data
 }
 
+export async function updateService(payload) {
+  const res = await api.post('/api/service/update', payload)
+  return res.data
+}
+
 export async function listServiceApps() {
   const res = await api.get('/api/user/service-apps')
   return res.data

@@ -80,6 +80,7 @@ func InitRoutes() {
 	web.Router("/api/service/info", &controllers.SiteController{}, "get:GetSiteInfo")
 	web.Router("/api/service/my", &controllers.SiteController{}, "get:GetMySites")
 	web.Router("/api/service/delete", &controllers.SiteController{}, "post:DeleteSite")
+	web.Router("/api/service/update", &controllers.SiteController{}, "post:UpdateService")
 	web.Router("/api/service/user-deleted", &controllers.SiteController{}, "post:UserDeleted")
 
 	// OpenID Connect endpoints

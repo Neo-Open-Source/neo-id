@@ -264,7 +264,69 @@ func (c *SiteController) DeleteSite() {
 	c.ServeJSON()
 }
 
-// GetSiteInfo returns site info for an authenticated site (via API key).
+// UpdateService allows owners to update allowed_origins and webhook_url of a service.
+func (c *SiteController) UpdateService() {
+	user, err := c.getAuthenticatedUser()
+	if err != nil || user == nil {
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+		return
+	}
+
+	var requestData struct {
+		SiteID         string   `json:"site_id"`
+		AllowedOrigins []string `json:"allowed_origins"`
+		WebhookURL     string   `json:"webhook_url"`
+		Description    string   `json:"description"`
+		LogoURL        string   `json:"logo_url"`
+	}
+	body, err := io.ReadAll(c.Ctx.Request.Body)
+	if err != nil {
+		respondError(&c.Controller, http.StatusBadRequest, "server_error", "Failed to read request body")
+		return
+	}
+	if err := json.Unmarshal(body, &requestData); err != nil {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		return
+	}
+	if requestData.SiteID == "" {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "site_id is required")
+		return
+	}
+
+	siteCRUD := models.NewSiteCRUD()
+	site, err := siteCRUD.GetSiteBySiteID(requestData.SiteID)
+	if err != nil || site == nil {
+		respondError(&c.Controller, http.StatusNotFound, "not_found", "Site not found")
+		return
+	}
+
+	role := strings.ToLower(strings.TrimSpace(user.Role))
+	if !strings.EqualFold(user.Email, site.OwnerEmail) && role != "admin" {
+		respondError(&c.Controller, http.StatusForbidden, "forbidden", "Permission denied")
+		return
+	}
+
+	if len(requestData.AllowedOrigins) > 0 {
+		site.AllowedOrigins = requestData.AllowedOrigins
+	}
+	if requestData.WebhookURL != "" {
+		site.WebhookURL = strings.TrimSpace(requestData.WebhookURL)
+	}
+	if requestData.Description != "" {
+		site.Description = requestData.Description
+	}
+	if requestData.LogoURL != "" {
+		site.LogoURL = requestData.LogoURL
+	}
+
+	if err := siteCRUD.UpdateSite(site); err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to update site")
+		return
+	}
+
+	c.Data["json"] = map[string]interface{}{"updated": true, "site_id": site.SiteID}
+	c.ServeJSON()
+}
 func (c *SiteController) GetSiteInfo() {
 	site, err := c.authenticateSite()
 	if err != nil || site == nil {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Box, Stack, Typography, Button, TextField, Alert, Collapse, Chip } from '@mui/material'
-import { registerService, getMyServices, deleteService } from '../../api/endpoints'
+import { Box, Stack, Typography, Button, TextField, Alert, Collapse, Chip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
+import { registerService, getMyServices, deleteService, updateService } from '../../api/endpoints'
 
 function SectionHeader({ title, subtitle }) {
   return (
@@ -55,7 +55,7 @@ function MonoField({ label, value, secret }) {
   )
 }
 
-function ServiceCard({ service, onDelete, highlight }) {
+function ServiceCard({ service, onDelete, onEdit, highlight }) {
   const [expanded, setExpanded] = useState(!!highlight)
   const envSnippet = `NEO_ID_URL=https://id.neomovies.ru\nNEO_ID_SITE_ID=${service.site_id}\nNEO_ID_API_KEY=${service.api_key || ''}`
   return (
@@ -68,6 +68,9 @@ function ServiceCard({ service, onDelete, highlight }) {
         <Stack direction="row" spacing={0.5} flexShrink={0}>
           <Button size="small" variant="outlined" onClick={() => setExpanded(e => !e)} sx={{ fontSize: '0.75rem', height: 28, px: 1.25 }}>
             {expanded ? 'Hide' : 'Credentials'}
+          </Button>
+          <Button size="small" variant="outlined" onClick={() => onEdit(service)} sx={{ fontSize: '0.75rem', height: 28, px: 1.25 }}>
+            Edit
           </Button>
           <Button size="small" color="error" onClick={() => onDelete(service)} sx={{ fontSize: '0.75rem', height: 28, px: 1.25 }}>
             Delete
@@ -102,6 +105,62 @@ function ServiceCard({ service, onDelete, highlight }) {
         </Stack>
       </Collapse>
     </Box>
+  )
+}
+
+function EditServiceDialog({ service, onClose, onSaved }) {
+  const [origins, setOrigins] = useState((service?.allowed_origins || []).join('\n'))
+  const [webhook, setWebhook] = useState(service?.webhook_url || '')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const onSubmit = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await updateService({
+        site_id: service.site_id,
+        allowed_origins: origins.split('\n').map(s => s.trim()).filter(Boolean),
+        webhook_url: webhook.trim() || undefined,
+      })
+      onSaved()
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 600, fontSize: '1rem' }}>Edit service — {service?.name}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ pt: 0.5 }}>
+          {error && <Alert severity="error" sx={{ py: 0.5 }}>{error}</Alert>}
+          <TextField
+            label="Allowed origins"
+            size="small"
+            multiline
+            minRows={4}
+            value={origins}
+            onChange={e => setOrigins(e.target.value)}
+            helperText="One origin per line, e.g. https://neomovies.ru"
+            autoFocus
+          />
+          <TextField
+            label="Webhook URL (optional)"
+            size="small"
+            value={webhook}
+            onChange={e => setWebhook(e.target.value)}
+            placeholder="https://yourapp.com/webhooks/neo-id"
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} sx={{ color: 'text.secondary' }}>Cancel</Button>
+        <Button variant="contained" onClick={onSubmit} disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
+      </DialogActions>
+    </Dialog>
   )
 }
 
@@ -160,17 +219,20 @@ function RegisterForm({ onRegistered, notify }) {
 export default function DeveloperSection({ profile, onNavigateToServices }) {
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
-  const [highlighted, setHighlighted] = useState(null) // newly registered service with full credentials
+  const [highlighted, setHighlighted] = useState(null)
+  const [editService, setEditService] = useState(null) // newly registered service with full credentials
 
   const role = (profile?.role || '').toLowerCase()
   const canManageOidc = ['developer', 'admin', 'moderator'].includes(role)
 
-  useEffect(() => {
+  const loadServices = () => {
     getMyServices()
       .then(d => setServices(d.sites || []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadServices() }, [])
 
   const onRegistered = (site) => {
     setHighlighted(site)
@@ -213,12 +275,21 @@ export default function DeveloperSection({ profile, onNavigateToServices }) {
                 key={s.site_id}
                 service={s}
                 onDelete={onDelete}
+                onEdit={setEditService}
                 highlight={highlighted?.site_id === s.site_id}
               />
             ))}
           </Stack>
         )}
       </Stack>
+
+      {editService && (
+        <EditServiceDialog
+          service={editService}
+          onClose={() => setEditService(null)}
+          onSaved={() => { setEditService(null); loadServices() }}
+        />
+      )}
     </Box>
   )
 }
