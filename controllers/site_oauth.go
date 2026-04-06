@@ -206,7 +206,7 @@ func (c *SiteController) VerifySiteToken() {
 			"unified_id":   user.UnifiedID,
 			"email":        user.Email,
 			"display_name": user.DisplayName,
-			"avatar":       user.Avatar,
+			"avatar":       publicAvatarURL(user.Avatar),
 			"first_name":   user.FirstName,
 			"last_name":    user.LastName,
 		},

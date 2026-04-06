@@ -503,7 +503,7 @@ func (c *OIDCController) UserInfo() {
 		"name":           user.DisplayName,
 		"given_name":     user.FirstName,
 		"family_name":    user.LastName,
-		"picture":        user.Avatar,
+		"picture":        publicAvatarURL(user.Avatar),
 		"updated_at":     user.UpdatedAt.Unix(),
 	}
 	c.ServeJSON()
@@ -655,7 +655,7 @@ func generateIDToken(user *models.User, site *models.Site, nonce string) (string
 		"name":           user.DisplayName,
 		"given_name":     user.FirstName,
 		"family_name":    user.LastName,
-		"picture":        user.Avatar,
+		"picture":        publicAvatarURL(user.Avatar),
 	}
 	if nonce != "" {
 		claims["nonce"] = nonce

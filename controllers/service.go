@@ -126,7 +126,7 @@ func (c *ServiceController) VerifyToken() {
 			"unified_id":   user.UnifiedID,
 			"email":        user.Email,
 			"display_name": user.DisplayName,
-			"avatar":       user.Avatar,
+			"avatar":       publicAvatarURL(user.Avatar),
 		},
 	}
 	c.ServeJSON()
@@ -179,7 +179,7 @@ func (c *ServiceController) GetUserInfo() {
 		"unified_id":   user.UnifiedID,
 		"email":        user.Email,
 		"display_name": user.DisplayName,
-		"avatar":       user.Avatar,
+		"avatar":       publicAvatarURL(user.Avatar),
 		"first_name":   user.FirstName,
 		"last_name":    user.LastName,
 		"location":     user.Location,

@@ -81,3 +81,20 @@ func getBaseURL() string {
 	}
 	return strings.TrimRight(strings.TrimSpace(baseUrl), "/")
 }
+
+// publicAvatarURL converts stored avatar paths like "/avatars/..." into absolute URLs
+// for third-party integrations. External URLs are returned as-is.
+func publicAvatarURL(avatar string) string {
+	avatar = strings.TrimSpace(avatar)
+	if avatar == "" {
+		return ""
+	}
+	if strings.HasPrefix(avatar, "https://") || strings.HasPrefix(avatar, "http://") || strings.HasPrefix(avatar, "data:") {
+		return avatar
+	}
+	base := getBaseURL()
+	if strings.HasPrefix(avatar, "/") {
+		return base + avatar
+	}
+	return base + "/" + avatar
+}
