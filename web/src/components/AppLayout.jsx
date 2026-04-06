@@ -81,7 +81,7 @@ export default function AppLayout({
         <Box sx={{ px: 1, py: 1.5, mb: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <UserAvatar
-              src={profile.avatar}
+              src={profile.avatar || (() => { try { return localStorage.getItem('neo_id_avatar_cache') || '' } catch { return '' } })()}
               name={profile.display_name || profile.email}
               sx={{ width: 32, height: 32, fontSize: '0.75rem' }}
             />

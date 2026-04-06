@@ -85,6 +85,57 @@ func buildMFACodeHTML(code string) string {
 </html>`
 }
 
+// buildVerifyActionHTML is used when sending a code to confirm a settings action (not a login).
+func buildVerifyActionHTML(code string) string {
+	escapedCode := html.EscapeString(code)
+	return `<!doctype html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:480px;background:#ffffff;border:1px solid #e5e5e5;border-radius:12px;padding:40px 32px;" cellpadding="0" cellspacing="0">
+      <tr><td>
+        <div style="font-size:18px;font-weight:700;color:#111111;letter-spacing:-0.3px;margin-bottom:24px;">Neo ID</div>
+        <div style="font-size:22px;font-weight:700;color:#111111;letter-spacing:-0.5px;margin-bottom:8px;">Verification code</div>
+        <div style="font-size:14px;color:#666666;line-height:1.5;margin-bottom:32px;">Enter this code to confirm the action in your account settings. It expires in 10 minutes.</div>
+        <div style="background:#f5f5f5;border:1px solid #e5e5e5;border-radius:8px;padding:24px;text-align:center;margin-bottom:32px;">
+          <div style="font-size:11px;font-weight:600;color:#999999;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">Verification code</div>
+          <div style="font-size:40px;font-weight:700;color:#111111;letter-spacing:0.25em;">` + escapedCode + `</div>
+        </div>
+        <div style="font-size:12px;color:#999999;line-height:1.5;">If you didn't request this, someone may be trying to change your security settings. Consider changing your password.</div>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`
+}
+
+// buildSecurityNoticeHTML sends a notification that a security setting was changed.
+func buildSecurityNoticeHTML(title, body string) string {
+	escapedTitle := html.EscapeString(title)
+	escapedBody := html.EscapeString(body)
+	return `<!doctype html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:480px;background:#ffffff;border:1px solid #e5e5e5;border-radius:12px;padding:40px 32px;" cellpadding="0" cellspacing="0">
+      <tr><td>
+        <div style="font-size:18px;font-weight:700;color:#111111;letter-spacing:-0.3px;margin-bottom:24px;">Neo ID</div>
+        <div style="font-size:22px;font-weight:700;color:#111111;letter-spacing:-0.5px;margin-bottom:8px;">` + escapedTitle + `</div>
+        <div style="font-size:14px;color:#666666;line-height:1.5;margin-bottom:32px;">` + escapedBody + `</div>
+        <div style="font-size:12px;color:#999999;line-height:1.5;">If you didn't make this change, please secure your account immediately by changing your password.</div>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`
+}
+
 func buildEmailVerificationHTML(code string, verifyURL string) string {
 	escapedCode := html.EscapeString(code)
 	escapedURL := html.EscapeString(verifyURL)

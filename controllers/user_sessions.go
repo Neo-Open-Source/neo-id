@@ -148,7 +148,7 @@ func (c *UserController) SendMFACode() {
 		ExpiresAt: exp,
 	})
 
-	htmlBody := buildMFACodeHTML(code)
+	htmlBody := buildVerifyActionHTML(code)
 	if err := sendResendEmail(user.Email, "Your verification code", htmlBody); err != nil {
 		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to send email: "+err.Error())
 		return
@@ -195,6 +195,22 @@ func (c *UserController) ToggleEmailMFA() {
 disable:
 	user.EmailMFAEnabled = body.Enabled
 	_ = models.NewUserCRUD().UpdateUser(user)
+
+	// Send security notice
+	if body.Enabled {
+		go sendResendEmail(user.Email, "Email MFA enabled",
+			buildSecurityNoticeHTML(
+				"Email MFA enabled",
+				"Email verification on login has been enabled for your Neo ID account. You will now receive a one-time code by email each time you sign in.",
+			))
+	} else {
+		go sendResendEmail(user.Email, "Email MFA disabled",
+			buildSecurityNoticeHTML(
+				"Email MFA disabled",
+				"Email verification on login has been disabled for your Neo ID account.",
+			))
+	}
+
 	c.Data["json"] = map[string]interface{}{"email_mfa_enabled": user.EmailMFAEnabled}
 	c.ServeJSON()
 }

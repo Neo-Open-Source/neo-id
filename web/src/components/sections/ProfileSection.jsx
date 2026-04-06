@@ -44,8 +44,20 @@ function Card({ children, sx = {} }) {
   )
 }
 
+const AVATAR_CACHE_KEY = 'neo_id_avatar_cache'
+
+function getCachedAvatar() {
+  try { return localStorage.getItem(AVATAR_CACHE_KEY) || '' } catch { return '' }
+}
+
+function setCachedAvatar(url) {
+  try { if (url) localStorage.setItem(AVATAR_CACHE_KEY, url); else localStorage.removeItem(AVATAR_CACHE_KEY) } catch {}
+}
+
 export default function ProfileSection({ profile, notify, onAvatarSaved }) {
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false)
+  // Use cached avatar until profile loads or avatar changes
+  const avatarSrc = profile?.avatar || getCachedAvatar()
 
   return (
     <Box>
@@ -57,7 +69,7 @@ export default function ProfileSection({ profile, notify, onAvatarSaved }) {
               sx={{ position: 'relative', display: 'inline-flex', cursor: 'pointer', flexShrink: 0 }}
               onClick={() => setAvatarDialogOpen(true)}
             >
-              <UserAvatar src={profile?.avatar} name={profile?.display_name || profile?.email} sx={AVATAR_LG_SX} />
+            <UserAvatar src={avatarSrc} name={profile?.display_name || profile?.email} sx={AVATAR_LG_SX} />
               <Box sx={{
                 position: 'absolute', inset: 0, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -91,6 +103,7 @@ export default function ProfileSection({ profile, notify, onAvatarSaved }) {
         displayName={profile?.display_name || profile?.email}
         onClose={() => setAvatarDialogOpen(false)}
         onSaved={(newUrl) => {
+          setCachedAvatar(newUrl)
           onAvatarSaved?.(newUrl)
           notify?.('success', 'Profile picture updated')
         }}

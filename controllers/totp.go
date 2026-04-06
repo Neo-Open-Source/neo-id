@@ -123,6 +123,12 @@ func (c *TOTPController) Verify() {
 	user.TOTPEnabled = true
 	_ = models.NewUserCRUD().UpdateUser(user)
 
+	go sendResendEmail(user.Email, "Authenticator app enabled",
+		buildSecurityNoticeHTML(
+			"Authenticator app (TOTP) enabled",
+			"Two-factor authentication via authenticator app has been enabled for your Neo ID account. You will now be asked for a code from your app each time you sign in.",
+		))
+
 	c.Data["json"] = map[string]interface{}{"enabled": true}
 	c.ServeJSON()
 }
@@ -163,6 +169,13 @@ disable:
 	user.TOTPEnabled = false
 	user.TOTPSecret = ""
 	_ = models.NewUserCRUD().UpdateUser(user)
+
+	go sendResendEmail(user.Email, "Authenticator app disabled",
+		buildSecurityNoticeHTML(
+			"Authenticator app (TOTP) disabled",
+			"Two-factor authentication via authenticator app has been disabled for your Neo ID account.",
+		))
+
 	c.Data["json"] = map[string]interface{}{"disabled": true}
 	c.ServeJSON()
 }

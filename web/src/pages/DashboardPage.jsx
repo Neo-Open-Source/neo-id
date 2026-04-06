@@ -22,9 +22,16 @@ const Icons = {
   developer: <Code2 size={15} />,
 }
 
+const VALID_SECTIONS = ['profile', 'security', 'services', 'developer']
+
+function getSectionFromHash() {
+  const h = window.location.hash.replace('#', '')
+  return VALID_SECTIONS.includes(h) ? h : 'profile'
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [activeSection, setActiveSection] = useState('profile')
+  const [activeSection, setActiveSection] = useState(getSectionFromHash)
   const [profile, setProfile] = useState(null)
   const [providers, setProviders] = useState([])
   const [hasPassword, setHasPassword] = useState(false)
@@ -35,9 +42,24 @@ export default function DashboardPage() {
 
   useEffect(() => { if (!token) navigate('/login') }, [token, navigate])
 
+  // Sync hash ↔ activeSection
+  useEffect(() => {
+    window.location.hash = activeSection
+  }, [activeSection])
+
+  useEffect(() => {
+    const onHashChange = () => setActiveSection(getSectionFromHash())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
   const load = async () => {
     const p = await getProfile()
     setProfile(p)
+    // Keep avatar cache fresh
+    if (p?.avatar) {
+      try { localStorage.setItem('neo_id_avatar_cache', p.avatar) } catch {}
+    }
     const pr = await getProviders()
     setProviders(pr.oauth_providers || [])
     setHasPassword(!!pr.has_password)
