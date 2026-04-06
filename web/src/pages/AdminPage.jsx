@@ -9,7 +9,8 @@ import { clearTokens } from '../api/client'
 import AppLayout from '../components/AppLayout.jsx'
 import {
   getProfile, adminGetUsers, adminSetUserRole, adminBanUser,
-  adminUnbanUser, adminGetServices, adminCreateService, adminGetSites
+  adminUnbanUser, adminGetServices, adminCreateService, adminGetSites,
+  logout,
 } from '../api/endpoints'
 
 const ROLE_COLORS = {
@@ -35,7 +36,7 @@ export default function AdminPage() {
     setTimeout(() => setMsg({ type: '', text: '' }), 4000)
   }
 
-  const logout = () => { clearTokens(); navigate('/login') }
+  const handleLogout = async () => { await logout(); clearTokens(); navigate('/login') }
 
   // Users
   const [users, setUsers] = useState([])
@@ -56,7 +57,7 @@ export default function AdminPage() {
   const [newService, setNewService] = useState({ name: '', display_name: '', description: '' })
 
   // Sites
-  const [sites, setSites] = useState([])
+  const [registeredServices, setRegisteredServices] = useState([])
 
   const loadProfile = async () => {
     const p = await getProfile()
@@ -80,9 +81,9 @@ export default function AdminPage() {
     setServices(res.services || [])
   }
 
-  const loadSites = async () => {
+  const loadRegisteredServices = async () => {
     const res = await adminGetSites()
-    setSites(res.sites || [])
+    setRegisteredServices(res.sites || [])
   }
 
   useEffect(() => {
@@ -93,7 +94,7 @@ export default function AdminPage() {
     if (!allowed) return
     if (tab === 0) loadUsers().catch((e) => notify('error', e?.message || 'Failed'))
     else if (tab === 1) loadServices().catch((e) => notify('error', e?.message || 'Failed'))
-    else loadSites().catch((e) => notify('error', e?.message || 'Failed'))
+    else loadRegisteredServices().catch((e) => notify('error', e?.message || 'Failed'))
   }, [allowed, tab])
 
   useEffect(() => {
@@ -131,17 +132,17 @@ export default function AdminPage() {
   }
 
   const onDeleteSite = async (siteId) => {
-    if (!window.confirm('Delete this site?')) return
+    if (!window.confirm('Delete this service?')) return
     try {
       const token = localStorage.getItem('accessToken')
-      const res = await fetch('/api/site/delete', {
+      const res = await fetch('/api/service/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ site_id: siteId })
       })
       if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
-      notify('success', 'Site deleted')
-      await loadSites()
+      notify('success', 'Service deleted')
+      await loadRegisteredServices()
     } catch (e) { notify('error', e?.message || 'Failed') }
   }
 
@@ -152,7 +153,7 @@ export default function AdminPage() {
       subtitle="Admin Panel"
       mobileTitle="Neo ID · Admin"
       navItems={[{ label: 'Dashboard', onClick: () => navigate('/dashboard') }]}
-      onLogout={logout}
+      onLogout={handleLogout}
     >
       <Box sx={{ p: { xs: 2, md: 4 } }}>
         <Collapse in={!!msg.text}>
@@ -172,7 +173,7 @@ export default function AdminPage() {
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ minHeight: 48 }}>
                   <Tab label="Users" sx={{ minHeight: 48, fontSize: '0.875rem' }} />
                   <Tab label="Services" sx={{ minHeight: 48, fontSize: '0.875rem' }} />
-                  <Tab label="Sites" sx={{ minHeight: 48, fontSize: '0.875rem' }} />
+                  <Tab label="Registered services" sx={{ minHeight: 48, fontSize: '0.875rem' }} />
                 </Tabs>
               </Box>
 
@@ -328,14 +329,14 @@ export default function AdminPage() {
                 {tab === 2 && (
                   <Stack spacing={2}>
                     <Stack direction="row" justifyContent="flex-end">
-                      <Button variant="outlined" size="small" onClick={loadSites}>Refresh</Button>
+                      <Button variant="outlined" size="small" onClick={loadRegisteredServices}>Refresh</Button>
                     </Stack>
 
                     <Stack spacing={0}>
-                      {sites.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>No sites</Typography>
-                      ) : sites.map((s, i) => (
-                        <Box key={s.site_id} sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.25, px: 1, borderBottom: i < sites.length - 1 ? '1px solid' : 'none', borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' } }}>
+                      {registeredServices.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>No registered services</Typography>
+                      ) : registeredServices.map((s, i) => (
+                        <Box key={s.site_id} sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.25, px: 1, borderBottom: i < registeredServices.length - 1 ? '1px solid' : 'none', borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' } }}>
                           <Box sx={{ flex: 1.5, minWidth: 0 }}>
                             <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>{s.name}</Typography>
                             <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>{s.domain}</Typography>

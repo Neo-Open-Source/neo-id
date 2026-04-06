@@ -1,321 +1,312 @@
-# Unified ID - API Интеграции
+# Neo ID — Integration Guide
 
-## Концепция
+## Concept
 
-Unified ID предоставляет только:
-- **Аутентификацию** (OAuth + email/password)
-- **Базовый профиль** (имя, аватар, email)
-- **Уникальный ID** (`unified_id`) для привязки данных
+Neo ID provides:
+- Authentication (OAuth: Google, GitHub, Yandex, VK + email/password)
+- Basic profile (name, avatar, email)
+- Unique `unified_id` for linking data across services
 
-Вся бизнес-логика и данные хранятся на вашем сайте.
+All business logic and data live on your side.
 
-## Регистрация сайта
+## Register your service
 
-1. Зарегистрируйте сайт на `https://id.neomovies.ru/register`
-2. Получите `API_KEY` и `API_SECRET`
-3. Настройте OAuth приложения в Google/GitHub
+1. Go to `https://id.neomovies.ru` → Dashboard → Services → New client
+2. You'll receive `site_id`, `api_key`, `api_secret`
+3. Set your `redirect_uri` (web URL or mobile deep link)
 
-## Процесс авторизации
+## Auth flows
 
-### 1. Инициация входа
+### Simple flow (token-based)
 
-```javascript
-// Ваш сайт запрашивает URL для входа
-const response = await fetch('https://id.neomovies.ru/api/site/login', {
-    method: 'POST',
-    headers: {
-        'X-API-Key': 'your_api_key',
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        // Web:
-        // redirect_url: 'https://neomovies.ru/auth/callback',
-        // Mobile deep link (any custom scheme):
-        redirect_url: 'neomovies://auth/callback',
-        // redirect_url: 'myapp://auth/callback',
-        // redirect_url: 'anotherapp://auth/callback',
-        // redirect_url: 'anyapp://auth/callback',
-        state: 'random_state_string'
-    })
-});
+Best for most apps. No OIDC required.
 
-const { login_url } = await response.json();
-window.location.href = login_url;
+**Step 1 — get login URL**
+
+```js
+const res = await fetch('https://id.neomovies.ru/api/service/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your_api_key',
+  },
+  body: JSON.stringify({
+    redirect_url: 'https://yourapp.com/auth/callback',
+    state: crypto.randomUUID(),
+    mode: 'popup', // or omit for redirect
+  }),
+})
+const { login_url } = await res.json()
+// redirect user or open popup to login_url
 ```
 
-### 2. OAuth Callback
+**Step 2 — consent page**
 
-Пользователь проходит OAuth на Unified ID и возвращается на ваш сайт/приложение:
+If the user is already signed in to Neo ID, they skip the login form and land on the consent page. They approve access and Neo ID redirects back with an access token.
+
+**Step 3 — callback**
+
 ```
-https://neomovies.ru/auth/callback?token=jwt_token&state=random_state_string
-
-neomovies://auth/callback?token=jwt_token&state=random_state_string
-myapp://auth/callback?token=jwt_token&state=random_state_string
-anyapp://auth/callback?token=jwt_token&state=random_state_string
+GET https://yourapp.com/auth/callback?token=<access_token>&state=<state>
 ```
 
-### 3. Верификация токена
+**Step 4 — verify token on your server**
 
-```javascript
-// Верифицируйте токен и получите данные пользователя
-const response = await fetch('https://id.neomovies.ru/api/site/verify', {
-    method: 'POST',
-    headers: {
-        'X-API-Key': 'your_api_key',
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        token: urlParams.get('token')
-    })
-});
+```js
+const res = await fetch('https://id.neomovies.ru/api/service/verify', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your_api_key',
+  },
+  body: JSON.stringify({ token: req.query.token }),
+})
+const { valid, user } = await res.json()
 
-const { valid, user } = await response.json();
 if (valid) {
-    // Пользователь авторизован!
-    // user.unified_id - используйте для привязки данных
-    // user.email, user.display_name, user.avatar - базовый профиль
+  // user.unified_id — use as primary key in your DB
+  // user.email, user.display_name, user.avatar
 }
 ```
 
-## База данных на вашем сайте
+---
+
+### OIDC flow (standard OAuth 2.0)
+
+Use this if you need standard OpenID Connect compatibility (e.g. existing OIDC libraries).
+
+Discovery document: `GET https://id.neomovies.ru/.well-known/openid-configuration`
+
+```
+GET /oauth/authorize
+  ?client_id=<site_id>
+  &redirect_uri=https://yourapp.com/callback
+  &response_type=code
+  &scope=openid profile email
+  &state=<random>
+  &code_challenge=<S256>        // PKCE recommended
+  &code_challenge_method=S256
+  &mode=popup                   // optional
+```
+
+Exchange code for tokens:
+
+```
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&code=<auth_code>
+&client_id=<site_id>
+&client_secret=<api_secret>
+&redirect_uri=https://yourapp.com/callback
+&code_verifier=<verifier>       // PKCE
+```
+
+Response:
+
+```json
+{
+  "access_token": "...",
+  "id_token": "...",
+  "refresh_token": "...",
+  "token_type": "Bearer",
+  "expires_in": 86400
+}
+```
+
+Get user info:
+
+```
+GET /oauth/userinfo
+Authorization: Bearer <access_token>
+```
+
+---
+
+### Popup flow
+
+For SPAs that want a popup window instead of a full redirect.
+
+```js
+// 1. Get login URL with mode=popup
+const { login_url } = await fetch('/api/service/login', {
+  method: 'POST',
+  headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ redirect_url: `${origin}/auth/callback`, state, mode: 'popup' }),
+}).then(r => r.json())
+
+// 2. Open popup
+const popup = window.open(login_url, 'neo_id', 'width=480,height=640')
+
+// 3. Listen for postMessage
+window.addEventListener('message', async (e) => {
+  if (e.data?.type !== 'neo_id_auth') return
+  const { access_token, refresh_token } = e.data
+  // exchange access_token with your backend
+})
+```
+
+Neo ID sends `postMessage` with:
+
+```json
+{
+  "type": "neo_id_auth",
+  "access_token": "...",
+  "refresh_token": "...",
+  "state": "..."
+}
+```
+
+---
+
+## Database schema
 
 ```sql
--- Таблица пользователей вашего сайта
+-- Users table (unified_id as primary key)
 CREATE TABLE users (
-    id VARCHAR(255) PRIMARY KEY,           -- unified_id от Unified ID
-    email VARCHAR(255) UNIQUE,
-    display_name VARCHAR(255),
-    avatar_url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP
-);
-
--- Таблица с данными вашего сервиса (пример для NeoMovies)
-CREATE TABLE user_preferences (
-    user_id VARCHAR(255),                  -- unified_id
-    favorite_genre VARCHAR(100),
-    subscription_plan VARCHAR(50),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+  id          VARCHAR(255) PRIMARY KEY,  -- unified_id from Neo ID
+  email       VARCHAR(255) UNIQUE,
+  name        VARCHAR(255),
+  avatar_url  TEXT,
+  created_at  TIMESTAMP DEFAULT NOW(),
+  last_login  TIMESTAMP
 );
 ```
 
-## Пример интеграции (Node.js)
+---
 
-```javascript
-const express = require('express');
-const axios = require('axios');
+## Node.js example (simple flow)
 
-const app = express();
+```js
+const express = require('express')
+const axios   = require('axios')
+const app     = express()
 
-// Конфигурация
-const UNIFIED_ID_BASE = 'https://id.neomovies.ru';
-const API_KEY = 'your_api_key';
+const NEO_ID  = 'https://id.neomovies.ru'
+const API_KEY = process.env.NEO_ID_API_KEY
 
-// Страница входа
+// Redirect to Neo ID login
 app.get('/login', async (req, res) => {
-    const response = await axios.post(`${UNIFIED_ID_BASE}/api/site/login`, {
-        redirect_url: `${req.protocol}://${req.get('host')}/auth/callback`,
-        state: 'random_state'
-    }, {
-        headers: { 'X-API-Key': API_KEY }
-    });
-    
-    res.redirect(response.data.login_url);
-});
+  const state = crypto.randomUUID()
+  req.session.state = state
 
-// OAuth callback
+  const { data } = await axios.post(`${NEO_ID}/api/service/login`, {
+    redirect_url: `${process.env.BASE_URL}/auth/callback`,
+    state,
+  }, { headers: { 'X-API-Key': API_KEY } })
+
+  res.redirect(data.login_url)
+})
+
+// Handle callback
 app.get('/auth/callback', async (req, res) => {
-    try {
-        const { token, state } = req.query;
-        
-        // Верификация токена
-        const response = await axios.post(`${UNIFIED_ID_BASE}/api/site/verify`, {
-            token
-        }, {
-            headers: { 'X-API-Key': API_KEY }
-        });
-        
-        const { valid, user } = response.data;
-        
-        if (valid) {
-            // Сохраняем/обновляем пользователя в БД
-            await saveOrUpdateUser(user);
-            
-            // Устанавливаем сессию
-            req.session.userId = user.unified_id;
-            req.session.user = user;
-            
-            res.redirect('/dashboard');
-        } else {
-            res.redirect('/login?error=invalid_token');
-        }
-    } catch (error) {
-        console.error('Auth error:', error);
-        res.redirect('/login?error=auth_failed');
-    }
-});
+  const { token, state } = req.query
 
-// Middleware для проверки авторизации
+  if (state !== req.session.state) return res.redirect('/login?error=invalid_state')
+
+  const { data } = await axios.post(`${NEO_ID}/api/service/verify`,
+    { token },
+    { headers: { 'X-API-Key': API_KEY } }
+  )
+
+  if (!data.valid) return res.redirect('/login?error=invalid_token')
+
+  // Upsert user
+  await db.query(`
+    INSERT INTO users (id, email, name, avatar_url, last_login)
+    VALUES ($1, $2, $3, $4, NOW())
+    ON CONFLICT (id) DO UPDATE
+      SET email = $2, name = $3, avatar_url = $4, last_login = NOW()
+  `, [data.user.unified_id, data.user.email, data.user.display_name, data.user.avatar])
+
+  req.session.userId = data.user.unified_id
+  res.redirect('/dashboard')
+})
+
 function requireAuth(req, res, next) {
-    if (!req.session.userId) {
-        return res.redirect('/login');
-    }
-    next();
+  if (!req.session.userId) return res.redirect('/login')
+  next()
 }
 
-// Защищенная страница
-app.get('/dashboard', requireAuth, async (req, res) => {
-    // Получаем данные пользователя из вашей БД
-    const userData = await getUserData(req.session.userId);
-    
-    res.render('dashboard', {
-        user: req.session.user,
-        userData: userData  // Ваши данные сервиса
-    });
-});
+app.get('/dashboard', requireAuth, (req, res) => {
+  res.render('dashboard', { userId: req.session.userId })
+})
+```
 
-// API для получения профиля пользователя
-app.get('/api/user/profile', requireAuth, async (req, res) => {
-    const userData = await getUserData(req.session.userId);
-    res.json({
-        unified: req.session.user,      // Данные из Unified ID
-        custom: userData                // Ваши данные
-    });
-});
+---
 
-async function saveOrUpdateUser(user) {
-    // Сохранение/обновление в вашей БД
-    const existing = await db.query('SELECT id FROM users WHERE id = ?', [user.unified_id]);
-    
-    if (existing.length === 0) {
-        await db.query('INSERT INTO users (id, email, display_name, avatar_url) VALUES (?, ?, ?, ?)', 
-            [user.unified_id, user.email, user.display_name, user.avatar]);
-    } else {
-        await db.query('UPDATE users SET email = ?, display_name = ?, avatar_url = ?, last_login = NOW() WHERE id = ?', 
-            [user.email, user.display_name, user.avatar, user.unified_id]);
-    }
+## Go example (simple flow)
+
+```go
+neoID := "https://id.neomovies.ru"
+apiKey := os.Getenv("NEO_ID_API_KEY")
+
+// Get login URL
+body, _ := json.Marshal(map[string]string{
+    "redirect_url": "https://yourapp.com/auth/callback",
+    "state":        state,
+})
+req, _ := http.NewRequest("POST", neoID+"/api/service/login", bytes.NewReader(body))
+req.Header.Set("X-API-Key", apiKey)
+req.Header.Set("Content-Type", "application/json")
+resp, _ := http.DefaultClient.Do(req)
+
+var result struct{ LoginURL string `json:"login_url"` }
+json.NewDecoder(resp.Body).Decode(&result)
+http.Redirect(w, r, result.LoginURL, http.StatusFound)
+
+// Verify token
+body, _ = json.Marshal(map[string]string{"token": token})
+req, _ = http.NewRequest("POST", neoID+"/api/service/verify", bytes.NewReader(body))
+req.Header.Set("X-API-Key", apiKey)
+req.Header.Set("Content-Type", "application/json")
+resp, _ = http.DefaultClient.Do(req)
+
+var verify struct {
+    Valid bool `json:"valid"`
+    User  struct {
+        UnifiedID   string `json:"unified_id"`
+        Email       string `json:"email"`
+        DisplayName string `json:"display_name"`
+        Avatar      string `json:"avatar"`
+    } `json:"user"`
 }
+json.NewDecoder(resp.Body).Decode(&verify)
+```
 
-async function getUserData(unifiedId) {
-    // Получение ваших данных по unified_id
-    return await db.query('SELECT * FROM user_preferences WHERE user_id = ?', [unifiedId]);
+---
+
+## Webhooks
+
+Neo ID calls your `webhook_url` when a user disconnects your service:
+
+```json
+POST <your_webhook_url>
+
+{
+  "event":      "user.disconnected",
+  "unified_id": "uid_...",
+  "email":      "user@example.com",
+  "service":    "yourservice"
 }
 ```
 
-## JavaScript SDK (клиентская часть)
+When a user deletes their account on your side, notify Neo ID:
 
-```javascript
-class UnifiedID {
-    constructor(apiKey, baseUrl = 'https://id.neomovies.ru') {
-        this.apiKey = apiKey;
-        this.baseUrl = baseUrl;
-    }
-    
-    async login(redirectUrl) {
-        const state = this.generateState();
-        localStorage.setItem('unified_id_state', state);
-        
-        const response = await fetch(`${this.baseUrl}/api/site/login`, {
-            method: 'POST',
-            headers: {
-                'X-API-Key': this.apiKey,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                redirect_url: redirectUrl,
-                state: state
-            })
-        });
-        
-        const data = await response.json();
-        window.location.href = data.login_url;
-    }
-    
-    async handleCallback(token, state) {
-        const savedState = localStorage.getItem('unified_id_state');
-        if (state !== savedState) {
-            throw new Error('Invalid state');
-        }
-        
-        const response = await fetch(`${this.baseUrl}/api/site/verify`, {
-            method: 'POST',
-            headers: {
-                'X-API-Key': this.apiKey,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ token })
-        });
-        
-        const data = await response.json();
-        if (data.valid) {
-            localStorage.setItem('unified_id_user', JSON.stringify(data.user));
-            localStorage.removeItem('unified_id_state');
-            return data.user;
-        }
-        
-        throw new Error('Invalid token');
-    }
-    
-    getCurrentUser() {
-        const userStr = localStorage.getItem('unified_id_user');
-        return userStr ? JSON.parse(userStr) : null;
-    }
-    
-    logout() {
-        localStorage.removeItem('unified_id_user');
-        localStorage.removeItem('unified_id_state');
-    }
-    
-    generateState() {
-        return Math.random().toString(36).substring(2, 15);
-    }
-}
+```
+POST /api/service/user-deleted
+X-API-Key: your_api_key
 
-// Использование
-const unifiedID = new UnifiedID('your_api_key');
-
-// Вход
-document.getElementById('loginBtn').onclick = () => {
-    unifiedID.login(window.location.origin + '/auth/callback');
-};
-
-// Обработка callback
-if (window.location.pathname === '/auth/callback') {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const state = params.get('state');
-    
-    if (token && state) {
-        unifiedID.handleCallback(token, state)
-            .then(user => {
-                window.location.href = '/dashboard';
-            })
-            .catch(error => {
-                console.error('Auth error:', error);
-                window.location.href = '/login?error=auth_failed';
-            });
-    }
-}
+{ "unified_id": "uid_..." }
 ```
 
-## Безопасность
+---
 
-1. **Всегда проверяйте `state` параметр** для защиты от CSRF
-2. **Храните API ключ в безопасности** на сервере
-3. **Используйте HTTPS** в production
-4. **Валидируйте токены** на каждом запросе
-5. **Ограничьте время жизни сессий**
+## Security checklist
 
-## Преимущества
-
-- ✅ **Единый вход** для всех ваших сервисов
-- ✅ **Надежная OAuth** аутентификация
-- ✅ **Минимальная интеграция** - только API вызовы
-- ✅ **Полный контроль** над данными пользователей
-- ✅ **Масштабируемость** - легко добавить новые сервисы
-
-## Поддержка
-
-- Документация: https://docs.unified-id.ru
-- API Reference: https://api.unified-id.ru/docs
-- Поддержка: support@unified-id.ru
+- Always validate the `state` parameter to prevent CSRF
+- Keep `api_key` and `api_secret` server-side only — never expose in frontend code
+- Use HTTPS in production
+- Verify tokens on every request, not just at login
+- Use PKCE when implementing the OIDC flow from a public client

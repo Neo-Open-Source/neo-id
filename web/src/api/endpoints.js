@@ -191,6 +191,14 @@ export async function toggleEmailMFA(enabled) {
   return res.data
 }
 
+export async function logout() {
+  try {
+    await api.post('/api/auth/logout')
+  } catch {
+    // best-effort — clear tokens locally regardless
+  }
+}
+
 export async function getSessions() {
   const res = await api.get('/api/user/sessions')
   return res.data

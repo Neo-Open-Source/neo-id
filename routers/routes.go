@@ -71,14 +71,14 @@ func InitRoutes() {
 	web.Router("/api/service/verify", &controllers.ServiceController{}, "post:VerifyToken")
 	web.Router("/api/service/userinfo", &controllers.ServiceController{}, "get:GetUserInfo")
 
-	// Site management routes (new SaaS model)
-	web.Router("/api/site/login", &controllers.SiteController{}, "post:SiteLogin;options:SiteLogin")
-	web.Router("/api/site/callback", &controllers.SiteController{}, "get:SiteCallback")
-	web.Router("/api/site/verify", &controllers.SiteController{}, "post:VerifySiteToken")
-	web.Router("/api/site/info", &controllers.SiteController{}, "get:GetSiteInfo")
-	web.Router("/api/site/my", &controllers.SiteController{}, "get:GetMySites")
-	web.Router("/api/site/delete", &controllers.SiteController{}, "post:DeleteSite")
-	web.Router("/api/site/user-deleted", &controllers.SiteController{}, "post:UserDeleted")
+	// Service management routes
+	web.Router("/api/service/login", &controllers.SiteController{}, "post:SiteLogin;options:SiteLogin")
+	web.Router("/api/service/callback", &controllers.SiteController{}, "get:SiteCallback")
+	web.Router("/api/service/verify", &controllers.SiteController{}, "post:VerifySiteToken")
+	web.Router("/api/service/info", &controllers.SiteController{}, "get:GetSiteInfo")
+	web.Router("/api/service/my", &controllers.SiteController{}, "get:GetMySites")
+	web.Router("/api/service/delete", &controllers.SiteController{}, "post:DeleteSite")
+	web.Router("/api/service/user-deleted", &controllers.SiteController{}, "post:UserDeleted")
 
 	// OpenID Connect endpoints
 	web.Router("/.well-known/openid-configuration", &controllers.OIDCController{}, "get:Discovery")

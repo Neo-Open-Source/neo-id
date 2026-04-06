@@ -11,7 +11,8 @@ import DeveloperSection from '../components/sections/DeveloperSection.jsx'
 import {
   getProfile, getProviders, unlinkProvider,
   getServices, connectService, disconnectService,
-  listServiceApps, createServiceApp, revokeServiceApp, deleteServiceApp
+  listServiceApps, createServiceApp, revokeServiceApp, deleteServiceApp,
+  logout,
 } from '../api/endpoints'
 
 const Icons = {
@@ -56,10 +57,10 @@ export default function DashboardPage() {
     setTimeout(() => setMsg({ type: '', text: '' }), 4000)
   }
 
-  const logout = () => { clearTokens(); navigate('/login') }
+  const handleLogout = async () => { await logout(); clearTokens(); navigate('/login') }
 
   const onUnlink = async (p) => {
-    try { await unlinkProvider(p); clearTokens(); navigate('/login') }
+    try { await unlinkProvider(p); await logout(); clearTokens(); navigate('/login') }
     catch (e) { notify('error', e?.response?.data?.error || 'Failed') }
   }
 
@@ -112,7 +113,7 @@ export default function DashboardPage() {
       profile={profile}
       navItems={navItems}
       extraNav={extraNav}
-      onLogout={logout}
+      onLogout={handleLogout}
     >
       <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 720 }}>
         <Collapse in={!!msg.text}>
