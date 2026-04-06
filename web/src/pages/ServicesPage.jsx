@@ -269,7 +269,6 @@ export default function ServicesPage() {
       </Box>
 
       <ClientDialog open={dialogOpen} client={editClient} onClose={onDialogClose} onSaved={onSaved} />
-      </Box>
     </AppLayout>
   )
 }

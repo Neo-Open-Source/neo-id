@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Box, Stack, Typography, Button, Alert, Chip, Select, MenuItem } from '@mui/material'
-import { getSessions, revokeSession, setRefreshDuration } from '../api/endpoints'
+import { getSessions, revokeSession, setRefreshDuration } from '../../api/endpoints'
 
 function DeviceIcon() {
   return (
