@@ -74,6 +74,14 @@ export default function DashboardPage() {
 
   useEffect(() => { load().catch(() => navigate('/login')) }, [])
 
+  // Reload profile after returning from /2fa
+  useEffect(() => {
+    if (sessionStorage.getItem('2fa_reload')) {
+      sessionStorage.removeItem('2fa_reload')
+      load().catch(() => {})
+    }
+  }, [])
+
   const notify = (type, text) => {
     setMsg({ type, text })
     setTimeout(() => setMsg({ type: '', text: '' }), 4000)

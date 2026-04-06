@@ -93,6 +93,8 @@ export default function TwoFAPage() {
           return
       }
       clearSession()
+      // Signal dashboard to reload profile
+      sessionStorage.setItem('2fa_reload', '1')
       setTimeout(() => navigate(back), 800)
     } catch (e) {
       setError(e?.response?.data?.error || 'Invalid code')

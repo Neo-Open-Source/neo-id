@@ -80,6 +80,13 @@ export default function SessionsSection({ currentRefreshMonths = 1 }) {
   const [durationSaving, setDurationSaving] = useState(false)
   const [durationSaved, setDurationSaved] = useState(false)
 
+  // Sync duration when profile loads (initially currentRefreshMonths may be undefined)
+  useEffect(() => {
+    if (currentRefreshMonths && currentRefreshMonths !== duration) {
+      setDuration(currentRefreshMonths)
+    }
+  }, [currentRefreshMonths])
+
   const load = async () => {
     setLoading(true)
     try {
