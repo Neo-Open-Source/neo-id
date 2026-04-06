@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Stack, Typography, Alert } from '@mui/material'
 import { toggleEmailMFA } from '../api/endpoints'
@@ -8,6 +8,11 @@ export default function EmailMFASection({ emailMfaEnabled: initialEnabled, totpE
   const [enabled, setEnabled] = useState(!!initialEnabled)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Sync when profile loads (initialEnabled starts as undefined)
+  useEffect(() => {
+    setEnabled(!!initialEnabled)
+  }, [initialEnabled])
 
   const onToggle = async () => {
     if (enabled) {

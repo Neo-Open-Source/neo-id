@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { Box, Container, Stack, Typography, Button, Alert, Link } from '@mui/material'
-import { mfaVerify, verifyEmailCode, resendVerifyEmail } from '../api/endpoints'
+import { mfaVerify, verifyEmailCode, resendVerifyEmail, totpLoginVerify } from '../api/endpoints'
 import { setTokens } from '../api/client'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 
@@ -34,9 +34,25 @@ export default function VerifyPage() {
   }
 
   useEffect(() => {
-    if (!email) { navigate('/login'); return }
+    if (!email) {
+      // Check hash for OAuth MFA redirect (e.g. /verify#mfa_email=...&mfa_verify_type=...)
+      const hash = window.location.hash.slice(1)
+      if (hash) {
+        const p = new URLSearchParams(hash)
+        const hashEmail = p.get('mfa_email')
+        const hashType = p.get('mfa_verify_type')
+        if (hashEmail) {
+          sessionStorage.setItem('mfa_email', hashEmail)
+          if (hashType) sessionStorage.setItem('mfa_verify_type', hashType)
+          window.history.replaceState({}, '', '/verify')
+          window.location.reload()
+          return
+        }
+      }
+      navigate('/login')
+      return
+    }
     refs.current[0]?.focus()
-    // For email verify: code was already sent during registration — start cooldown only, don't resend
     if (isEmailVerify) startCooldown(60)
     return () => clearInterval(cooldownRef.current)
   }, [])
@@ -87,6 +103,18 @@ export default function VerifyPage() {
         } else {
           navigate('/login?verified=1')
         }
+      } else if (verifyType === 'totp') {
+        const data = await totpLoginVerify(email, code, siteId, redirectUrl, siteState)
+        setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+        clearSession()
+        const sid = data.site_id || siteId
+        const rurl = data.redirect_url || redirectUrl
+        const ss = data.site_state || siteState
+        if (sid && rurl) {
+          window.location.href = `/api/service/callback?site_id=${encodeURIComponent(sid)}&redirect_url=${encodeURIComponent(rurl)}&state=${encodeURIComponent(ss)}&token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}`
+          return
+        }
+        navigate('/dashboard')
       } else {
         const data = await mfaVerify(email, code)
         setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
@@ -95,7 +123,7 @@ export default function VerifyPage() {
         const rurl = data.redirect_url || redirectUrl
         const ss = data.site_state || siteState
         if (sid && rurl) {
-          window.location.href = `/api/site/callback?site_id=${encodeURIComponent(sid)}&redirect_url=${encodeURIComponent(rurl)}&state=${encodeURIComponent(ss)}&token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}`
+          window.location.href = `/api/service/callback?site_id=${encodeURIComponent(sid)}&redirect_url=${encodeURIComponent(rurl)}&state=${encodeURIComponent(ss)}&token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}`
           return
         }
         navigate('/dashboard')
@@ -140,12 +168,18 @@ export default function VerifyPage() {
 
             <Stack spacing={0.75}>
               <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '-0.5px' }}>
-                {isEmailVerify ? 'Verify your email' : 'Check your email'}
+                {isEmailVerify ? 'Verify your email' : verifyType === 'totp' ? 'Authenticator code' : 'Check your email'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {isEmailVerify ? 'Enter the 6-digit code we sent to' : 'Enter the 6-digit login code we sent to'}
+                {isEmailVerify
+                  ? 'Enter the 6-digit code we sent to'
+                  : verifyType === 'totp'
+                  ? 'Enter the 6-digit code from your authenticator app'
+                  : 'Enter the 6-digit login code we sent to'}
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{email}</Typography>
+              {verifyType !== 'totp' && (
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{email}</Typography>
+              )}
             </Stack>
 
             {error && <Alert severity="error" sx={{ py: 0.5 }}>{error}</Alert>}
@@ -186,6 +220,7 @@ export default function VerifyPage() {
               {loading ? 'Verifying...' : 'Continue'}
             </Button>
 
+            {verifyType !== 'totp' && (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
               Didn't get the code?{' '}
               <Box
@@ -203,6 +238,7 @@ export default function VerifyPage() {
                 {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
               </Box>
             </Typography>
+            )}
 
           </Stack>
         </Box>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Box, Stack, Typography, Button, Alert, Chip, Select, MenuItem } from '@mui/material'
 import { getSessions, revokeSession, setRefreshDuration } from '../../api/endpoints'
 
@@ -79,11 +79,15 @@ export default function SessionsSection({ currentRefreshMonths = 1 }) {
   const [duration, setDuration] = useState(currentRefreshMonths || 1)
   const [durationSaving, setDurationSaving] = useState(false)
   const [durationSaved, setDurationSaved] = useState(false)
+  const durationInitialized = useRef(false)
 
-  // Sync duration when profile loads (initially currentRefreshMonths may be undefined)
+  // Sync duration only on first real profile load (currentRefreshMonths starts as undefined/1)
   useEffect(() => {
-    if (currentRefreshMonths && currentRefreshMonths !== duration) {
+    if (currentRefreshMonths && currentRefreshMonths > 1 && !durationInitialized.current) {
+      durationInitialized.current = true
       setDuration(currentRefreshMonths)
+    } else if (currentRefreshMonths && !durationInitialized.current) {
+      durationInitialized.current = true
     }
   }, [currentRefreshMonths])
 

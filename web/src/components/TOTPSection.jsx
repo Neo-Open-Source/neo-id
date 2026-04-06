@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Stack, Typography, Button, Alert, TextField } from '@mui/material'
 import { totpSetup } from '../api/endpoints'

@@ -449,6 +449,46 @@ func (c *AuthController) Callback() {
 	if oauthMonths < 1 || oauthMonths > 9 {
 		oauthMonths = 1
 	}
+
+	// MFA check — require verification before issuing session
+	if unifiedUser.TOTPEnabled || unifiedUser.EmailMFAEnabled {
+		if unifiedUser.EmailMFAEnabled {
+			mfaCode, err := generateEmailVerificationCode()
+			if err == nil {
+				mfaCRUD := models.NewMFACodeCRUD()
+				_ = mfaCRUD.DeleteByEmail(unifiedUser.Email)
+				exp := time.Now().Add(10 * time.Minute)
+				_ = mfaCRUD.Create(&models.MFACode{
+					UserID:    unifiedUser.UnifiedID,
+					Email:     unifiedUser.Email,
+					Code:      mfaCode,
+					ExpiresAt: exp,
+				})
+				_ = sendResendEmail(unifiedUser.Email, "Your login code", buildMFACodeHTML(mfaCode))
+			}
+		}
+
+		verifyType := "mfa"
+		if unifiedUser.TOTPEnabled && !unifiedUser.EmailMFAEnabled {
+			verifyType = "totp"
+		}
+
+		siteID, _ := oauthSess.Values["site_id"].(string)
+		redirectURL, _ := oauthSess.Values["redirect_url"].(string)
+		siteState, _ := oauthSess.Values["site_state"].(string)
+
+		// Store pending MFA context in cookie session
+		oauthSess.Values["mfa_pending_uid"] = unifiedUser.UnifiedID
+		oauthSess.Values["mfa_pending_months"] = oauthMonths
+		oauthSess.Values["mfa_pending_site_id"] = siteID
+		oauthSess.Values["mfa_pending_redirect_url"] = redirectURL
+		oauthSess.Values["mfa_pending_site_state"] = siteState
+		_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess)
+
+		// Pass email and verify type to frontend via hash so VerifyPage can read them
+		c.Redirect("/verify#mfa_email="+unifiedUser.Email+"&mfa_verify_type="+verifyType, http.StatusFound)
+		return
+	}
 	accessToken, refreshToken, refreshExp, err := generateTokensWithDuration(unifiedUser.UnifiedID, unifiedUser.Email, oauthMonths)
 	if err != nil {
 		c.Data["json"] = map[string]interface{}{"error": "Failed to generate tokens: " + err.Error()}
