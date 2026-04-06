@@ -39,9 +39,15 @@ export default function ConsentPage() {
     setSubmitting(true)
     setError('')
     try {
+      const accessToken = (() => {
+        try { return localStorage.getItem('accessToken') || '' } catch { return '' }
+      })()
       const resp = await fetch('/api/oauth/consent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ session: sessionKey, approved }),
       })
       const data = await resp.json()

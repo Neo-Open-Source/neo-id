@@ -200,6 +200,28 @@ func (c *OIDCController) Consent() {
 
 	// Popup mode: return tokens for postMessage
 	if pc.Mode == "popup" {
+		// Reuse existing browser session token if it belongs to the same user.
+		bearer := strings.TrimSpace(strings.TrimPrefix(c.Ctx.Request.Header.Get("Authorization"), "Bearer "))
+		if bearer != "" {
+			sessionCRUD := models.NewSessionCRUD()
+			if existing, err2 := sessionCRUD.GetSessionByToken(bearer); err2 == nil && existing != nil && existing.UserID == pc.UserID {
+				origin := pc.RedirectURI
+				if u, err3 := url.Parse(pc.RedirectURI); err3 == nil {
+					origin = u.Scheme + "://" + u.Host
+				}
+				json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]interface{}{
+					"popup":         true,
+					"access_token":  bearer,
+					"refresh_token": existing.RefreshToken,
+					"state":         pc.State,
+					"origin":        origin,
+					"redirect":      finalURL,
+				})
+				return
+			}
+		}
+
+		// Fallback: issue a fresh session if no reusable session token was provided.
 		months := user.RefreshDurationMonths
 		if months < 1 {
 			months = 1
