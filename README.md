@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/public/logo.png" width="120" height="120" style="border-radius: 24px;" />
+  <img src=".github/icon.png" width="120" height="120" style="border-radius: 24px;" />
 </p>
 
 <h1 align="center">Neo ID</h1>
