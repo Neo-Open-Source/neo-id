@@ -75,11 +75,24 @@ func generateSiteTokenForCallback(userID, siteID string) (string, error) {
 }
 
 func getBaseURL() string {
-	baseUrl := os.Getenv("BASE_URL")
-	if strings.TrimSpace(baseUrl) == "" {
-		baseUrl = web.AppConfig.DefaultString("base_url", "http://localhost:8080")
+	baseUrl := strings.TrimSpace(os.Getenv("BASE_URL"))
+	if baseUrl == "" {
+		// Vercel provides deployment host without scheme.
+		if vercelHost := strings.TrimSpace(os.Getenv("VERCEL_URL")); vercelHost != "" {
+			if strings.HasPrefix(vercelHost, "http://") || strings.HasPrefix(vercelHost, "https://") {
+				baseUrl = vercelHost
+			} else {
+				baseUrl = "https://" + vercelHost
+			}
+		}
 	}
-	return strings.TrimRight(strings.TrimSpace(baseUrl), "/")
+	if baseUrl == "" {
+		baseUrl = strings.TrimSpace(web.AppConfig.DefaultString("base_url", ""))
+	}
+	if baseUrl == "" {
+		baseUrl = "http://localhost:8080"
+	}
+	return strings.TrimRight(baseUrl, "/")
 }
 
 // publicAvatarURL converts stored avatar paths like "/avatars/..." into absolute URLs
