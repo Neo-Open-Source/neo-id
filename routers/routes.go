@@ -70,7 +70,7 @@ func InitRoutes() {
 	web.Router("/api/admin/sites", &controllers.AdminController{}, "get:GetSites")
 
 	// Service integration routes (legacy)
-	web.Router("/api/service/verify", &controllers.ServiceController{}, "post:VerifyToken")
+	web.Router("/api/service-app/verify", &controllers.ServiceController{}, "post:VerifyToken")
 	web.Router("/api/service/userinfo", &controllers.ServiceController{}, "get:GetUserInfo")
 
 	// Service management routes

@@ -181,7 +181,16 @@ func (c *SiteController) VerifySiteToken() {
 	var requestData struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &requestData); err != nil {
+	raw := c.Ctx.Input.RequestBody
+	if len(raw) == 0 {
+		var readErr error
+		raw, readErr = io.ReadAll(c.Ctx.Request.Body)
+		if readErr != nil {
+			respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
+			return
+		}
+	}
+	if err := json.Unmarshal(raw, &requestData); err != nil {
 		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
 		return
 	}
