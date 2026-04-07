@@ -102,10 +102,19 @@ func createIndexes() error {
 
 	// Sessions collection indexes
 	sessionsCol := GetCollection(SessionsCollection)
+	// Migrate legacy TTL index from expires_at to refresh_expires_at.
+	// A short-lived access token must not delete the whole long-lived session.
+	if _, err := sessionsCol.Indexes().DropOne(ctx, "expires_at_1"); err != nil {
+		log.Printf("sessions index migration: drop expires_at_1 skipped: %v", err)
+	}
+	if _, err := sessionsCol.Indexes().DropOne(ctx, "refresh_expires_at_1"); err != nil {
+		log.Printf("sessions index migration: drop refresh_expires_at_1 skipped: %v", err)
+	}
 	sessionsIndexes := []mongo.IndexModel{
 		{Keys: bson.D{{Key: "token", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "user_id", Value: 1}}},
-		{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+		{Keys: bson.D{{Key: "expires_at", Value: 1}}},
+		{Keys: bson.D{{Key: "refresh_expires_at", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
 	}
 
 	if _, err := sessionsCol.Indexes().CreateMany(ctx, sessionsIndexes); err != nil {

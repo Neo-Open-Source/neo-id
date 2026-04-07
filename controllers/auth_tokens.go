@@ -129,20 +129,18 @@ func (c *AuthController) RefreshToken() {
 		return
 	}
 
-	_ = sessionCRUD.DeleteSession(sess.Token)
-	newSess := &models.Session{
-		Token:                 newAccess,
-		UserID:                user.UnifiedID,
-		ExpiresAt:             time.Now().Add(24 * time.Hour),
-		IPAddress:             getRealIP(c.Ctx.Request),
-		UserAgent:             c.Ctx.Request.UserAgent(),
-		RefreshToken:          newRefresh,
-		RefreshExpiresAt:      newRefreshExp,
-		RefreshDurationMonths: months,
-		LastUsedAt:            time.Now(),
+	if err := sessionCRUD.RotateSessionByRefreshToken(
+		requestBody.RefreshToken,
+		newAccess,
+		newRefresh,
+		time.Now().Add(24*time.Hour),
+		newRefreshExp,
+		getRealIP(c.Ctx.Request),
+		c.Ctx.Request.UserAgent(),
+	); err != nil {
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_request", "Invalid or expired refresh token")
+		return
 	}
-	enforceSessionLimit(user.UnifiedID)
-	_ = sessionCRUD.CreateSession(newSess)
 
 	c.Data["json"] = map[string]interface{}{
 		"access_token":  newAccess,

@@ -215,13 +215,14 @@ func (c *OIDCController) Consent() {
 		if u, err2 := url.Parse(pc.RedirectURI); err2 == nil {
 			origin = u.Scheme + "://" + u.Host
 		}
+		redirectWithTokens, _ := withTokenAndState(pc.RedirectURI, accessToken, refreshToken, pc.State)
 		json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]interface{}{
 			"popup":         true,
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
 			"state":         pc.State,
 			"origin":        origin,
-			"redirect":      finalURL,
+			"redirect":      redirectWithTokens,
 		})
 		return
 	}

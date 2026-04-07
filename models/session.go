@@ -16,6 +16,17 @@ type SessionCRUD struct {
 	collection *mongo.Collection
 }
 
+func activeSessionFilter(userID string) bson.M {
+	now := time.Now()
+	return bson.M{
+		"user_id": userID,
+		"$or": []bson.M{
+			{"refresh_expires_at": bson.M{"$gt": now}},
+			{"refresh_expires_at": bson.M{"$exists": false}, "expires_at": bson.M{"$gt": now}},
+		},
+	}
+}
+
 func NewSessionCRUD() *SessionCRUD {
 	return &SessionCRUD{
 		collection: GetCollection(SessionsCollection),
@@ -107,10 +118,7 @@ func (sc *SessionCRUD) GetSessionByRefreshToken(refreshToken string) (*Session, 
 // GetUserSessions returns all active sessions for a user
 func (sc *SessionCRUD) GetUserSessions(userID string) ([]Session, error) {
 	ctx := context.Background()
-	cursor, err := sc.collection.Find(ctx, bson.M{
-		"user_id":    userID,
-		"expires_at": bson.M{"$gt": time.Now()},
-	})
+	cursor, err := sc.collection.Find(ctx, activeSessionFilter(userID))
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +150,40 @@ func (sc *SessionCRUD) TouchSession(token string) error {
 		bson.M{"$set": bson.M{"last_used_at": time.Now()}},
 	)
 	return err
+}
+
+// RotateSessionByRefreshToken atomically rotates access/refresh tokens in the same session row.
+func (sc *SessionCRUD) RotateSessionByRefreshToken(oldRefreshToken, newAccessToken, newRefreshToken string, accessExp, refreshExp time.Time, ipAddress, userAgent string) error {
+	ctx := context.Background()
+	update := bson.M{
+		"token":              newAccessToken,
+		"expires_at":         accessExp,
+		"refresh_token":      newRefreshToken,
+		"refresh_expires_at": refreshExp,
+		"last_used_at":       time.Now(),
+	}
+	if ipAddress != "" {
+		update["ip_address"] = ipAddress
+	}
+	if userAgent != "" {
+		update["user_agent"] = userAgent
+	}
+
+	res, err := sc.collection.UpdateOne(
+		ctx,
+		bson.M{
+			"refresh_token":      oldRefreshToken,
+			"refresh_expires_at": bson.M{"$gt": time.Now()},
+		},
+		bson.M{"$set": update},
+	)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
 }
 
 // RevokeSession deletes a specific session by ID (for session management UI)
@@ -178,10 +220,7 @@ func (sc *SessionCRUD) DeleteUserSessions(userID string) error {
 // CountUserSessions counts active (non-expired) sessions for a user
 func (sc *SessionCRUD) CountUserSessions(userID string) (int, error) {
 	ctx := context.Background()
-	count, err := sc.collection.CountDocuments(ctx, bson.M{
-		"user_id":    userID,
-		"expires_at": bson.M{"$gt": time.Now()},
-	})
+	count, err := sc.collection.CountDocuments(ctx, activeSessionFilter(userID))
 	if err != nil {
 		return 0, fmt.Errorf("failed to count user sessions: %w", err)
 	}
@@ -193,10 +232,7 @@ func (sc *SessionCRUD) DeleteOldestSession(userID string) error {
 	ctx := context.Background()
 	var oldest Session
 	opts := options.FindOne().SetSort(bson.D{{Key: "last_used_at", Value: 1}})
-	err := sc.collection.FindOne(ctx, bson.M{
-		"user_id":    userID,
-		"expires_at": bson.M{"$gt": time.Now()},
-	}, opts).Decode(&oldest)
+	err := sc.collection.FindOne(ctx, activeSessionFilter(userID), opts).Decode(&oldest)
 	if err == mongo.ErrNoDocuments {
 		return nil
 	}
@@ -229,6 +265,12 @@ func (sc *SessionCRUD) CleanupExpiredSessions() error {
 
 	_, err := sc.collection.DeleteMany(ctx, bson.M{
 		"expires_at": bson.M{"$lt": time.Now()},
+		"$or": []bson.M{
+			// Legacy sessions without refresh lifecycle metadata
+			{"refresh_expires_at": bson.M{"$exists": false}},
+			// Refresh token has also expired
+			{"refresh_expires_at": bson.M{"$lt": time.Now()}},
+		},
 	})
 
 	if err != nil {
