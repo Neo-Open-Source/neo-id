@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -485,8 +486,31 @@ func (c *AuthController) Callback() {
 		oauthSess.Values["mfa_pending_site_state"] = siteState
 		_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess)
 
-		// Pass email and verify type to frontend via hash so VerifyPage can read them
-		c.Redirect("/verify#mfa_email="+unifiedUser.Email+"&mfa_verify_type="+verifyType, http.StatusFound)
+		oidcClientID, _ := oauthSess.Values["oidc_client_id"].(string)
+		oidcRedirectURI, _ := oauthSess.Values["oidc_redirect_uri"].(string)
+		oidcScope, _ := oauthSess.Values["oidc_scope"].(string)
+		oidcState, _ := oauthSess.Values["oidc_state"].(string)
+		oidcMode, _ := oauthSess.Values["oidc_mode"].(string)
+
+		// Pass MFA + optional OIDC context to frontend via hash so VerifyPage can continue to consent.
+		q := url.Values{}
+		q.Set("mfa_email", unifiedUser.Email)
+		q.Set("mfa_verify_type", verifyType)
+		if oidcClientID != "" && oidcRedirectURI != "" {
+			q.Set("mfa_oidc", "1")
+			q.Set("mfa_client_id", oidcClientID)
+			q.Set("mfa_redirect_uri", oidcRedirectURI)
+			if oidcState != "" {
+				q.Set("mfa_state", oidcState)
+			}
+			if oidcScope != "" {
+				q.Set("mfa_scope", oidcScope)
+			}
+			if oidcMode != "" {
+				q.Set("mfa_mode", oidcMode)
+			}
+		}
+		c.Redirect("/verify#"+q.Encode(), http.StatusFound)
 		return
 	}
 	accessToken, refreshToken, refreshExp, err := generateTokensWithDuration(unifiedUser.UnifiedID, unifiedUser.Email, oauthMonths)
@@ -528,6 +552,43 @@ func (c *AuthController) Callback() {
 			},
 		}
 		c.ServeJSON()
+		return
+	}
+
+	// OIDC authorization flow should always continue to consent, not dashboard/site callback.
+	oidcClientID, _ := oauthSess.Values["oidc_client_id"].(string)
+	oidcRedirectURI, _ := oauthSess.Values["oidc_redirect_uri"].(string)
+	oidcScope, _ := oauthSess.Values["oidc_scope"].(string)
+	oidcState, _ := oauthSess.Values["oidc_state"].(string)
+	oidcNonce, _ := oauthSess.Values["oidc_nonce"].(string)
+	oidcCodeChallenge, _ := oauthSess.Values["oidc_code_challenge"].(string)
+	oidcCodeChallengeMethod, _ := oauthSess.Values["oidc_code_challenge_method"].(string)
+	oidcMode, _ := oauthSess.Values["oidc_mode"].(string)
+	if oidcClientID != "" && oidcRedirectURI != "" {
+		key := newConsentSession(&pendingConsent{
+			ClientID:            oidcClientID,
+			RedirectURI:         oidcRedirectURI,
+			Scope:               oidcScope,
+			State:               oidcState,
+			Nonce:               oidcNonce,
+			CodeChallenge:       oidcCodeChallenge,
+			CodeChallengeMethod: oidcCodeChallengeMethod,
+			Mode:                oidcMode,
+			UserID:              unifiedUser.UnifiedID,
+			ExpiresAt:           time.Now().Add(10 * time.Minute),
+		})
+
+		delete(oauthSess.Values, "oidc_client_id")
+		delete(oauthSess.Values, "oidc_redirect_uri")
+		delete(oauthSess.Values, "oidc_scope")
+		delete(oauthSess.Values, "oidc_state")
+		delete(oauthSess.Values, "oidc_nonce")
+		delete(oauthSess.Values, "oidc_code_challenge")
+		delete(oauthSess.Values, "oidc_code_challenge_method")
+		delete(oauthSess.Values, "oidc_mode")
+		_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess)
+
+		c.Redirect("/consent?session="+key, http.StatusFound)
 		return
 	}
 

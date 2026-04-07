@@ -150,6 +150,9 @@ func (c *OIDCController) Authorize() {
 	sess.Values["oidc_nonce"] = nonce
 	sess.Values["oidc_code_challenge"] = codeChallenge
 	sess.Values["oidc_code_challenge_method"] = codeChallengeMethod
+	if mode != "" {
+		sess.Values["oidc_mode"] = mode
+	}
 	_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, sess)
 
 	q := url.Values{}
@@ -596,6 +599,7 @@ func (c *OIDCController) OIDCCallback() {
 	delete(sess.Values, "oidc_nonce")
 	delete(sess.Values, "oidc_code_challenge")
 	delete(sess.Values, "oidc_code_challenge_method")
+	delete(sess.Values, "oidc_mode")
 	_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, sess)
 
 	// Redirect to client with code

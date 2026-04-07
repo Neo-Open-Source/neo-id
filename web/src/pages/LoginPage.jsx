@@ -43,6 +43,7 @@ export default function LoginPage() {
   const siteId = params.get('client_id') || params.get('site_id') || ''
   const redirectUrl = params.get('redirect_uri') || params.get('redirect_url') || ''
   const siteState = params.get('state') || params.get('site_state') || ''
+  const isOIDCFlow = !!(params.get('client_id') && params.get('redirect_uri'))
   const popupMode = params.get('mode') || ''
   const passedToken = params.get('token') || ''
 
@@ -80,15 +81,43 @@ export default function LoginPage() {
 
   const oauthLogin = (provider) => {
     const q = new URLSearchParams()
-    if (siteId) q.set('site_id', siteId)
-    if (redirectUrl) q.set('redirect_url', redirectUrl)
-    if (siteState) q.set('site_state', siteState)
+    if (!isOIDCFlow) {
+      if (siteId) q.set('site_id', siteId)
+      if (redirectUrl) q.set('redirect_url', redirectUrl)
+      if (siteState) q.set('site_state', siteState)
+    }
     const qs = q.toString()
     window.location.href = qs ? `/api/auth/login/${provider}?${qs}` : `/api/auth/login/${provider}`
   }
 
-  const handleSuccess = (data) => {
+  const continueOIDCConsent = async (accessToken) => {
+    const resp = await fetch('/api/auth/check-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        client_id: params.get('client_id') || '',
+        redirect_uri: params.get('redirect_uri') || '',
+        state: params.get('state') || '',
+        scope: params.get('scope') || 'openid profile email',
+        mode: popupMode,
+      }),
+    })
+    const payload = await resp.json().catch(() => null)
+    if (!resp.ok || !payload?.consent_url) {
+      throw new Error(payload?.error || 'Failed to open consent page')
+    }
+    window.location.replace(payload.consent_url)
+  }
+
+  const handleSuccess = async (data) => {
     setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+    if (isOIDCFlow) {
+      await continueOIDCConsent(data.access_token)
+      return
+    }
     const sid = data.site_id || siteId
     const rurl = data.redirect_url || redirectUrl
     const ss = data.site_state || siteState
@@ -110,19 +139,35 @@ export default function LoginPage() {
       if (data.mfa_required) {
         sessionStorage.setItem('mfa_email', data.email || email)
         sessionStorage.setItem('mfa_verify_type', 'mfa')
+        if (isOIDCFlow) {
+          sessionStorage.setItem('mfa_oidc', '1')
+          sessionStorage.setItem('mfa_client_id', params.get('client_id') || '')
+          sessionStorage.setItem('mfa_redirect_uri', params.get('redirect_uri') || '')
+          sessionStorage.setItem('mfa_state', params.get('state') || '')
+          sessionStorage.setItem('mfa_scope', params.get('scope') || 'openid profile email')
+          sessionStorage.setItem('mfa_mode', popupMode || '')
+        }
         if (siteId) sessionStorage.setItem('mfa_site_id', siteId)
         if (redirectUrl) sessionStorage.setItem('mfa_redirect_url', redirectUrl)
         if (siteState) sessionStorage.setItem('mfa_site_state', siteState)
         navigate('/verify')
         return
       }
-      handleSuccess(data)
+      await handleSuccess(data)
     } catch (e) {
       const status = e?.response?.status
       const msg = e?.response?.data?.error || e?.message || 'Login failed'
       if (status === 403 && msg.toLowerCase().includes('not verified')) {
         sessionStorage.setItem('mfa_email', email)
         sessionStorage.setItem('mfa_verify_type', 'email')
+        if (isOIDCFlow) {
+          sessionStorage.setItem('mfa_oidc', '1')
+          sessionStorage.setItem('mfa_client_id', params.get('client_id') || '')
+          sessionStorage.setItem('mfa_redirect_uri', params.get('redirect_uri') || '')
+          sessionStorage.setItem('mfa_state', params.get('state') || '')
+          sessionStorage.setItem('mfa_scope', params.get('scope') || 'openid profile email')
+          sessionStorage.setItem('mfa_mode', popupMode || '')
+        }
         if (siteId) sessionStorage.setItem('mfa_site_id', siteId)
         if (redirectUrl) sessionStorage.setItem('mfa_redirect_url', redirectUrl)
         if (siteState) sessionStorage.setItem('mfa_site_state', siteState)

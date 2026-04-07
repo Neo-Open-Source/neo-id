@@ -20,6 +20,12 @@ export default function VerifyPage() {
   const siteId = sessionStorage.getItem('mfa_site_id') || ''
   const redirectUrl = sessionStorage.getItem('mfa_redirect_url') || ''
   const siteState = sessionStorage.getItem('mfa_site_state') || ''
+  const mfaOIDC = sessionStorage.getItem('mfa_oidc') === '1'
+  const mfaClientID = sessionStorage.getItem('mfa_client_id') || ''
+  const mfaRedirectURI = sessionStorage.getItem('mfa_redirect_uri') || ''
+  const mfaState = sessionStorage.getItem('mfa_state') || ''
+  const mfaScope = sessionStorage.getItem('mfa_scope') || 'openid profile email'
+  const mfaMode = sessionStorage.getItem('mfa_mode') || ''
   const isEmailVerify = verifyType === 'email'
 
   const startCooldown = (seconds = 60) => {
@@ -41,9 +47,18 @@ export default function VerifyPage() {
         const p = new URLSearchParams(hash)
         const hashEmail = p.get('mfa_email')
         const hashType = p.get('mfa_verify_type')
+        const hashOIDC = p.get('mfa_oidc')
         if (hashEmail) {
           sessionStorage.setItem('mfa_email', hashEmail)
           if (hashType) sessionStorage.setItem('mfa_verify_type', hashType)
+          if (hashOIDC === '1') {
+            sessionStorage.setItem('mfa_oidc', '1')
+            sessionStorage.setItem('mfa_client_id', p.get('mfa_client_id') || '')
+            sessionStorage.setItem('mfa_redirect_uri', p.get('mfa_redirect_uri') || '')
+            sessionStorage.setItem('mfa_state', p.get('mfa_state') || '')
+            sessionStorage.setItem('mfa_scope', p.get('mfa_scope') || 'openid profile email')
+            sessionStorage.setItem('mfa_mode', p.get('mfa_mode') || '')
+          }
           window.history.replaceState({}, '', '/verify')
           window.location.reload()
           return
@@ -85,8 +100,33 @@ export default function VerifyPage() {
   }
 
   const clearSession = () => {
-    ['mfa_email', 'mfa_verify_type', 'mfa_site_id', 'mfa_redirect_url', 'mfa_site_state']
+    ['mfa_email', 'mfa_verify_type', 'mfa_site_id', 'mfa_redirect_url', 'mfa_site_state', 'mfa_oidc', 'mfa_client_id', 'mfa_redirect_uri', 'mfa_state', 'mfa_scope', 'mfa_mode']
       .forEach((k) => sessionStorage.removeItem(k))
+  }
+
+  const continueOIDCConsent = async (accessToken) => {
+    if (!mfaOIDC || !mfaClientID || !mfaRedirectURI) return false
+    const resp = await fetch('/api/auth/check-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        client_id: mfaClientID,
+        redirect_uri: mfaRedirectURI,
+        state: mfaState,
+        scope: mfaScope || 'openid profile email',
+        mode: mfaMode,
+      }),
+    })
+    const payload = await resp.json().catch(() => null)
+    if (!resp.ok || !payload?.consent_url) {
+      throw new Error(payload?.error || 'Failed to open consent page')
+    }
+    clearSession()
+    window.location.replace(payload.consent_url)
+    return true
   }
 
   const onVerify = async () => {
@@ -106,6 +146,7 @@ export default function VerifyPage() {
       } else if (verifyType === 'totp') {
         const data = await totpLoginVerify(email, code, siteId, redirectUrl, siteState)
         setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+        if (await continueOIDCConsent(data.access_token)) return
         clearSession()
         const sid = data.site_id || siteId
         const rurl = data.redirect_url || redirectUrl
@@ -118,6 +159,7 @@ export default function VerifyPage() {
       } else {
         const data = await mfaVerify(email, code)
         setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+        if (await continueOIDCConsent(data.access_token)) return
         clearSession()
         const sid = data.site_id || siteId
         const rurl = data.redirect_url || redirectUrl

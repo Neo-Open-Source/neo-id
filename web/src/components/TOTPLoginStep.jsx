@@ -39,7 +39,7 @@ export default function TOTPLoginStep({ email, siteId, redirectUrl, siteState, o
     setError('')
     try {
       const data = await totpLoginVerify(email, code, siteId, redirectUrl, siteState)
-      onSuccess(data)
+      await onSuccess(data)
     } catch (e) {
       setError(e?.response?.data?.error || 'Invalid code')
       setDigits(['', '', '', '', '', ''])
