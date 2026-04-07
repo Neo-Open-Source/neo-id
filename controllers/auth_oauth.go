@@ -549,8 +549,14 @@ func (c *AuthController) Callback() {
 			return
 		}
 
+		siteToken, err := generateSiteTokenForCallback(unifiedUser.UnifiedID, siteID)
+		if err != nil {
+			respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate site token")
+			return
+		}
+
 		deleteOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request)
-		redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, refreshToken, siteState)
+		redirectURLWithToken, err := withTokenAndState(redirectURL, siteToken, "", siteState)
 		if err != nil {
 			c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 			c.Data["json"] = map[string]interface{}{"error": "Invalid redirect_url: " + err.Error()}

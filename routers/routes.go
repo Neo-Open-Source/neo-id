@@ -78,6 +78,7 @@ func InitRoutes() {
 	web.Router("/api/service/login", &controllers.SiteController{}, "post:SiteLogin;options:SiteLogin")
 	web.Router("/api/service/callback", &controllers.SiteController{}, "get:SiteCallback")
 	web.Router("/api/service/verify", &controllers.SiteController{}, "post:VerifySiteToken")
+	web.Router("/api/service/refresh", &controllers.SiteController{}, "post:RefreshServiceToken")
 	web.Router("/api/service/info", &controllers.SiteController{}, "get:GetSiteInfo")
 	web.Router("/api/service/my", &controllers.SiteController{}, "get:GetMySites")
 	web.Router("/api/service/delete", &controllers.SiteController{}, "post:DeleteSite")

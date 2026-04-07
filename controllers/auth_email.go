@@ -232,7 +232,11 @@ func (c *AuthController) PasswordRegister() {
 		return
 	}
 	if existing != nil {
-		respondError(&c.Controller, http.StatusConflict, "conflict", "Email already registered")
+		if existing.EmailVerified {
+			respondError(&c.Controller, http.StatusConflict, "conflict", "Account with this email already exists. Please sign in.")
+		} else {
+			respondError(&c.Controller, http.StatusConflict, "conflict", "Account with this email already exists but is not verified. Use email verification.")
+		}
 		return
 	}
 

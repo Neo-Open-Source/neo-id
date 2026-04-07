@@ -126,13 +126,22 @@ func (c *SiteController) SiteCallback() {
 	_ = userCRUD.AddConnectedService(user.UnifiedID, site.Name)
 
 	accessToken := strings.TrimSpace(c.GetString("token"))
-	refreshToken := strings.TrimSpace(c.GetString("refresh_token"))
 	if accessToken == "" {
 		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "token is required")
 		return
 	}
 
-	redirectURLWithToken, err := withTokenAndState(redirectURL, accessToken, refreshToken, state)
+	months := user.RefreshDurationMonths
+	if months < 1 {
+		months = 1
+	}
+	serviceToken, serviceRefreshToken, _, err := generateServiceTokensForCallback(user.UnifiedID, siteID, months)
+	if err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate site token")
+		return
+	}
+
+	redirectURLWithToken, err := withTokenAndState(redirectURL, serviceToken, serviceRefreshToken, state)
 	if err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
 		c.Data["json"] = map[string]interface{}{"error": "Invalid redirect_url: " + err.Error()}
@@ -148,7 +157,7 @@ func (c *SiteController) SiteCallback() {
 		}
 		html := `<!doctype html><html><head><meta charset="utf-8"></head><body><script>
 (function(){
-  var data={type:"neo_id_auth",access_token:"` + accessToken + `",refresh_token:"` + refreshToken + `",state:"` + state + `"};
+  var data={type:"neo_id_auth",access_token:"` + serviceToken + `",refresh_token:"` + serviceRefreshToken + `",state:"` + state + `"};
   if(window.opener){window.opener.postMessage(data,"` + origin + `");window.close();}
   else{window.location.replace("` + redirectURLWithToken + `");}
 })();
@@ -194,6 +203,17 @@ func (c *SiteController) VerifySiteToken() {
 	user, err := userCRUD.GetUserByUnifiedID(userID)
 	if err != nil || user == nil {
 		respondError(&c.Controller, http.StatusNotFound, "not_found", "User not found")
+		return
+	}
+	connected := false
+	for _, s := range user.ConnectedServices {
+		if s == site.Name {
+			connected = true
+			break
+		}
+	}
+	if !connected {
+		respondError(&c.Controller, http.StatusForbidden, "forbidden", "Service is disconnected for this user")
 		return
 	}
 
@@ -246,5 +266,68 @@ func (c *SiteController) UserDeleted() {
 	}
 
 	c.Data["json"] = map[string]interface{}{"ok": true}
+	c.ServeJSON()
+}
+
+// RefreshServiceToken rotates service tokens for a connected user/site pair.
+// POST /api/service/refresh { "refresh_token": "..." }
+func (c *SiteController) RefreshServiceToken() {
+	site, err := c.authenticateSite()
+	if err != nil || site == nil {
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized - invalid API key")
+		return
+	}
+
+	var body struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	raw, _ := io.ReadAll(c.Ctx.Request.Body)
+	_ = json.Unmarshal(raw, &body)
+	body.RefreshToken = strings.TrimSpace(body.RefreshToken)
+	if body.RefreshToken == "" {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "refresh_token is required")
+		return
+	}
+
+	userID, tokenSiteID, err := c.verifyServiceRefreshToken(body.RefreshToken)
+	if err != nil || tokenSiteID != site.SiteID {
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_token", "Invalid refresh token")
+		return
+	}
+
+	userCRUD := models.NewUserCRUD()
+	user, err := userCRUD.GetUserByUnifiedID(userID)
+	if err != nil || user == nil || user.IsBanned {
+		respondError(&c.Controller, http.StatusUnauthorized, "invalid_token", "User not found or banned")
+		return
+	}
+	connected := false
+	for _, s := range user.ConnectedServices {
+		if s == site.Name {
+			connected = true
+			break
+		}
+	}
+	if !connected {
+		respondError(&c.Controller, http.StatusForbidden, "forbidden", "Service is disconnected for this user")
+		return
+	}
+
+	months := user.RefreshDurationMonths
+	if months < 1 {
+		months = 1
+	}
+	newAccess, newRefresh, _, err := generateServiceTokensForCallback(user.UnifiedID, site.SiteID, months)
+	if err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to refresh service token")
+		return
+	}
+
+	c.Data["json"] = map[string]interface{}{
+		"access_token":  newAccess,
+		"refresh_token": newRefresh,
+		"token_type":    "Bearer",
+		"expires_in":    900,
+	}
 	c.ServeJSON()
 }

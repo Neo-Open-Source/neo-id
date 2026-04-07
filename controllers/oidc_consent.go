@@ -200,42 +200,16 @@ func (c *OIDCController) Consent() {
 
 	// Popup mode: return tokens for postMessage
 	if pc.Mode == "popup" {
-		// Reuse existing browser session token if it belongs to the same user.
-		bearer := strings.TrimSpace(strings.TrimPrefix(c.Ctx.Request.Header.Get("Authorization"), "Bearer "))
-		if bearer != "" {
-			sessionCRUD := models.NewSessionCRUD()
-			if existing, err2 := sessionCRUD.GetSessionByToken(bearer); err2 == nil && existing != nil && existing.UserID == pc.UserID {
-				origin := pc.RedirectURI
-				if u, err3 := url.Parse(pc.RedirectURI); err3 == nil {
-					origin = u.Scheme + "://" + u.Host
-				}
-				json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]interface{}{
-					"popup":         true,
-					"access_token":  bearer,
-					"refresh_token": existing.RefreshToken,
-					"state":         pc.State,
-					"origin":        origin,
-					"redirect":      finalURL,
-				})
-				return
-			}
-		}
-
-		// Fallback: issue a fresh session if no reusable session token was provided.
 		months := user.RefreshDurationMonths
 		if months < 1 {
 			months = 1
 		}
-		accessToken, refreshToken, refreshExp, err := generateTokensWithDuration(user.UnifiedID, user.Email, months)
+		accessToken, refreshToken, _, err := generateServiceTokensForCallback(user.UnifiedID, pc.ClientID, months)
 		if err != nil {
 			c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]string{"error": "failed to generate session tokens"})
+			json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]string{"error": "failed to generate service tokens"})
 			return
 		}
-		sessionCRUD := models.NewSessionCRUD()
-		sess := makeSession(accessToken, user.UnifiedID, "", "", months, refreshToken, refreshExp)
-		enforceSessionLimit(user.UnifiedID)
-		_ = sessionCRUD.CreateSession(sess)
 
 		origin := pc.RedirectURI
 		if u, err2 := url.Parse(pc.RedirectURI); err2 == nil {
