@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"unified-id/models"
@@ -211,25 +214,80 @@ func notifyServiceDisconnect(serviceName, unifiedID, email string) {
 	_ = cursor.All(ctx, &sites)
 
 	for _, site := range sites {
-		if site.WebhookURL == "" {
-			continue
-		}
 		payload, _ := json.Marshal(map[string]interface{}{
 			"event":      "user.disconnected",
 			"unified_id": unifiedID,
 			"email":      email,
 			"service":    serviceName,
 		})
-		req, err := http.NewRequest(http.MethodPost, site.WebhookURL, bytes.NewReader(payload))
-		if err != nil {
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Neo-ID-Event", "user.disconnected")
 		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
-		if err == nil {
-			resp.Body.Close()
+		for _, webhookURL := range webhookCandidates(site) {
+			req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(payload))
+			if err != nil {
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Neo-ID-Event", "user.disconnected")
+			resp, err := client.Do(req)
+			if err == nil {
+				resp.Body.Close()
+				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+					break
+				}
+			}
 		}
 	}
+}
+
+func webhookCandidates(site models.Site) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	add := func(v string) {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return
+		}
+		if _, ok := seen[v]; ok {
+			return
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+
+	add(site.WebhookURL)
+
+	domain := strings.TrimSpace(site.Domain)
+	if domain == "" {
+		return out
+	}
+	raw := domain
+	if !strings.HasPrefix(strings.ToLower(raw), "http://") && !strings.HasPrefix(strings.ToLower(raw), "https://") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || strings.TrimSpace(u.Host) == "" {
+		return out
+	}
+
+	basePath := "/api/v1/webhooks/neo-id"
+	hostWithPort := u.Host
+	scheme := u.Scheme
+	if scheme == "" {
+		scheme = "https"
+	}
+	add(fmt.Sprintf("%s://%s%s", scheme, hostWithPort, basePath))
+
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
+	if host != "" && strings.Contains(host, ".") && host != "localhost" {
+		root := strings.TrimPrefix(host, "www.")
+		if !strings.HasPrefix(root, "api.") {
+			port := ""
+			if p := u.Port(); p != "" {
+				port = ":" + p
+			}
+			add(fmt.Sprintf("%s://api.%s%s%s", scheme, root, port, basePath))
+		}
+	}
+
+	return out
 }
