@@ -45,9 +45,11 @@ func (c *SiteController) SiteLogin() {
 	}
 
 	var requestData struct {
-		RedirectURL string `json:"redirect_url"`
-		State       string `json:"state"`
-		Mode        string `json:"mode"`
+		RedirectURL         string `json:"redirect_url"`
+		State               string `json:"state"`
+		Mode                string `json:"mode"`
+		CodeChallenge       string `json:"code_challenge"`
+		CodeChallengeMethod string `json:"code_challenge_method"`
 	}
 	body, err := io.ReadAll(c.Ctx.Request.Body)
 	if err != nil {
@@ -74,6 +76,14 @@ func (c *SiteController) SiteLogin() {
 		"&state=" + url.QueryEscape(requestData.State)
 	if requestData.Mode == "popup" {
 		loginURL += "&mode=popup"
+	}
+	if requestData.CodeChallenge != "" {
+		method := requestData.CodeChallengeMethod
+		if method == "" {
+			method = "S256"
+		}
+		loginURL += "&code_challenge=" + url.QueryEscape(requestData.CodeChallenge)
+		loginURL += "&code_challenge_method=" + url.QueryEscape(method)
 	}
 
 	c.Data["json"] = map[string]interface{}{

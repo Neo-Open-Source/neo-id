@@ -180,8 +180,10 @@ disable:
 	c.ServeJSON()
 }
 
-// LoginVerify is called during login when TOTP is enabled
-// It receives email + TOTP code (no password — password was already verified)
+// LoginVerify is called during login when TOTP is enabled.
+// It receives email + TOTP code (no password — password was already verified).
+// Now correctly creates a full session with refresh_token so the user
+// stays logged in beyond 24 hours.
 func (c *TOTPController) LoginVerify() {
 	var body struct {
 		Email string `json:"email"`
@@ -218,21 +220,34 @@ func (c *TOTPController) LoginVerify() {
 		return
 	}
 
-	accessToken, refreshToken, err := generateTokens(user.UnifiedID, user.Email)
+	months := user.RefreshDurationMonths
+	if months < 1 || months > 9 {
+		months = 1
+	}
+
+	accessToken, refreshToken, refreshExp, err := generateTokensWithDuration(user.UnifiedID, user.Email, months)
 	if err != nil {
 		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate tokens")
 		return
 	}
 
 	sessionCRUD := models.NewSessionCRUD()
+	// Use makeSession so the session includes refresh_token and refresh_expires_at —
+	// without these the user gets logged out after 24h of inactivity.
+	totpSess := &models.Session{
+		Token:                 accessToken,
+		UserID:                user.UnifiedID,
+		ExpiresAt:             time.Now().Add(24 * time.Hour),
+		IPAddress:             getRealIP(c.Ctx.Request),
+		UserAgent:             c.Ctx.Request.UserAgent(),
+		RefreshToken:          refreshToken,
+		RefreshExpiresAt:      refreshExp,
+		RefreshDurationMonths: months,
+		LastUsedAt:            time.Now(),
+	}
 	enforceSessionLimit(user.UnifiedID)
-	_ = sessionCRUD.CreateSession(&models.Session{
-		Token:     accessToken,
-		UserID:    user.UnifiedID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-		IPAddress: getRealIP(c.Ctx.Request),
-		UserAgent: c.Ctx.Request.UserAgent(),
-	})
+	_ = sessionCRUD.CreateSession(totpSess)
+	createSessionWithGeo(totpSess)
 
 	resp := map[string]interface{}{
 		"access_token":  accessToken,

@@ -47,14 +47,25 @@ func (sc *SessionCRUD) CreateSession(session *Session) error {
 	return nil
 }
 
-// GetSessionByToken gets session by token
+// GetSessionByToken gets session by token.
+// A session is considered alive as long as the refresh token has not expired,
+// even if the short-lived access token (expires_at / 24h) has already passed.
+// This prevents users from being logged out after 1-2 days of inactivity
+// despite having a long-lived refresh token.
 func (sc *SessionCRUD) GetSessionByToken(token string) (*Session, error) {
 	ctx := context.Background()
 	var session Session
 
+	now := time.Now()
 	err := sc.collection.FindOne(ctx, bson.M{
-		"token":      token,
-		"expires_at": bson.M{"$gt": time.Now()},
+		"token": token,
+		"$or": []bson.M{
+			// Access token still valid (normal case, active user)
+			{"expires_at": bson.M{"$gt": now}},
+			// Access token expired but refresh token is still alive
+			// (user was away for >24h but <N months)
+			{"refresh_expires_at": bson.M{"$gt": now}},
+		},
 	}).Decode(&session)
 
 	if err == mongo.ErrNoDocuments {

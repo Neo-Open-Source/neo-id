@@ -365,8 +365,12 @@ func (c *OIDCController) processAuthCodeGrant(code, clientID, clientSecret, redi
 		return
 	}
 
-	// Generate tokens
-	accessToken, refreshToken, err := generateTokens(user.UnifiedID, user.Email)
+	// Generate tokens with proper duration
+	months := user.RefreshDurationMonths
+	if months < 1 || months > 9 {
+		months = 1
+	}
+	accessToken, refreshToken, refreshExp, err := generateTokensWithDuration(user.UnifiedID, user.Email, months)
 	if err != nil {
 		c.tokenError("server_error", "failed to generate tokens")
 		return
@@ -379,16 +383,22 @@ func (c *OIDCController) processAuthCodeGrant(code, clientID, clientSecret, redi
 		return
 	}
 
-	// Store session
+	// Store session with full refresh token data so user stays logged in
+	// beyond 24 hours without being kicked out.
 	sessionCRUD := models.NewSessionCRUD()
+	oidcSess := &models.Session{
+		Token:                 accessToken,
+		UserID:                user.UnifiedID,
+		ExpiresAt:             time.Now().Add(24 * time.Hour),
+		IPAddress:             getRealIP(c.Ctx.Request),
+		UserAgent:             c.Ctx.Request.UserAgent(),
+		RefreshToken:          refreshToken,
+		RefreshExpiresAt:      refreshExp,
+		RefreshDurationMonths: months,
+		LastUsedAt:            time.Now(),
+	}
 	enforceSessionLimit(user.UnifiedID)
-	_ = sessionCRUD.CreateSession(&models.Session{
-		Token:     accessToken,
-		UserID:    user.UnifiedID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-		IPAddress: c.Ctx.Request.RemoteAddr,
-		UserAgent: c.Ctx.Request.UserAgent(),
-	})
+	_ = sessionCRUD.CreateSession(oidcSess)
 
 	c.Data["json"] = map[string]interface{}{
 		"access_token":  accessToken,
@@ -437,24 +447,47 @@ func (c *OIDCController) processRefreshTokenGrant(refreshToken, clientID, client
 		return
 	}
 
-	accessToken, newRefreshToken, err := generateTokens(user.UnifiedID, user.Email)
+	months := user.RefreshDurationMonths
+	if months < 1 || months > 9 {
+		months = 1
+	}
+
+	newAccessToken, newRefreshToken, newRefreshExp, err := generateTokensWithDuration(user.UnifiedID, user.Email, months)
 	if err != nil {
 		c.tokenError("server_error", "failed to generate tokens")
 		return
 	}
 
+	// Try to rotate the existing session record first (preferred — keeps session count stable)
 	sessionCRUD := models.NewSessionCRUD()
-	enforceSessionLimit(user.UnifiedID)
-	_ = sessionCRUD.CreateSession(&models.Session{
-		Token:     accessToken,
-		UserID:    user.UnifiedID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-		IPAddress: c.Ctx.Request.RemoteAddr,
-		UserAgent: c.Ctx.Request.UserAgent(),
-	})
+	rotateErr := sessionCRUD.RotateSessionByRefreshToken(
+		refreshToken,
+		newAccessToken,
+		newRefreshToken,
+		time.Now().Add(24*time.Hour),
+		newRefreshExp,
+		getRealIP(c.Ctx.Request),
+		c.Ctx.Request.UserAgent(),
+	)
+	if rotateErr != nil {
+		// Rotation failed (old session not found) — create a fresh session
+		oidcRefreshSess := &models.Session{
+			Token:                 newAccessToken,
+			UserID:                user.UnifiedID,
+			ExpiresAt:             time.Now().Add(24 * time.Hour),
+			IPAddress:             getRealIP(c.Ctx.Request),
+			UserAgent:             c.Ctx.Request.UserAgent(),
+			RefreshToken:          newRefreshToken,
+			RefreshExpiresAt:      newRefreshExp,
+			RefreshDurationMonths: months,
+			LastUsedAt:            time.Now(),
+		}
+		enforceSessionLimit(user.UnifiedID)
+		_ = sessionCRUD.CreateSession(oidcRefreshSess)
+	}
 
 	c.Data["json"] = map[string]interface{}{
-		"access_token":  accessToken,
+		"access_token":  newAccessToken,
 		"token_type":    "Bearer",
 		"expires_in":    86400,
 		"refresh_token": newRefreshToken,
