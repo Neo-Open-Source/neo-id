@@ -353,4 +353,4 @@ For complete API documentation, see **[API.md](API.md)**
 
 ---
 
-<p align="center">Made with ❤️ by the Neo ID team</p>
+<p align="center">Made with ❤️ by the Neo-Open-Source</p>
