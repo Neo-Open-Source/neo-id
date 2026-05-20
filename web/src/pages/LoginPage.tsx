@@ -81,7 +81,7 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const data = await passwordLogin(email, password, siteId, redirectUrl, siteState)
+      const data = await passwordLogin(email, password, siteId, redirectUrl, siteState) as Record<string, unknown>
 
       if (data.totp_required) {
         setTotpRequired(true)
@@ -107,8 +107,8 @@ export default function LoginPage() {
       }
 
       setTokens({ 
-        accessToken: data.access_token, 
-        refreshToken: data.refresh_token 
+        accessToken: data.access_token as string | undefined, 
+        refreshToken: data.refresh_token as string | undefined,
       })
       
       await handleAuthSuccess(data)

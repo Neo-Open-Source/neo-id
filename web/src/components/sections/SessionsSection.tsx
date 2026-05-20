@@ -358,7 +358,7 @@ export default function SessionsSection({ currentRefreshMonths = 1, compact = fa
   const load = async () => {
     setLoading(true)
     try { 
-      const d = await getSessions() 
+      const d = await getSessions() as { sessions?: Session[] }
       setSessions((d.sessions || []).sort((a: Session, b: Session) => {
         if (a.is_current && !b.is_current) return -1
         if (!a.is_current && b.is_current) return 1

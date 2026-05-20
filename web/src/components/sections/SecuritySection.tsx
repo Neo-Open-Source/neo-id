@@ -105,7 +105,7 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
       setPasskeyLoading(true)
       let pk = passkeyCreationOptions
       if (!pk) {
-        const optionsRes = await beginPasskeyRegistration(passkeyRequiresMFA ? passkeyMFACode : undefined)
+        const optionsRes = await beginPasskeyRegistration(passkeyRequiresMFA ? passkeyMFACode : undefined) as { publicKey?: SecurityPasskeyPublicKeyOptions }
         pk = optionsRes?.publicKey as SecurityPasskeyPublicKeyOptions
       }
       if (!pk) throw new Error('No publicKey options')
@@ -147,7 +147,7 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
         },
       })
 
-      const r = await listPasskeys()
+      const r = await listPasskeys() as { passkeys?: SecurityPasskey[] }
       setPasskeys((r?.passkeys || []) as SecurityPasskey[])
       setPasskeyName('')
       setPasskeyMFACode('')
@@ -174,7 +174,7 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
     if (activeModal !== 'passkeys') return
     setPasskeyLoading(true)
     listPasskeys()
-      .then((r) => setPasskeys((r?.passkeys || []) as SecurityPasskey[]))
+      .then((r) => setPasskeys(((r as { passkeys?: SecurityPasskey[] })?.passkeys || []) as SecurityPasskey[]))
       .catch(() => notify?.('error', 'Failed to load passkeys'))
       .finally(() => setPasskeyLoading(false))
   }, [activeModal, notify])
@@ -465,7 +465,7 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
         onContinue={async () => {
           setPasskeyVerifyLoading(true)
           try {
-            const optionsRes = await beginPasskeyRegistration(passkeyMFACode)
+            const optionsRes = await beginPasskeyRegistration(passkeyMFACode) as { publicKey?: SecurityPasskeyPublicKeyOptions }
             setPasskeyCreationOptions((optionsRes?.publicKey || null) as SecurityPasskeyPublicKeyOptions | null)
             setActiveModal('passkeys')
           } catch (e: unknown) {

@@ -94,7 +94,7 @@ function RegisterForm({ onRegistered }: { onRegistered: (s: DeveloperService) =>
     if (!name.trim() || !domain.trim() || !ownerEmail.trim()) { setError('Name, domain and owner email are required'); return }
     setLoading(true)
     try {
-      const data = await registerService({ name: name.trim(), domain: domain.trim(), owner_email: ownerEmail.trim(), webhook_url: webhookUrl.trim() || undefined })
+      const data = await registerService({ name: name.trim(), domain: domain.trim(), owner_email: ownerEmail.trim(), webhook_url: webhookUrl.trim() || undefined }) as { site: DeveloperService }
       setOpen(false); setName(''); setDomain(''); setOwnerEmail(''); setWebhookUrl(''); onRegistered(data.site)
     } catch (e: unknown) { setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed') }
     finally { setLoading(false) }

@@ -26,7 +26,7 @@ export default function TOTPSection({ totpEnabled: initialEnabled, emailMfaEnabl
       // Enable flow - show setup
       setLoading(true); setError('')
       try { 
-        const data = await totpSetup(); 
+        const data = await totpSetup() as { qr_code: string; secret: string };
         setSetupData(data); 
         setStep('setup')
         setEnabled(false) // Keep switch off until fully enabled

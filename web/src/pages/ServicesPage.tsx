@@ -117,7 +117,7 @@ export default function ServicesPage() {
   const notify = (type: string, text: string) => { setMsg({ type, text }); setTimeout(() => setMsg({ type: '', text: '' }), 4000) }
   const load = async () => {
     setLoading(true)
-    try { const d = await adminListClients(); setClients(d.clients || []) }
+    try { const d = await adminListClients() as { clients?: Client[] }; setClients(d.clients || []) }
     catch { notify('error', 'Failed to load clients') }
     finally { setLoading(false) }
   }
