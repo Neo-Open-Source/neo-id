@@ -8,6 +8,7 @@ import {
 } from '@neo-open-source/ui-web'
 import { useThemeMode } from '../app/ThemeContext'
 import { setTokens } from '../api/client'
+import styles from '../styles/DeviceLoginPage.module.css'
 
 const POLL_INTERVAL = 3000
 const CODE_TTL = 5 * 60 * 1000
@@ -93,12 +94,12 @@ export default function DeviceLoginPage() {
   const formattedCode = code ? `${code.slice(0, 3)}–${code.slice(3)}` : ''
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'fixed', top: 16, right: 16 }}>
+    <div className={styles.page}>
+      <div className={styles.themeToggle}>
         <ThemeToggle dark={dark} onChange={(d) => setMode(d ? 'dark' : 'light')} />
       </div>
 
-      <div style={{ width: '100%', maxWidth: 440 }}>
+      <div className={styles.container}>
         <Card>
           <CardHeader>
             <CardTitle>Sign in on TV</CardTitle>
@@ -107,28 +108,28 @@ export default function DeviceLoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && <div style={{ marginBottom: 16 }}><AlertBanner tone="danger" title={error} onDismiss={() => setError('')} /></div>}
-            {status === 'confirmed' && <div style={{ marginBottom: 16 }}><AlertBanner tone="success" title="Signed in! Redirecting…" /></div>}
+            {error && <div className={styles.banner}><AlertBanner tone="danger" title={error} onDismiss={() => setError('')} /></div>}
+            {status === 'confirmed' && <div className={styles.banner}><AlertBanner tone="success" title="Signed in! Redirecting…" /></div>}
 
             {error && status === 'idle' ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+              <div className={styles.centerPad}>
                 <Button variant="secondary" onClick={generateCode}>Try again</Button>
               </div>
             ) : null}
 
             {status === 'expired' ? (
-              <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <p style={{ color: 'var(--neo-text-secondary)', marginBottom: 16 }}>Code expired</p>
+              <div className={styles.expired}>
+                <p className={styles.expiredText}>Code expired</p>
                 <Button variant="secondary" onClick={generateCode}>Generate new code</Button>
               </div>
             ) : status === 'idle' && !error ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><Spinner /></div>
+              <div className={styles.idleLoading}><Spinner /></div>
             ) : (
               <DeviceLoginCard qrImage={qrImage} code={formattedCode} url="neo.id/tv" onRefresh={generateCode} />
             )}
 
             {status === 'waiting' ? (
-              <p style={{ marginTop: 16, fontSize: '0.8rem', color: 'var(--neo-text-secondary)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <p className={styles.waiting}>
                 <Spinner /> Waiting for confirmation…
               </p>
             ) : null}

@@ -7,6 +7,7 @@ import DeveloperSection from '../components/sections/DeveloperSection'
 import { logout } from '../api/endpoints'
 import { useCachedProfile } from '../hooks/useCachedProfile'
 import { buildAppNav } from '../navigation/appNav'
+import styles from '../styles/DeveloperPage.module.css'
 
 export default function DeveloperPage() {
   const navigate = useNavigate()
@@ -33,12 +34,12 @@ export default function DeveloperPage() {
   return (
     <ResponsiveLayout
       useAppLayout
-      appLayoutProps={{ title: 'Neo ID', profile: profile as never, navItems, onLogout: undefined, compact: true }}
+      appLayoutProps={{ title: 'Neo ID', profile: profile || undefined, navItems, onLogout: undefined, compact: true }}
       mobileTitle="Developer"
       backTo="/"
     >
-      <div style={{ width: 'min(100%, 960px)', margin: '0 auto', padding: '24px 16px 96px' }}>
-        {profile && <DeveloperSection profile={profile as never} onNavigateToServices={() => navigate('/services')} />}
+      <div className={styles.container}>
+        {profile && <DeveloperSection profile={profile} onNavigateToServices={() => navigate('/services')} />}
       </div>
     </ResponsiveLayout>
   )

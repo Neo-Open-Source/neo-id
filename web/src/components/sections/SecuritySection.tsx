@@ -16,12 +16,11 @@ import PasskeyVerifyModal from './security/PasskeyVerifyModal'
 import PasskeysModal from './security/PasskeysModal'
 import PasswordModal from './security/PasswordModal'
 import { useSecuritySectionState, type SecurityPasskey, type SecurityPasskeyPublicKeyOptions } from './security/useSecuritySectionState'
+import type { OAuthProvider, UserProfile } from '../../types/app'
 
-interface Provider { provider: string; external_id?: string }
-interface Profile { totp_enabled?: boolean; email_mfa_enabled?: boolean; display_name?: string; email?: string; first_name?: string; last_name?: string; email_verified?: boolean; pending_email?: string; passkeys_count?: number }
 export default function SecuritySection({ profile, providers, hasPassword, notify, onUnlink, onPasswordChanged, onOpenApps, onDeleteAccount, onLogout }: {
-  profile?: Profile
-  providers?: Provider[]
+  profile?: UserProfile
+  providers?: OAuthProvider[]
   hasPassword?: boolean
   notify?: (t: string, m: string) => void
   onUnlink?: (p: string) => void

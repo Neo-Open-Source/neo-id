@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { AccountCard, AvatarPicker, Button } from '@neo-open-source/ui-web'
 import Modal from '../Modal'
 import { uploadAvatar, setAvatarStock, STOCK_AVATARS } from '../../api/endpoints'
+import styles from '../../styles/ProfileSection.module.css'
 
 interface Profile { avatar?: string; display_name?: string; email?: string; role?: string; unified_id?: string }
 
@@ -40,13 +41,13 @@ export default function ProfileSection({ profile, notify, onAvatarSaved }: { pro
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontWeight: 600, fontSize: '1.1rem' }}>Profile</h2>
-        <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--neo-text-muted)' }}>Your account information</p>
+      <div className={styles.header}>
+        <h2 className={styles.title}>Profile</h2>
+        <p className={styles.subtitle}>Your account information</p>
       </div>
 
       {/* AccountCard with clickable avatar overlay */}
-      <div style={{ maxWidth: 480, position: 'relative' }}>
+      <div className={styles.cardWrap}>
         <AccountCard
           avatar={avatarSrc}
           name={profile?.display_name || profile?.email || ''}
@@ -58,7 +59,7 @@ export default function ProfileSection({ profile, notify, onAvatarSaved }: { pro
         {/* Camera overlay on avatar */}
         <button
           onClick={() => setPickerOpen(true)}
-          className="neo-id-avatar-overlay"
+          className={styles.avatarOverlay}
           aria-label="Change avatar"
         />
       </div>
@@ -80,31 +81,8 @@ export default function ProfileSection({ profile, notify, onAvatarSaved }: { pro
           onSelect={setSelected}
           onUpload={onUpload}
         />
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
+        <input ref={fileRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={onFileChange} />
       </Modal>
-
-      <style>{`
-        .neo-id-profile-card .neo-account-card__avatar { cursor: pointer; }
-        .neo-id-avatar-overlay {
-          position: absolute;
-          top: 28px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 88px;
-          height: 88px;
-          border-radius: 50%;
-          border: none;
-          background: transparent;
-          cursor: pointer;
-          transition: background 0.15s;
-        }
-        .neo-id-avatar-overlay:hover {
-          background: rgba(0,0,0,0.4);
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z'/%3E%3Ccircle cx='12' cy='13' r='4'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: center;
-        }
-      `}</style>
     </div>
   )
 }

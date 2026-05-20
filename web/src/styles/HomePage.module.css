@@ -5,6 +5,56 @@
   gap: 30px;
 }
 
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 24px;
+}
+
+.skeletonSpinner {
+  display: grid;
+  place-items: center;
+  padding: 8px 0 4px;
+}
+
+.skeletonAvatar {
+  margin: 0 auto;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: var(--neo-surface-2);
+}
+
+.skeletonName {
+  margin: 0 auto;
+  width: 160px;
+  height: 20px;
+  border-radius: 8px;
+  background: var(--neo-surface-2);
+}
+
+.skeletonEmail {
+  margin: 0 auto;
+  width: 220px;
+  height: 14px;
+  border-radius: 8px;
+  background: var(--neo-surface-2);
+}
+
+.skeletonMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.skeletonRow {
+  height: 52px;
+  border-radius: 12px;
+  background: var(--neo-surface-2);
+}
+
 .profile {
   display: grid;
   justify-items: center;

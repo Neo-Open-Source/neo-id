@@ -74,11 +74,12 @@ func DispatchLegalDocsNotify(maxBatches int) (*legalDispatchResult, error) {
 	col := models.GetCollection(models.LegalMetaCollection)
 	eventsCol := models.GetCollection(models.LegalNoticeEventsCollection)
 	usersCol := models.NewUserCRUD().Collection()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	var current legalMetaRecord
-	_ = col.FindOne(ctx, bson.M{"key": "legal_docs_version"}).Decode(&current)
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = col.FindOne(ctx, bson.M{"key": "legal_docs_version"}).Decode(&current)
+		cancel()
+	}
 
 	base := strings.TrimRight(getBaseURL(), "/")
 	termsURL := base + "/terms"
@@ -98,9 +99,14 @@ func DispatchLegalDocsNotify(maxBatches int) (*legalDispatchResult, error) {
 	var lastID primitive.ObjectID
 	cursorKey := "legal_docs_cursor:" + version
 	var cursorRec legalMetaRecord
-	if err := col.FindOne(ctx, bson.M{"key": cursorKey}).Decode(&cursorRec); err == nil {
-		if oid, parseErr := primitive.ObjectIDFromHex(cursorRec.Value); parseErr == nil {
-			lastID = oid
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := col.FindOne(ctx, bson.M{"key": cursorKey}).Decode(&cursorRec)
+		cancel()
+		if err == nil {
+			if oid, parseErr := primitive.ObjectIDFromHex(cursorRec.Value); parseErr == nil {
+				lastID = oid
+			}
 		}
 	}
 
@@ -209,8 +215,9 @@ func DispatchLegalDocsNotify(maxBatches int) (*legalDispatchResult, error) {
 		res.NextFrom = lastID.Hex()
 	}
 
+	finalCtx, finalCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	_, upsertErr := col.UpdateOne(
-		ctx,
+		finalCtx,
 		bson.M{"key": "legal_docs_version"},
 		bson.M{
 			"$set": bson.M{
@@ -220,6 +227,7 @@ func DispatchLegalDocsNotify(maxBatches int) (*legalDispatchResult, error) {
 		},
 		options.Update().SetUpsert(true),
 	)
+	finalCancel()
 	if upsertErr != nil {
 		return nil, upsertErr
 	}

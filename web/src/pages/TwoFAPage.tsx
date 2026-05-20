@@ -4,6 +4,7 @@ import { Button, AlertBanner } from '@neo-open-source/ui-web'
 import { Shield, Bell } from '@neo-open-source/icons'
 import { totpVerifyEnable, totpDisable, toggleEmailMFA, sendMFACode } from '../api/endpoints'
 import AuthShell from '../components/AuthShell'
+import styles from '../styles/TwoFAPage.module.css'
 
 const SmartphoneIcon = () => <Shield size={28} />
 const MailIcon = () => <Bell size={28} />
@@ -75,38 +76,27 @@ export default function TwoFAPage() {
   } as Record<string, { icon: React.ReactNode; title: string; sub: string; btn: string; danger: boolean }>)[action] || { icon: <Shield size={28} />, title: '2FA verification', sub: 'Enter your 6-digit code', btn: 'Verify', danger: false }
   const canSwitch = (action === 'totp_disable' || action === 'email_disable') && sessionStorage.getItem('2fa_has_both') === '1'
 
-  const inputStyle = (d: string): React.CSSProperties => ({ width: 48, height: 56, border: `1px solid ${d ? 'var(--neo-text-primary)' : 'var(--neo-border-subtle)'}`, borderRadius: 'var(--neo-radius-sm)', fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', outline: 'none', background: 'var(--neo-surface-2)', color: 'var(--neo-text-primary)', fontFamily: 'inherit', cursor: 'text' })
-
   return (
-    <AuthShell backTo={back} title={cfg.title} description={cfg.sub} hero={<div style={{ display: 'flex', justifyContent: 'center' }}>{cfg.icon}</div>}>
+    <AuthShell backTo={back} title={cfg.title} description={cfg.sub} hero={<div className={styles.hero}>{cfg.icon}</div>}>
       {error && <AlertBanner tone="danger" title={error} onDismiss={() => setError('')} />}
       {success && <AlertBanner tone="success" title={success} />}
-      <div className="neo-id-2fa-grid">
+      <div className={styles.grid}>
         {digits.map((d, i) => (
           <input key={i} ref={el => (refs.current[i] = el)} type="text" inputMode="numeric" maxLength={6}
-            value={d} onChange={e => onDigitChange(i, e.target.value)} onKeyDown={e => onKeyDown(i, e)} onFocus={e => e.target.select()} style={inputStyle(d)} />
+            value={d} onChange={e => onDigitChange(i, e.target.value)} onKeyDown={e => onKeyDown(i, e)} onFocus={e => e.target.select()} className={`${styles.input} ${d ? styles.inputFilled : ''}`} />
         ))}
       </div>
-      <Button variant={cfg.danger ? 'danger' : 'primary'} disabled={code.length < 6 || loading || !!success} onClick={onVerify} style={{ width: '100%' }}>
+      <Button className={styles.fullButton} variant={cfg.danger ? 'danger' : 'primary'} disabled={code.length < 6 || loading || !!success} onClick={onVerify}>
         {loading ? 'Verifying…' : success ? 'Done' : cfg.btn}
       </Button>
       {canSwitch && (
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--neo-text-muted)', textAlign: 'center' }}>
+        <p className={styles.switchText}>
           {altType === 'totp' ? "Don't have your authenticator? " : 'Prefer authenticator app? '}
-          <button onClick={switchAlt} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--neo-text-primary)', fontWeight: 600, padding: 0, fontSize: 14 }}>
+          <button onClick={switchAlt} className={styles.switchButton}>
             {altType === 'totp' ? 'Use email code' : 'Use authenticator code'}
           </button>
         </p>
       )}
-
-      <style>{`
-        .neo-id-2fa-grid {
-          display: grid;
-          grid-template-columns: repeat(6, minmax(0, 1fr));
-          gap: 8px;
-          justify-content: center;
-        }
-      `}</style>
     </AuthShell>
   )
 }

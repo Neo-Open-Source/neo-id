@@ -1,0 +1,92 @@
+.loadingWrap {
+  display: flex;
+  justify-content: center;
+  padding: 64px;
+}
+
+.fullButton {
+  width: 100%;
+}
+
+.siteCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-2);
+}
+
+.siteAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.siteName {
+  font-weight: 600;
+  margin: 0;
+  font-size: 14px;
+}
+
+.siteDescription {
+  margin: 0;
+  font-size: 13px;
+  color: var(--neo-text-muted);
+}
+
+.signedInRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--neo-text-muted);
+}
+
+.signedInUser {
+  font-weight: 600;
+  color: var(--neo-text-primary);
+}
+
+.scopeWrap {
+  display: grid;
+  gap: 8px;
+}
+
+.scopeTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neo-text-muted);
+  margin: 0;
+}
+
+.scopeItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.scopeMark {
+  color: var(--neo-success-500);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--neo-text-muted);
+  text-align: center;
+}
+
+html[data-theme='light'] .siteCard {
+  background: #f4f5f7;
+  border-color: #e4e8ee;
+}

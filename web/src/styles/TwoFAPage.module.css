@@ -1,3 +1,8 @@
+.hero {
+  display: flex;
+  justify-content: center;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -9,7 +14,7 @@
   width: 48px;
   height: 56px;
   border: 1px solid var(--neo-border-subtle);
-  border-radius: 16px;
+  border-radius: var(--neo-radius-sm);
   font-size: 1.5rem;
   font-weight: 700;
   text-align: center;
@@ -18,45 +23,29 @@
   color: var(--neo-text-primary);
   font-family: inherit;
   cursor: text;
-  transition: border-color 160ms ease;
-}
-
-.input:focus {
-  border-color: var(--neo-text-primary);
 }
 
 .inputFilled {
   border-color: var(--neo-text-primary);
 }
 
-.actions {
-  display: grid;
-  gap: 12px;
-  justify-items: center;
-}
-
-.submit {
+.fullButton {
   width: 100%;
 }
 
-.link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--neo-text-primary);
-  text-decoration: none;
-  font-size: 0.98rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 160ms ease;
-}
-
-.link:hover {
-  opacity: 0.8;
-}
-
-.link:disabled {
+.switchText {
+  margin: 0;
+  font-size: 14px;
   color: var(--neo-text-muted);
-  cursor: not-allowed;
-  opacity: 0.6;
+  text-align: center;
+}
+
+.switchButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--neo-text-primary);
+  font-weight: 600;
+  padding: 0;
+  font-size: 14px;
 }

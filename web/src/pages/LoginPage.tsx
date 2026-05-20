@@ -15,6 +15,7 @@ import { ROUTES } from '../constants'
 import styles from '../styles/LoginPage.module.css'
 
 type AuthTab = 'login' | 'register'
+type RequestError = { response?: { status?: number; data?: { error?: string; message?: string } }; message?: string }
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -111,10 +112,11 @@ export default function LoginPage() {
       })
       
       await handleAuthSuccess(data)
-    } catch (err: any) {
-      const status = err?.response?.status
-      const errorCode = err?.response?.data?.error || ''
-      const errorMessage = err?.response?.data?.message || err?.message
+    } catch (err: unknown) {
+      const requestError = err as RequestError
+      const status = requestError?.response?.status
+      const errorCode = requestError?.response?.data?.error || ''
+      const errorMessage = requestError?.response?.data?.message || requestError?.message
       
       // Map error codes to user-friendly messages
       let message = errorMessage
@@ -167,9 +169,10 @@ export default function LoginPage() {
       })
       
       navigate(ROUTES.VERIFY)
-    } catch (err: any) {
-      const errorCode = err?.response?.data?.error || ''
-      const errorMessage = err?.response?.data?.message || err?.message
+    } catch (err: unknown) {
+      const requestError = err as RequestError
+      const errorCode = requestError?.response?.data?.error || ''
+      const errorMessage = requestError?.response?.data?.message || requestError?.message
       
       // Map error codes to user-friendly messages
       let message = errorMessage

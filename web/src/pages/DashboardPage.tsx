@@ -9,6 +9,7 @@ import SecuritySection from '../components/sections/SecuritySection'
 import ServicesSection from '../components/sections/ServicesSection'
 import { deleteAccountRequest, getProfile, getProviders, unlinkProvider, getServices, connectService, disconnectService, logout } from '../api/endpoints'
 import { buildAppNav } from '../navigation/appNav'
+import type { OAuthProvider, UserProfile, UserServicesResponse } from '../types/app'
 import styles from '../styles/DashboardPage.module.css'
 
 const VALID = ['security', 'apps']
@@ -18,22 +19,20 @@ const getHash = () => {
   return VALID.includes(h) ? h : 'security'
 }
 
-type Profile = Record<string, unknown>
-
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState(getHash)
-  const readCachedProfile = (): Profile | null => {
+  const readCachedProfile = (): UserProfile | null => {
     try {
-      return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || '') as Profile
+      return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || '') as UserProfile
     } catch {
       return null
     }
   }
-  const [profile, setProfile] = useState<Profile | null>(() => readCachedProfile())
-  const [providers, setProviders] = useState<unknown[]>([])
+  const [profile, setProfile] = useState<UserProfile | null>(() => readCachedProfile())
+  const [providers, setProviders] = useState<OAuthProvider[]>([])
   const [hasPassword, setHasPassword] = useState(false)
-  const [services, setServices] = useState<{ connected_services?: unknown[]; available_services?: unknown[] }>({})
+  const [services, setServices] = useState<UserServicesResponse>({})
   const [msg, setMsg] = useState({ type: '', text: '' })
   const [loading, setLoading] = useState(() => !readCachedProfile())
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -151,7 +150,7 @@ export default function DashboardPage() {
 
   if (loading && !profile) {
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--neo-bg-canvas)' }}>
+      <div className={styles.fullPageLoading}>
         <Spinner />
       </div>
     )
@@ -161,7 +160,7 @@ export default function DashboardPage() {
     <>
       <ResponsiveLayout 
         useAppLayout 
-        appLayoutProps={{ title: "Neo ID", profile: profile as never, navItems, extraNav, onLogout: undefined, compact: true }}
+        appLayoutProps={{ title: "Neo ID", profile: profile || undefined, navItems, extraNav, onLogout: undefined, compact: true }}
         mobileTitle={sectionTitle}
         backTo="/"
       >
@@ -187,8 +186,8 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            {activeSection === 'security' && <SecuritySection profile={profile as never} providers={providers as never} hasPassword={hasPassword} notify={notify} onUnlink={onUnlink} onPasswordChanged={load} onOpenApps={() => setActiveSection('apps')} onDeleteAccount={() => setDeleteModalOpen(true)} onLogout={handleLogout} />}
-            {activeSection === 'apps' && <ServicesSection services={services as never} onConnect={onConnectService} onDisconnect={onDisconnectService} />}
+            {activeSection === 'security' && <SecuritySection profile={profile || undefined} providers={providers} hasPassword={hasPassword} notify={notify} onUnlink={onUnlink} onPasswordChanged={load} onOpenApps={() => setActiveSection('apps')} onDeleteAccount={() => setDeleteModalOpen(true)} onLogout={handleLogout} />}
+            {activeSection === 'apps' && <ServicesSection services={services} onConnect={onConnectService} onDisconnect={onDisconnectService} />}
           </div>
         </div>
       </ResponsiveLayout>
@@ -204,7 +203,7 @@ export default function DashboardPage() {
           </>
         }
       >
-        <p style={{ margin: 0, color: 'var(--neo-text-muted)' }}>You'll receive an email to confirm.</p>
+        <p className={styles.deleteHint}>You'll receive an email to confirm.</p>
       </Modal>
 
     </>

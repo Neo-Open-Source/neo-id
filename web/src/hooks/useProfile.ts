@@ -2,31 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getProfile, getProviders, getServices } from '../api/endpoints'
 import { ROUTES } from '../constants'
-
-interface Profile {
-  id: string
-  email: string
-  display_name: string
-  avatar?: string
-  [key: string]: unknown
-}
-
-interface Provider {
-  provider: string
-  [key: string]: unknown
-}
-
-interface Services {
-  connected_services?: unknown[]
-  available_services?: unknown[]
-}
+import type { OAuthProvider, UserProfile, UserServicesResponse } from '../types/app'
 
 export const useProfile = () => {
   const navigate = useNavigate()
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [providers, setProviders] = useState<Provider[]>([])
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [providers, setProviders] = useState<OAuthProvider[]>([])
   const [hasPassword, setHasPassword] = useState(false)
-  const [services, setServices] = useState<Services>({})
+  const [services, setServices] = useState<UserServicesResponse>({})
   const [loading, setLoading] = useState(true)
 
   const loadProfile = async () => {
@@ -49,7 +32,7 @@ export const useProfile = () => {
 
       const servicesData = await getServices()
       setServices(servicesData)
-    } catch (error) {
+    } catch {
       navigate(ROUTES.LOGIN)
     } finally {
       setLoading(false)

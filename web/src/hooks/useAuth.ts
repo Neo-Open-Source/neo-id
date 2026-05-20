@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User } from '../types'
+import type { UserProfile } from '../types/app'
 import { TOKEN_STORAGE_KEYS, ROUTES } from '../constants'
 
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 

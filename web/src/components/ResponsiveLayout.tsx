@@ -1,12 +1,12 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AppLayout from './AppLayout'
+import AppLayout, { type AppLayoutProps } from './AppLayout'
 import MobilePageShell from './MobilePageShell'
 
 interface ResponsiveLayoutProps {
   children: ReactNode
   useAppLayout?: boolean
-  appLayoutProps?: any
+  appLayoutProps?: Omit<AppLayoutProps, 'children'>
   mobileTitle?: string
   showBackButton?: boolean
   backTo?: string

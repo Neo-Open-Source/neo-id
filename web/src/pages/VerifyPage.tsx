@@ -151,7 +151,7 @@ export default function VerifyPage() {
             value={d} onChange={e => onDigitChange(i, e.target.value)} onKeyDown={e => onKeyDown(i, e)} onFocus={e => e.target.select()} className={`${styles.input} ${d ? styles.inputFilled : ''}`} aria-label={`Code digit ${i + 1}`} />
         ))}
       </div>
-      <Button disabled={code.length < 6 || loading} onClick={onVerify} style={{ width: '100%' }}>
+      <Button className={styles.submit} disabled={code.length < 6 || loading} onClick={onVerify}>
         {loading ? <Spinner /> : 'Continue'}
       </Button>
       {verifyType !== 'totp' && (

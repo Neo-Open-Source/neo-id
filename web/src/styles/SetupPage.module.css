@@ -1,0 +1,158 @@
+.progress {
+  display: flex;
+  gap: 6px;
+}
+
+.progressStep {
+  height: 4px;
+  flex: 1;
+  border-radius: 999px;
+  background: var(--neo-border-subtle);
+  transition: background 0.3s;
+}
+
+.progressStepActive {
+  background: var(--neo-text-primary);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.avatarCenter {
+  display: flex;
+  justify-content: center;
+}
+
+.avatarPickerWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.avatarPreview {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--neo-border-subtle);
+  background: var(--neo-surface-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+}
+
+.avatarPreviewActive {
+  border-color: var(--neo-text-primary);
+}
+
+.avatarPreviewImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarCameraButton {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-2);
+  color: var(--neo-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fileInput {
+  display: none;
+}
+
+.stockLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neo-text-muted);
+}
+
+.stockGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.stockItem {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2.5px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.stockItemActive {
+  border-color: var(--neo-text-primary);
+}
+
+.stockImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fullButton {
+  width: 100%;
+}
+
+.backButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--neo-text-muted);
+  font-size: 14px;
+  padding: 0;
+  text-align: left;
+  width: fit-content;
+}
+
+.miniProfile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.miniAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--neo-border-subtle);
+  flex-shrink: 0;
+}
+
+.miniAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.miniText {
+  font-size: 13px;
+  color: var(--neo-text-muted);
+}

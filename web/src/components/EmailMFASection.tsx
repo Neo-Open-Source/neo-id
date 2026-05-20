@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Switch } from '@neo-open-source/ui-web'
+import styles from '../styles/EmailMFASection.module.css'
 
 interface Props { emailMfaEnabled?: boolean; totpEnabled?: boolean }
 
@@ -26,17 +27,17 @@ export default function EmailMFASection({ emailMfaEnabled: initialEnabled, totpE
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--neo-text-muted)', lineHeight: 1.5, flex: 1 }}>
+    <div className={styles.root}>
+      <div className={styles.row}>
+        <p className={styles.description}>
           Require a one-time code sent to your email every time you sign in
         </p>
-        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+        <div className={styles.switchWrap}>
           <Switch checked={enabled} onClick={onToggle} />
         </div>
       </div>
       {enabled && (
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--neo-text-muted)', background: 'var(--neo-surface-2)', border: '1px solid var(--neo-border-subtle)', borderRadius: 12, padding: '12px 14px', lineHeight: 1.45 }}>
+        <p className={styles.hint}>
           A 6-digit code will be sent to your email each time you sign in with a password.
         </p>
       )}

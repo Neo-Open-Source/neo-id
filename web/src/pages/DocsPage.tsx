@@ -1,10 +1,12 @@
+import styles from '../styles/DocsPage.module.css'
+
 export default function DocsPage() {
   return (
-    <div style={{ height: '100vh', background: 'var(--neo-bg-canvas)' }}>
+    <div className={styles.page}>
       <iframe
         src="/scalar.html"
         title="Neo ID API Docs"
-        style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
+        className={styles.frame}
       />
     </div>
   )

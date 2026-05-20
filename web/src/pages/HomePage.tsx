@@ -6,12 +6,13 @@ import MobilePageShell from '../components/MobilePageShell'
 import AvatarPickerDialog from '../components/AvatarPickerDialog'
 import { getAccessToken } from '../api/client'
 import { getProfile } from '../api/endpoints'
+import type { UserProfile } from '../types/app'
 import styles from '../styles/HomePage.module.css'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const token = getAccessToken()
-  const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
@@ -31,12 +32,12 @@ export default function HomePage() {
     setProfile(prev => prev ? { ...prev, avatar: url } : null)
   }
 
-  const role = ((profile?.role as string) || '').toLowerCase()
-  const fullName = [profile?.first_name as string, profile?.last_name as string]
+  const role = (profile?.role || '').toLowerCase()
+  const fullName = [profile?.first_name, profile?.last_name]
     .map(v => (v || '').trim())
     .filter(Boolean)
     .join(' ')
-  const preferredName = fullName || (profile?.display_name as string) || (profile?.email as string) || 'Neo User'
+  const preferredName = fullName || profile?.display_name || profile?.email || 'Neo User'
   const items = [
     { label: 'Settings', icon: <SettingsIcon size={18} />, onClick: () => navigate('/dashboard') },
     { label: 'Services', icon: <Command size={18} />, onClick: () => navigate('/services') },
@@ -48,16 +49,16 @@ export default function HomePage() {
     <MobilePageShell>
       <div className={styles.container}>
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingTop: 24 }}>
-            <div style={{ display: 'grid', placeItems: 'center', padding: '8px 0 4px' }}>
+          <div className={styles.skeleton}>
+            <div className={styles.skeletonSpinner}>
               <Spinner />
             </div>
-            <div style={{ margin: '0 auto', width: 92, height: 92, borderRadius: '50%', background: 'var(--neo-surface-2)' }} />
-            <div style={{ margin: '0 auto', width: 160, height: 20, borderRadius: 8, background: 'var(--neo-surface-2)' }} />
-            <div style={{ margin: '0 auto', width: 220, height: 14, borderRadius: 8, background: 'var(--neo-surface-2)' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            <div className={styles.skeletonAvatar} />
+            <div className={styles.skeletonName} />
+            <div className={styles.skeletonEmail} />
+            <div className={styles.skeletonMenu}>
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} style={{ height: 52, borderRadius: 12, background: 'var(--neo-surface-2)' }} />
+                <div key={i} className={styles.skeletonRow} />
               ))}
             </div>
           </div>
@@ -65,13 +66,13 @@ export default function HomePage() {
           <>
             <div className={styles.profile}>
               <div className={styles.avatarWrap}>
-                <Avatar src={(profile?.avatar as string) || ''} fallback={preferredName[0]?.toUpperCase() || '?'} className={styles.avatar} />
+                <Avatar src={profile?.avatar || ''} fallback={preferredName[0]?.toUpperCase() || '?'} className={styles.avatar} />
                 <button type="button" className={styles.avatarEdit} onClick={() => setShowAvatarPicker(true)} aria-label="Change avatar">
                   <Camera size={16} />
                 </button>
               </div>
               <h1>{preferredName}</h1>
-              <p>{(profile?.email as string) || ''}</p>
+              <p>{profile?.email || ''}</p>
             </div>
 
             <div className={styles.menu}>
@@ -92,7 +93,7 @@ export default function HomePage() {
       {!loading && (
         <AvatarPickerDialog
           open={showAvatarPicker}
-          currentAvatar={(profile?.avatar as string) || ''}
+          currentAvatar={profile?.avatar || ''}
           displayName={preferredName}
           onClose={() => setShowAvatarPicker(false)}
           onSaved={handleAvatarSaved}

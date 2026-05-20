@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Input, AlertBanner, Spinner } from '@neo-open-source/ui-web'
 import { registerService, getMyServices, deleteService, updateService } from '../../api/endpoints'
 import Modal from '../Modal'
-
-interface Service { site_id: string; name: string; domain?: string; api_key?: string; api_secret?: string; allowed_origins?: string[]; webhook_url?: string }
+import type { DeveloperService, UserProfile } from '../../types/app'
 
 function MonoField({ label, value, secret }: { label: string; value: string; secret?: boolean }) {
   const [revealed, setRevealed] = useState(false)
@@ -23,7 +22,7 @@ function MonoField({ label, value, secret }: { label: string; value: string; sec
   )
 }
 
-function ServiceCard({ service, onDelete, onEdit, highlight }: { service: Service; onDelete: (s: Service) => void; onEdit: (s: Service) => void; highlight?: boolean }) {
+function ServiceCard({ service, onDelete, onEdit, highlight }: { service: DeveloperService; onDelete: (s: DeveloperService) => void; onEdit: (s: DeveloperService) => void; highlight?: boolean }) {
   const [expanded, setExpanded] = useState(!!highlight)
   const envSnippet = `NEO_ID_URL=https://id.example.com\nNEO_ID_SITE_ID=${service.site_id}\nNEO_ID_API_KEY=${service.api_key || ''}`
   return (
@@ -58,7 +57,7 @@ function ServiceCard({ service, onDelete, onEdit, highlight }: { service: Servic
   )
 }
 
-function EditModal({ service, onClose, onSaved }: { service: Service; onClose: () => void; onSaved: () => void }) {
+function EditModal({ service, onClose, onSaved }: { service: DeveloperService; onClose: () => void; onSaved: () => void }) {
   const [origins, setOrigins] = useState((service.allowed_origins || []).join('\n'))
   const [webhook, setWebhook] = useState(service.webhook_url || '')
   const [loading, setLoading] = useState(false)
@@ -86,7 +85,7 @@ function EditModal({ service, onClose, onSaved }: { service: Service; onClose: (
   )
 }
 
-function RegisterForm({ onRegistered }: { onRegistered: (s: Service) => void }) {
+function RegisterForm({ onRegistered }: { onRegistered: (s: DeveloperService) => void }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(''); const [domain, setDomain] = useState(''); const [ownerEmail, setOwnerEmail] = useState(''); const [webhookUrl, setWebhookUrl] = useState('')
   const [loading, setLoading] = useState(false); const [error, setError] = useState('')
@@ -119,12 +118,12 @@ function RegisterForm({ onRegistered }: { onRegistered: (s: Service) => void }) 
   )
 }
 
-export default function DeveloperSection({ profile, onNavigateToServices }: { profile?: { role?: string }; onNavigateToServices?: () => void }) {
-  const [services, setServices] = useState<Service[]>([])
+export default function DeveloperSection({ profile, onNavigateToServices }: { profile?: Pick<UserProfile, 'role'>; onNavigateToServices?: () => void }) {
+  const [services, setServices] = useState<DeveloperService[]>([])
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
-  const [highlighted, setHighlighted] = useState<Service | null>(null)
-  const [editService, setEditService] = useState<Service | null>(null)
+  const [highlighted, setHighlighted] = useState<DeveloperService | null>(null)
+  const [editService, setEditService] = useState<DeveloperService | null>(null)
   const canManageOidc = ['developer', 'admin', 'moderator'].includes((profile?.role || '').toLowerCase())
   const loadServices = () => { getMyServices().then(d => setServices(d.sites || [])).catch(() => {}).finally(() => setLoading(false)) }
   useEffect(() => { loadServices() }, [])
@@ -134,8 +133,8 @@ export default function DeveloperSection({ profile, onNavigateToServices }: { pr
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-  const onRegistered = (site: Service) => { setHighlighted(site); setServices(prev => [site, ...prev.filter(s => s.site_id !== site.site_id)]) }
-  const onDelete = async (service: Service) => {
+  const onRegistered = (site: DeveloperService) => { setHighlighted(site); setServices(prev => [site, ...prev.filter(s => s.site_id !== site.site_id)]) }
+  const onDelete = async (service: DeveloperService) => {
     if (!window.confirm(`Delete "${service.name}"?`)) return
     try { await deleteService(service.site_id); setServices(prev => prev.filter(s => s.site_id !== service.site_id)); if (highlighted?.site_id === service.site_id) setHighlighted(null) } catch {}
   }

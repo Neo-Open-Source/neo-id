@@ -1,0 +1,49 @@
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--neo-text-muted);
+}
+
+.cardWrap {
+  max-width: 480px;
+  position: relative;
+}
+
+:global(.neo-id-profile-card .neo-account-card__avatar) {
+  cursor: pointer;
+}
+
+.avatarOverlay {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.avatarOverlay:hover {
+  background: rgba(0, 0, 0, 0.4);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z'/%3E%3Ccircle cx='12' cy='13' r='4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.hiddenInput {
+  display: none;
+}

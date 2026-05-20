@@ -5,7 +5,7 @@ import { useThemeMode } from '../app/ThemeContext'
 import styles from '../styles/AppLayout.module.css'
 import AvatarPickerDialog from './AvatarPickerDialog'
 
-interface NavItem { 
+export interface NavItem { 
   id?: string
   label: string
   icon?: ReactNode
@@ -13,7 +13,7 @@ interface NavItem {
   onClick: () => void
 }
 
-interface Profile { 
+export interface LayoutProfile { 
   avatar?: string
   display_name?: string
   first_name?: string
@@ -22,9 +22,9 @@ interface Profile {
   role?: string
 }
 
-interface AppLayoutProps {
+export interface AppLayoutProps {
   title?: string
-  profile?: Profile
+  profile?: LayoutProfile
   navItems?: NavItem[]
   extraNav?: NavItem[]
   onLogout?: () => void | Promise<void>
