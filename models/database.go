@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beego/beego/v2/server/web"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -36,10 +35,10 @@ const (
 
 // InitDatabase initializes MongoDB connection
 func InitDatabase() error {
-	// Get MongoDB URI from environment or use localhost
+	// Get MongoDB URI from environment
 	mongoURI := os.Getenv("MONGODB_URI")
 	if mongoURI == "" {
-		mongoURI = web.AppConfig.DefaultString("mongodb_uri", "mongodb://localhost:27017")
+		return fmt.Errorf("MONGODB_URI environment variable is not set")
 	}
 
 	dbName := DatabaseName

@@ -16,6 +16,7 @@ import (
 )
 
 var app *web.HttpServer
+var initialized bool
 
 func isAllowedOrigin(origin string, allowed map[string]struct{}) bool {
 	if origin == "" {
@@ -49,9 +50,6 @@ func corsFilter(ctx *webctx.Context) {
 	}
 
 	allowedRaw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
-	if allowedRaw == "" {
-		allowedRaw = web.AppConfig.DefaultString("allowed_origins", "")
-	}
 	allowed := map[string]struct{}{}
 	for _, v := range strings.Split(allowedRaw, ",") {
 		vv := strings.TrimSpace(v)
@@ -59,7 +57,6 @@ func corsFilter(ctx *webctx.Context) {
 			allowed[vv] = struct{}{}
 		}
 	}
-	// local dev
 	allowed["http://localhost:3000"] = struct{}{}
 	allowed["http://localhost:5173"] = struct{}{}
 
@@ -77,34 +74,27 @@ func corsFilter(ctx *webctx.Context) {
 	}
 }
 
-func init() {
+func initialize() {
 	_ = godotenv.Load()
 
-	// Configure Beego for serverless - disable sessions for now
-	web.BConfig.WebConfig.Session.SessionOn = false
+	web.BConfig.AppName = "neo-id"
 	web.BConfig.RunMode = "prod"
+	web.BConfig.WebConfig.Session.SessionOn = false
 
 	controllers.InitOAuthProviders()
 
-	// Initialize database connection
 	if err := models.InitDatabase(); err != nil {
 		panic("Failed to initialize database: " + err.Error())
 	}
 
-	// Initialize routers
 	routers.InitRoutes()
 
-	// CORS for browser-based API calls.
 	web.InsertFilter("/api/*", web.BeforeRouter, corsFilter)
-	// Handle OPTIONS preflight for all API routes
 	web.InsertFilter("/api/*", web.BeforeRouter, func(ctx *webctx.Context) {
 		if ctx.Input.Method() == http.MethodOptions {
 			origin := ctx.Input.Header("Origin")
 			if origin != "" {
 				allowedRaw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
-				if allowedRaw == "" {
-					allowedRaw = web.AppConfig.DefaultString("allowed_origins", "")
-				}
 				allowed := map[string]struct{}{}
 				for _, v := range strings.Split(allowedRaw, ",") {
 					vv := strings.TrimSpace(v)
@@ -132,22 +122,24 @@ func init() {
 		}
 	})
 
-	// Store the app instance
 	app = web.BeeApp
 
-	// Serve static files from Vercel build output
 	if _, err := os.Stat("static"); err == nil {
 		web.SetStaticPath("/assets", "static/app/assets")
 	}
+
+	initialized = true
 }
 
 // Handler is the main serverless entry point
 func Handler(w http.ResponseWriter, r *http.Request) {
-	// Ensure static files are available
+	if !initialized {
+		initialize()
+	}
+
 	if _, err := os.Stat("static"); err == nil {
 		web.SetStaticPath("/assets", "static/app/assets")
 	}
 
-	// Use the app's Handlers which implements http.Handler
 	app.Handlers.ServeHTTP(w, r)
 }
