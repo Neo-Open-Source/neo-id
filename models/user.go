@@ -32,6 +32,7 @@ type User struct {
 	EmailVerificationExpiresAt *time.Time `bson:"email_verification_expires_at,omitempty" json:"-"`
 	EmailVerificationCode      string     `bson:"email_verification_code,omitempty" json:"-"`
 	EmailVerificationCodeExpAt *time.Time `bson:"email_verification_code_expires_at,omitempty" json:"-"`
+	PendingEmail               string     `bson:"pending_email,omitempty" json:"pending_email,omitempty"`
 
 	// Profile info
 	FirstName string `bson:"first_name,omitempty" json:"first_name,omitempty"`
@@ -221,6 +222,15 @@ func (uc *UserCRUD) UpdateUser(user *User) error {
 	}
 
 	return nil
+}
+
+func (uc *UserCRUD) DeleteByUnifiedID(unifiedID string) error {
+  ctx := context.Background()
+  _, err := uc.collection.DeleteOne(ctx, bson.M{"unified_id": unifiedID})
+  if err != nil {
+    return fmt.Errorf("failed to delete user: %w", err)
+  }
+  return nil
 }
 
 // BanUser bans a user

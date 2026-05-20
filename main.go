@@ -64,7 +64,7 @@ func main() {
 	}
 
 	port := web.AppConfig.DefaultInt("httpport", 8080)
-	fmt.Printf("Unified ID Service starting on port %d\n", port)
+	fmt.Printf("Neo ID Service starting on port %d\n", port)
 
 	web.Run(fmt.Sprintf(":%v", port))
 }

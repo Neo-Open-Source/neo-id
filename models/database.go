@@ -22,14 +22,16 @@ var (
 
 // Database configuration
 const (
-	DatabaseName          = "unified_id"
-	UsersCollection       = "users"
-	ServicesCollection    = "services"
-	ServiceAppsCollection = "service_apps"
-	SessionsCollection    = "sessions"
-	SitesCollection       = "sites"
-	AuthCodesCollection   = "auth_codes"
-	MFACodesCollection    = "mfa_codes"
+	DatabaseName                = "unified_id"
+	UsersCollection             = "users"
+	ServicesCollection          = "services"
+	ServiceAppsCollection       = "service_apps"
+	PasskeysCollection          = "passkeys"
+	PasskeyChallengesCollection = "passkey_challenges"
+	SessionsCollection          = "sessions"
+	SitesCollection             = "sites"
+	AuthCodesCollection         = "auth_codes"
+	MFACodesCollection          = "mfa_codes"
 )
 
 // InitDatabase initializes MongoDB connection
@@ -131,6 +133,25 @@ func createIndexes() error {
 
 	if _, err := serviceAppsCol.Indexes().CreateMany(ctx, serviceAppsIndexes); err != nil {
 		return fmt.Errorf("failed to create service apps indexes: %w", err)
+	}
+
+	// Passkeys collection indexes
+	passkeysCol := GetCollection(PasskeysCollection)
+	passkeysIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "user_id", Value: 1}}},
+		{Keys: bson.D{{Key: "credential_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+	}
+	if _, err := passkeysCol.Indexes().CreateMany(ctx, passkeysIndexes); err != nil {
+		return fmt.Errorf("failed to create passkeys indexes: %w", err)
+	}
+
+	passkeyChallengesCol := GetCollection(PasskeyChallengesCollection)
+	passkeyChallengesIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+	}
+	if _, err := passkeyChallengesCol.Indexes().CreateMany(ctx, passkeyChallengesIndexes); err != nil {
+		return fmt.Errorf("failed to create passkey challenge indexes: %w", err)
 	}
 
 	// MFA codes collection indexes

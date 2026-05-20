@@ -118,6 +118,15 @@ func (sc *ServiceAppCRUD) DeleteByID(ownerUserID, id string) error {
 	return nil
 }
 
+func (sc *ServiceAppCRUD) DeleteByOwner(ownerUserID string) error {
+  ctx := context.Background()
+  _, err := sc.collection.DeleteMany(ctx, bson.M{"owner_user_id": ownerUserID})
+  if err != nil {
+    return fmt.Errorf("failed to delete owner service apps: %w", err)
+  }
+  return nil
+}
+
 func (sc *ServiceAppCRUD) VerifyToken(token string) (*ServiceApp, error) {
 	ctx := context.Background()
 	var app ServiceApp

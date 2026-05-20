@@ -1,0 +1,66 @@
+.shell {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+  justify-items: stretch;
+  overflow-x: hidden;
+}
+
+.shell > * {
+  min-width: 0;
+}
+
+@media (min-width: 480px) {
+  .shell {
+    max-width: 420px;
+    gap: 22px;
+  }
+}
+
+.hero {
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+}
+
+.copy {
+  text-align: center;
+  display: grid;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.copy h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 5.5vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+
+.copy p {
+  margin: 0;
+  color: var(--neo-text-muted);
+  font-size: clamp(0.95rem, 3vw, 1.05rem);
+  line-height: 1.5;
+}
+
+.body {
+  display: grid;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .shell {
+    gap: 18px;
+  }
+  
+  .copy {
+    gap: 6px;
+  }
+  
+  .body {
+    gap: 12px;
+  }
+}

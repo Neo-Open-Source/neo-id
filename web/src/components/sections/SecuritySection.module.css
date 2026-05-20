@@ -1,0 +1,67 @@
+.root {
+  color: var(--neo-text-primary);
+}
+
+.surface {
+  box-shadow: none;
+}
+
+.heroIcon {
+  color: var(--neo-text-primary);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--neo-surface-3);
+  color: var(--neo-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.badgeSuccess {
+  color: var(--neo-success-500);
+}
+
+.sectionLabel {
+  margin: 0;
+  color: var(--neo-text-muted);
+  font-size: 13px;
+}
+
+:global(html[data-theme='light']) .surface {
+  background: #ffffff !important;
+  border-color: #e3e8ef !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+:global(html[data-theme='light']) .heroIcon {
+  background: #f3f5f8 !important;
+}
+
+:global(html[data-theme='light']) .badge {
+  background: #f3f5f8;
+  color: #516071;
+}
+
+@media (max-width: 768px) {
+  .root {
+    gap: 16px !important;
+  }
+
+  .sectionLabel {
+    padding-left: 4px;
+  }
+
+  .hero {
+    flex-direction: column;
+    gap: 14px !important;
+  }
+
+  .heroMeta {
+    margin-top: 12px !important;
+  }
+}

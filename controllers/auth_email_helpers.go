@@ -158,6 +158,10 @@ func buildEmailVerificationHTML(code string, verifyURL string) string {
         <div style="text-align:center;margin-bottom:32px;">
           <a href="` + escapedURL + `" style="display:inline-block;padding:12px 24px;background:#111111;color:#ffffff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Verify by link instead</a>
         </div>
+        <div style="font-size:12px;color:#999999;line-height:1.6;margin-bottom:18px;word-break:break-all;">
+          Or open this link directly:<br/>
+          <a href="` + escapedURL + `" style="color:#666666;text-decoration:underline;">` + escapedURL + `</a>
+        </div>
         <div style="font-size:12px;color:#999999;line-height:1.5;">If you didn't create a Neo ID account, you can safely ignore this email.</div>
       </td></tr>
     </table>

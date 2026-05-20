@@ -1,0 +1,165 @@
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border-radius: 18px;
+  background: var(--neo-surface-1);
+  border: 1px solid var(--neo-border-subtle);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+@media (max-width: 390px) {
+  .tabs {
+    gap: 4px;
+    padding: 4px;
+    border-radius: 14px;
+  }
+}
+
+.tabItem {
+  min-height: 50px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--neo-text-secondary);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.tabItem:not(.tabItemActive):hover {
+  color: var(--neo-text-primary);
+  background: var(--neo-bg-canvas-2);
+}
+
+.tabItemActive {
+  background: var(--neo-brand-500);
+  color: var(--neo-brand-text);
+  border-color: var(--neo-brand-500);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.oauth,
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 390px) {
+  .oauth {
+    gap: 10px;
+  }
+  
+  .oauth button {
+    min-height: 48px;
+    font-size: 0.9rem;
+  }
+}
+
+.oauth button,
+.form input,
+.submit {
+  border-radius: 14px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.form input:focus,
+.form input:focus-visible {
+  border-color: var(--neo-text-primary) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--neo-text-primary) 12%, transparent) !important;
+}
+
+.githubIcon {
+  display: inline-flex;
+  color: #e8edf6;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neo-text-muted);
+  font-size: 0.88rem;
+}
+
+.submit {
+  width: 100%;
+}
+
+.legal {
+  margin: 0;
+  text-align: center;
+  color: var(--neo-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  hyphens: auto;
+}
+
+@media (max-width: 390px) {
+  .legal {
+    font-size: 0.6875rem;
+    line-height: 1.3;
+  }
+}
+
+.legal a {
+  color: var(--neo-text-primary);
+  text-decoration: none;
+}
+
+/* Light theme overrides */
+html[data-theme='light'] .oauth button {
+  background: #353f50 !important;
+  color: #f2f5fb !important;
+  border: 1px solid #4f5c70 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html[data-theme='light'] .oauth button:hover {
+  background: #3d485c !important;
+  border-color: #5b697f !important;
+}
+
+html[data-theme='light'] .githubIcon {
+  color: #f0f4fb;
+}
+
+html[data-theme='light'] .form input {
+  background: #1f2430 !important;
+  color: #f4f7fb !important;
+  border: 1px solid #3f4b5f !important;
+}
+
+html[data-theme='light'] .form input:focus,
+html[data-theme='light'] .form input:focus-visible {
+  border-color: #5f6d84 !important;
+  box-shadow: 0 0 0 2px rgba(63, 75, 95, 0.16) !important;
+}
+
+html[data-theme='light'] .form input::placeholder {
+  color: #a4afbf !important;
+}
+
+html[data-theme='light'] .submit {
+  background: #121212 !important;
+  color: #ffffff !important;
+  border: 1px solid #121212 !important;
+}
+
+html[data-theme='light'] .legal,
+html[data-theme='light'] .divider {
+  color: #6b7280;
+}
+
+html[data-theme='light'] .legal a {
+  color: #121826;
+}

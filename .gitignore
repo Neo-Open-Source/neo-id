@@ -12,6 +12,8 @@
 
 # Output of the go coverage tool
 *.out
+coverage.out
+coverage.html
 
 # Go workspace file
 go.work
@@ -20,11 +22,18 @@ go.work
 .env
 .env.local
 .env.production
+.env.test
 
 # Node modules and build artifacts
 web/node_modules/
 web/dist/
 web/build/
+web/.vite/
+web/pnpm-lock.yaml
+node_modules/
+
+# Static build output
+static/
 
 # OS generated files
 .DS_Store
@@ -41,6 +50,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.windsurf/
 
 # Logs
 *.log
@@ -49,3 +59,21 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# Test data
+tests/testdata/
+controllers/testdata/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+
+# Backup files
+*.bak
+*.backup

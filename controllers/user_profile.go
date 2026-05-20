@@ -9,6 +9,7 @@ import (
 
 	"unified-id/models"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -33,10 +34,13 @@ func (c *UserController) GetProfile() {
 		user.AccessToken = ""
 		_ = models.NewUserCRUD().UpdateUser(user)
 	}
+	passkeys, _ := models.NewPasskeyCRUD().ListByUserID(user.UnifiedID)
 
 	c.Data["json"] = map[string]interface{}{
 		"unified_id":              user.UnifiedID,
 		"email":                   user.Email,
+		"pending_email":           user.PendingEmail,
+		"email_verified":          user.EmailVerified,
 		"display_name":            user.DisplayName,
 		"avatar":                  user.Avatar,
 		"role":                    user.Role,
@@ -52,7 +56,81 @@ func (c *UserController) GetProfile() {
 		"totp_enabled":            user.TOTPEnabled,
 		"email_mfa_enabled":       user.EmailMFAEnabled,
 		"refresh_duration_months": user.RefreshDurationMonths,
+		"passkeys_count":          len(passkeys),
 	}
+	c.ServeJSON()
+}
+
+// RequestEmailChange updates pending email and sends a verification email.
+func (c *UserController) RequestEmailChange() {
+	user, err := c.authenticateUser()
+	if err != nil || user == nil {
+		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+		return
+	}
+
+	var body struct {
+		Email string `json:"email"`
+	}
+	raw, err := io.ReadAll(c.Ctx.Request.Body)
+	if err != nil {
+		respondError(&c.Controller, http.StatusBadRequest, "server_error", "Failed to read request body")
+		return
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		return
+	}
+
+	nextEmail := strings.TrimSpace(strings.ToLower(body.Email))
+	if nextEmail == "" {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "email is required")
+		return
+	}
+	if nextEmail == strings.ToLower(strings.TrimSpace(user.Email)) {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "email is unchanged")
+		return
+	}
+
+	userCRUD := models.NewUserCRUD()
+	existing, err := userCRUD.GetUserByEmail(nextEmail)
+	if err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Database error")
+		return
+	}
+	if existing != nil && existing.UnifiedID != user.UnifiedID {
+		respondError(&c.Controller, http.StatusConflict, "conflict", "Account with this email already exists")
+		return
+	}
+
+	verifyToken := uuid.NewString()
+	expiresAt := time.Now().Add(24 * time.Hour)
+	code, codeErr := generateEmailVerificationCode()
+	codeExp := time.Now().Add(30 * time.Minute)
+	if codeErr != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to generate verification code")
+		return
+	}
+
+	user.PendingEmail = nextEmail
+	user.EmailVerificationToken = verifyToken
+	user.EmailVerificationExpiresAt = &expiresAt
+	user.EmailVerificationCode = code
+	user.EmailVerificationCodeExpAt = &codeExp
+
+	if err := userCRUD.UpdateUser(user); err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", "Failed to update email change request")
+		return
+	}
+
+	verifyURL := getBaseURL() + "/api/auth/verify-email?token=" + verifyToken
+	htmlBody := buildEmailVerificationHTML(code, verifyURL)
+	if err := sendResendEmail(nextEmail, "Verify your new email", htmlBody); err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", err.Error())
+		return
+	}
+
+	c.Data["json"] = map[string]interface{}{"pending_email": nextEmail, "verification_sent": true}
 	c.ServeJSON()
 }
 

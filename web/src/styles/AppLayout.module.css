@@ -1,0 +1,261 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--neo-bg-canvas);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 20;
+  flex-shrink: 0;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+.sidebarSurface {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-1);
+}
+
+.sidebarHeader {
+  padding: 18px 18px 10px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.3px;
+}
+
+.sidebarProfile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px 18px;
+  text-align: center;
+}
+
+.avatarWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.avatar {
+  font-size: 1.4rem;
+}
+
+.avatarEdit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--neo-border-subtle);
+  border-radius: 999px;
+  color: var(--neo-text-primary);
+  background: var(--neo-surface-1);
+  box-shadow: var(--neo-shadow-md);
+  cursor: pointer;
+}
+
+.profileCopy {
+  display: grid;
+  gap: 6px;
+}
+
+.profileName,
+.profileEmail {
+  margin: 0;
+}
+
+.profileName {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.profileEmail {
+  color: var(--neo-text-muted);
+  font-size: 13px;
+}
+
+.navContainer {
+  flex: 1;
+  padding: 0 12px;
+}
+
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.navItem {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  column-gap: 12px;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  width: 100%;
+  color: var(--neo-text-secondary);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  transform: none !important;
+  transition: background var(--neo-motion-fast) var(--neo-ease-spring), 
+              color var(--neo-motion-fast) var(--neo-ease-spring) !important;
+  cursor: pointer;
+}
+
+.navItem:hover,
+.navItem:active,
+.navItemActive {
+  transform: none !important;
+}
+
+.navItemActive {
+  color: var(--neo-text-primary);
+  background: var(--neo-surface-3);
+}
+
+.navIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  margin-right: 0;
+  color: var(--neo-text-secondary);
+  flex-shrink: 0;
+  transform: translateZ(0);
+}
+
+.navItemActive .navIcon {
+  color: var(--neo-text-primary);
+}
+
+.navLabel {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.themeToggleContainer {
+  padding: 8px 12px 12px;
+}
+
+.themeToggleInner {
+  padding: 8px 8px 4px;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
+}
+
+.mobileNavShell {
+  display: none;
+}
+
+.mobileNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  border: 1px solid var(--neo-border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--neo-surface-1) 88%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.mobileNavItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--neo-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.mobileNavItemActive {
+  color: var(--neo-text-primary);
+  background: var(--neo-surface-3);
+}
+
+.mobileNavAvatar {
+  width: 26px;
+  height: 26px;
+}
+
+/* Light theme */
+html[data-theme='light'] .shell {
+  background: #f6f7f9;
+}
+
+html[data-theme='light'] .sidebarSurface {
+  background: #ffffff;
+  border-right-color: #e3e8ef;
+}
+
+html[data-theme='light'] .navItemActive {
+  background: #f1f3f5;
+}
+
+html[data-theme='light'] .avatarEdit {
+  background: #ffffff;
+  border-color: #dbe2ea;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme='light'] .mobileNav {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: #dbe2ea;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme='light'] .mobileNavItemActive {
+  background: #eff1f4;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none !important;
+  }
+  
+  .main {
+    margin-left: 0 !important;
+    padding-bottom: 96px;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .mobileNavShell {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px 16px;
+  }
+}

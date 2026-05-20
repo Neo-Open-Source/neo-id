@@ -1,0 +1,503 @@
+openapi: 3.0.3
+info:
+  title: Neo ID API
+  description: Modern unified authentication service with OAuth 2.0, OIDC, and SaaS integration
+  version: 1.0.0
+  contact:
+    name: Neo ID Team
+    url: https://github.com/your-org/neo-id
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://neoid.dev
+    description: Production
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints
+  - name: User
+    description: User management endpoints
+  - name: OAuth/OIDC
+    description: OAuth 2.0 and OpenID Connect endpoints
+  - name: Site Integration
+    description: SaaS site integration endpoints
+  - name: Admin
+    description: Admin panel endpoints
+  - name: A/B Testing
+    description: Experiment management endpoints
+
+paths:
+  /api/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user
+      description: Register a new user with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: securePassword123
+      responses:
+        '200':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Verification email sent
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Email not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/profile:
+    get:
+      tags:
+        - User
+      summary: Get user profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    
+    put:
+      tags:
+        - User
+      summary: Update user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                avatar:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/sessions:
+    get:
+      tags:
+        - User
+      summary: Get active sessions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+  /oauth/authorize:
+    get:
+      tags:
+        - OAuth/OIDC
+      summary: OIDC authorization endpoint
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [code]
+        - name: scope
+          in: query
+          required: true
+          schema:
+            type: string
+            example: openid profile email
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to login or consent page
+
+  /oauth/token:
+    post:
+      tags:
+        - OAuth/OIDC
+      summary: Exchange authorization code for tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - grant_type
+                - code
+                - redirect_uri
+                - client_id
+                - client_secret
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code]
+                code:
+                  type: string
+                redirect_uri:
+                  type: string
+                  format: uri
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+      responses:
+        '200':
+          description: Tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenResponse'
+
+  /api/ab/experiments:
+    post:
+      tags:
+        - A/B Testing
+      summary: Create A/B test experiment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExperimentRequest'
+      responses:
+        '201':
+          description: Experiment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  experiment:
+                    $ref: '#/components/schemas/Experiment'
+    
+    get:
+      tags:
+        - A/B Testing
+      summary: List all experiments
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of experiments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  experiments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Experiment'
+
+  /api/ab/variant/{experiment}:
+    get:
+      tags:
+        - A/B Testing
+      summary: Get variant for user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: experiment
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Variant assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  experiment:
+                    type: string
+                  variant:
+                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        avatar:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        email_verified:
+          type: boolean
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        device:
+          type: string
+        ip:
+          type: string
+        location:
+          type: string
+        last_active:
+          type: string
+          format: date-time
+        current:
+          type: boolean
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        totp_required:
+          type: boolean
+        mfa_required:
+          type: boolean
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+
+    OAuthTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        id_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 3600
+
+    Experiment:
+      type: object
+      properties:
+        name:
+          type: string
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variant'
+        active:
+          type: boolean
+
+    Variant:
+      type: object
+      properties:
+        name:
+          type: string
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    CreateExperimentRequest:
+      type: object
+      required:
+        - name
+        - variants
+      properties:
+        name:
+          type: string
+        variants:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/Variant'
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

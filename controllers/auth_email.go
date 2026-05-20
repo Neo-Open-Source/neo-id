@@ -5,12 +5,20 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"unified-id/models"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+)
+
+// Rate limiter for email resend
+var (
+	resendLimiter      = make(map[string]time.Time)
+	resendLimiterMutex sync.RWMutex
+	resendCooldown     = 60 * time.Second
 )
 
 // VerifyEmail verifies email via token link
@@ -31,6 +39,11 @@ func (c *AuthController) VerifyEmail() {
 	if user.EmailVerificationExpiresAt != nil && time.Now().After(*user.EmailVerificationExpiresAt) {
 		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "token expired")
 		return
+	}
+
+	if strings.TrimSpace(user.PendingEmail) != "" {
+		user.Email = strings.TrimSpace(strings.ToLower(user.PendingEmail))
+		user.PendingEmail = ""
 	}
 
 	user.EmailVerified = true
@@ -82,23 +95,28 @@ func (c *AuthController) VerifyEmailCode() {
 		respondError(&c.Controller, http.StatusNotFound, "not_found", "user not found")
 		return
 	}
-	if user.EmailVerified {
+	if user.EmailVerified && strings.TrimSpace(user.PendingEmail) == "" {
 		c.Data["json"] = map[string]interface{}{"verified": true}
 		c.ServeJSON()
 		return
 	}
 
 	if user.EmailVerificationCode == "" || user.EmailVerificationCodeExpAt == nil {
-		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "verification code is not available")
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Verification code is not available")
 		return
 	}
 	if time.Now().After(*user.EmailVerificationCodeExpAt) {
-		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "code expired")
+		respondError(&c.Controller, http.StatusBadRequest, "code_expired", "Code has expired")
 		return
 	}
 	if code != user.EmailVerificationCode {
-		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "invalid code")
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_code", "Invalid code")
 		return
+	}
+
+	if strings.TrimSpace(user.PendingEmail) != "" {
+		user.Email = strings.TrimSpace(strings.ToLower(user.PendingEmail))
+		user.PendingEmail = ""
 	}
 
 	user.EmailVerified = true
@@ -155,13 +173,24 @@ func (c *AuthController) ResendVerifyEmail() {
 		return
 	}
 
+	// Check rate limit
+	resendLimiterMutex.RLock()
+	lastSent, exists := resendLimiter[email]
+	resendLimiterMutex.RUnlock()
+	
+	if exists && time.Since(lastSent) < resendCooldown {
+		respondError(&c.Controller, http.StatusTooManyRequests, "rate_limit_exceeded", "Too many requests. Please wait before requesting another code.")
+		return
+	}
+
 	userCRUD := models.NewUserCRUD()
 	user, err := userCRUD.GetUserByEmail(email)
 	if err != nil || user == nil {
 		respondError(&c.Controller, http.StatusNotFound, "not_found", "user not found")
 		return
 	}
-	if user.EmailVerified {
+	hasPendingEmail := strings.TrimSpace(user.PendingEmail) != ""
+	if user.EmailVerified && !hasPendingEmail {
 		c.Data["json"] = map[string]interface{}{"sent": false, "message": "already verified"}
 		c.ServeJSON()
 		return
@@ -186,12 +215,21 @@ func (c *AuthController) ResendVerifyEmail() {
 
 	verifyURL := getBaseURL() + "/api/auth/verify-email?token=" + verifyToken
 	htmlBody := buildEmailVerificationHTML(code, verifyURL)
-	if err := sendResendEmail(email, "Verify your email", htmlBody); err != nil {
+	targetEmail := email
+	if hasPendingEmail {
+		targetEmail = strings.TrimSpace(strings.ToLower(user.PendingEmail))
+	}
+	if err := sendResendEmail(targetEmail, "Verify your email", htmlBody); err != nil {
 		c.Ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 		c.Data["json"] = map[string]interface{}{"error": err.Error()}
 		c.ServeJSON()
 		return
 	}
+
+	// Update rate limiter
+	resendLimiterMutex.Lock()
+	resendLimiter[email] = time.Now()
+	resendLimiterMutex.Unlock()
 
 	c.Data["json"] = map[string]interface{}{"sent": true}
 	c.ServeJSON()
@@ -455,7 +493,7 @@ func (c *AuthController) MFAVerify() {
 	}
 
 	if pending.Code != code {
-		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "Invalid code")
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_code", "Invalid code")
 		return
 	}
 
