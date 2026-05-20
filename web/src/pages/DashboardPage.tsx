@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertBanner, Button, Spinner } from '@neo-open-source/ui-web'
-import { ChevronLeft, Command, Settings as SettingsIcon, Shield } from '@neo-open-source/icons'
+import { ChevronLeft } from '@neo-open-source/icons'
 import { clearTokens } from '../api/client'
 import ResponsiveLayout from '../components/ResponsiveLayout'
 import Modal from '../components/Modal'
 import SecuritySection from '../components/sections/SecuritySection'
 import ServicesSection from '../components/sections/ServicesSection'
 import { deleteAccountRequest, getProfile, getProviders, unlinkProvider, getServices, connectService, disconnectService, logout } from '../api/endpoints'
+import { buildAppNav } from '../navigation/appNav'
 import styles from '../styles/DashboardPage.module.css'
 
 const VALID = ['security', 'apps']
@@ -133,13 +134,9 @@ export default function DashboardPage() {
   }
 
   const role = ((profile?.role as string) || '').toLowerCase()
-  const isAdmin = ['admin', 'moderator'].includes(role)
-
-  const navItems: { id: string; label: string; icon: JSX.Element; active: boolean; onClick: () => void }[] = [
-    { id: 'security', label: 'Settings', icon: <SettingsIcon size={15} /> },
-    ...(['developer', 'admin', 'moderator'].includes(role) ? [{ id: 'developer', label: 'Developer', icon: <Command size={15} />, onClick: () => navigate('/developer') }] : []),
-    ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: <Shield size={15} />, onClick: () => navigate('/admin') }] : []),
-  ].map((n) => ({ ...n, active: activeSection === n.id, onClick: 'onClick' in n && n.onClick ? n.onClick : () => setActiveSection(n.id) }))
+  const navItems = buildAppNav(role, 'settings', navigate).map((item) =>
+    item.id === 'settings' ? { ...item, onClick: () => setActiveSection('security') } : item
+  )
 
   const extraNav: { label: string; onClick: () => void }[] = []
 

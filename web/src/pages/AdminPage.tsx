@@ -6,6 +6,7 @@ import ResponsiveLayout from '../components/ResponsiveLayout'
 import Modal from '../components/Modal'
 import { adminGetUsers, adminSetUserRole, adminBanUser, adminUnbanUser, adminGetServices, adminCreateService, adminGetSites, logout } from '../api/endpoints'
 import { useCachedProfile } from '../hooks/useCachedProfile'
+import { buildAppNav } from '../navigation/appNav'
 
 interface User { unified_id: string; display_name?: string; email?: string; avatar?: string; role?: string; is_banned?: boolean }
 interface Service { name: string; display_name?: string; description?: string; is_active?: boolean }
@@ -27,6 +28,8 @@ export default function AdminPage() {
   }, [profile])
   const notify = (type: string, text: string) => { setMsg({ type, text }); setTimeout(() => setMsg({ type: '', text: '' }), 4000) }
   const handleLogout = async () => { await logout(); clearTokens(); navigate('/login') }
+  const role = ((profile?.role as string) || '').toLowerCase()
+  const navItems = buildAppNav(role, 'admin', navigate)
 
   // Users
   const [users, setUsers] = useState<User[]>([])
@@ -107,7 +110,7 @@ export default function AdminPage() {
   return (
     <ResponsiveLayout 
       useAppLayout 
-      appLayoutProps={{ title: "Neo ID · Admin", navItems: [{ label: 'Dashboard', onClick: () => navigate('/') }], onLogout: handleLogout }}
+      appLayoutProps={{ title: "Neo ID", profile: profile as never, navItems, onLogout: handleLogout, compact: true }}
       mobileTitle="Admin Panel"
       backTo="/"
     >

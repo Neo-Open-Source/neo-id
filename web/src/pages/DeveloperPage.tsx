@@ -1,19 +1,18 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertBanner } from '@neo-open-source/ui-web'
-import { Code, Settings as SettingsIcon, Shield } from '@neo-open-source/icons'
 import { clearTokens } from '../api/client'
 import ResponsiveLayout from '../components/ResponsiveLayout'
 import DeveloperSection from '../components/sections/DeveloperSection'
 import { logout } from '../api/endpoints'
 import { useCachedProfile } from '../hooks/useCachedProfile'
+import { buildAppNav } from '../navigation/appNav'
 
 export default function DeveloperPage() {
   const navigate = useNavigate()
   const { profile, loading } = useCachedProfile()
 
   const role = ((profile?.role as string) || '').toLowerCase()
-  const isAdmin = ['admin', 'moderator'].includes(role)
   const hasAccess = ['developer', 'admin', 'moderator'].includes(role)
 
   useEffect(() => {
@@ -29,11 +28,7 @@ export default function DeveloperPage() {
 
   if (!loading && !hasAccess) return <AlertBanner tone="warning" title="Access denied" />
 
-  const navItems: { id: string; label: string; icon: JSX.Element; active: boolean; onClick: () => void }[] = [
-    { id: 'settings', label: 'Settings', icon: <SettingsIcon size={15} />, active: false, onClick: () => navigate('/dashboard') },
-    { id: 'developer', label: 'Developer', icon: <Code size={15} />, active: true, onClick: () => navigate('/developer') },
-    ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: <Shield size={15} />, active: false, onClick: () => navigate('/admin') }] : []),
-  ]
+  const navItems = buildAppNav(role, 'developer', navigate)
 
   return (
     <ResponsiveLayout
@@ -48,4 +43,3 @@ export default function DeveloperPage() {
     </ResponsiveLayout>
   )
 }
-
