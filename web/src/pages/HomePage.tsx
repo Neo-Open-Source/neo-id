@@ -16,7 +16,7 @@ export default function HomePage() {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
   useEffect(() => {
-    if (!token) return
+    if (!token) { navigate('/login', { replace: true }); return }
     if (window.innerWidth > 768) {
       navigate('/dashboard', { replace: true })
       return
@@ -25,13 +25,10 @@ export default function HomePage() {
     getProfile().then(setProfile).catch(() => {}).finally(() => setLoading(false))
   }, [token, navigate])
 
+  if (!token) return null
+
   const handleAvatarSaved = (url: string) => {
     setProfile(prev => prev ? { ...prev, avatar: url } : null)
-  }
-
-  if (!token) {
-    navigate('/login')
-    return null
   }
 
   const role = ((profile?.role as string) || '').toLowerCase()
