@@ -45,7 +45,27 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (getAccessToken()) {
-      navigate('/')
+      if (isOIDCFlow) {
+        // Already logged in — skip login form, go straight to consent
+        const token = getAccessToken()
+        const urlParams = new URLSearchParams(window.location.search)
+        fetch('/api/auth/check-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            client_id: urlParams.get('client_id') || '',
+            redirect_uri: urlParams.get('redirect_uri') || '',
+            state: urlParams.get('state') || '',
+            scope: urlParams.get('scope') || 'openid profile email',
+            mode: popupMode,
+          }),
+        })
+          .then(r => r.json())
+          .then(payload => { if (payload?.consent_url) window.location.replace(payload.consent_url) })
+          .catch(() => navigate('/'))
+      } else {
+        navigate('/')
+      }
       return
     }
     if (getBoolean('verified')) {

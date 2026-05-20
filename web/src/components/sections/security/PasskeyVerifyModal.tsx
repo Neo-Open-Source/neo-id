@@ -30,8 +30,8 @@ export default function PasskeyVerifyModal({
   onContinue,
 }: Props) {
   return (
-    <Modal open={open} onClose={onClose} title="Confirm security code">
-      <div style={{ display: 'grid', gap: 12 }}>
+    <Modal open={open} onClose={onClose} title="Confirm security code" maxWidth={460}>
+      <div style={{ display: 'grid', gap: 12, padding: '8px 0 2px' }}>
         {bothEnabled ? <AlertBanner tone="brand" title="Authenticator code is required because OTP is enabled" /> : null}
         {useEmailMethod ? (
           <p style={{ margin: 0, fontSize: 14, color: 'var(--neo-text-muted)', textAlign: 'center' }}>
@@ -60,6 +60,11 @@ export default function PasskeyVerifyModal({
             }}
           />
         </div>
+        <div style={{ width: '100%', display: 'grid' }}>
+          <Button size="sm" variant="secondary" disabled={checking || code.length < 6} onClick={onContinue}>
+            {checking ? 'Checking…' : 'Continue'}
+          </Button>
+        </div>
         {useEmailMethod ? (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <Button variant="ghost" size="sm" disabled={codeSending} onClick={onSendCode}>
@@ -67,13 +72,7 @@ export default function PasskeyVerifyModal({
             </Button>
           </div>
         ) : null}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button size="sm" disabled={checking || code.length < 6} onClick={onContinue}>
-            {checking ? 'Checking…' : 'Continue'}
-          </Button>
-        </div>
       </div>
     </Modal>
   )
 }
-

@@ -16,6 +16,15 @@ export default function VerifyPage() {
   const refs = useRef<(HTMLInputElement | null)[]>([])
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // OAuth callback passes MFA context via hash — consume it into sessionStorage
+  if (window.location.hash && window.location.hash.length > 1) {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1))
+    if (hashParams.get('mfa_email')) {
+      hashParams.forEach((v, k) => sessionStorage.setItem(k, v))
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }
+
   const email = sessionStorage.getItem('mfa_email') || ''
   const verifyType = sessionStorage.getItem('mfa_verify_type') || 'mfa'
   const siteId = sessionStorage.getItem('mfa_site_id') || ''

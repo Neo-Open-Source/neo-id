@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Button, AlertBanner, Badge, Spinner } from '@neo-open-source/ui-web'
 import { ChevronRight, Code, Command, Settings, Shield, Camera, Smartphone, Monitor, Globe, X } from '@neo-open-source/icons'
 import { getSessions, revokeSession, setRefreshDuration } from '../../api/endpoints'
+import styles from './SessionsSection.module.css'
 
 interface Session { id: string; user_agent?: string; ip_address?: string; location?: string; is_current?: boolean; last_used_at?: string; created_at?: string; refresh_expires_at?: string }
 interface DevicePairingState { code: string; deviceCode: string; qrImage: string; status: 'idle' | 'waiting' | 'confirmed' | 'expired'; error: string }
@@ -215,7 +216,7 @@ function PairDeviceModal({
   }
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 1300, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 16 }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1300, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 16 }} onClick={onClose}>
       <div style={{ background: 'var(--neo-surface-1)', borderRadius: isMobile ? '18px 18px 0 0' : 'var(--neo-radius-lg)', width: '100%', maxWidth: isMobile ? '100%' : 420, overflow: 'hidden', maxHeight: isMobile ? '92vh' : 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--neo-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Add new device</h3>
@@ -428,7 +429,7 @@ export default function SessionsSection({ currentRefreshMonths = 1, compact = fa
 
   return (
     <div style={{ background: compact ? 'transparent' : 'var(--neo-surface-1)', border: compact ? 0 : '1px solid var(--neo-border-subtle)', borderRadius: compact ? 0 : 'var(--neo-radius-lg)', padding: compact ? 0 : 24 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div className={styles.layout} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         
         {/* Session Duration */}
         <div>
@@ -439,22 +440,24 @@ export default function SessionsSection({ currentRefreshMonths = 1, compact = fa
           <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--neo-text-muted)' }}>
             How long you stay signed in without using the service
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div className={styles.durationWrap} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {DURATIONS.map(o => (
               <button
+                className={`${styles.durationBtn} ${duration === o.value ? styles.durationBtnActive : ''}`}
                 key={o.value}
                 onClick={() => onSaveDuration(o.value)}
                 disabled={durationSaving}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '8px 14px',
-                  borderRadius: 'var(--neo-radius-md)',
+                  borderRadius: 10,
                   border: '1px solid var(--neo-border-subtle)',
                   background: duration === o.value ? 'var(--neo-surface-3)' : 'var(--neo-surface-2)',
                   color: duration === o.value ? 'var(--neo-text-primary)' : 'var(--neo-text-muted)',
                   fontSize: 13,
                   cursor: 'pointer',
-                  fontWeight: duration === o.value ? 500 : 400
+                  fontWeight: duration === o.value ? 500 : 400,
+                  minHeight: 34
                 }}
               >
                 {o.label}
@@ -481,16 +484,17 @@ export default function SessionsSection({ currentRefreshMonths = 1, compact = fa
               {sessions.filter(s => s.is_current).length === 1 ? 'This device and others currently signed in' : 'Devices currently signed in'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+          <div className={styles.actions} style={{ display: 'flex', gap: 8 }}>
+            <Button className={styles.refreshBtn} variant="secondary" size="sm" onClick={load} disabled={loading}>
               {loading ? <Spinner /> : 'Refresh'}
             </Button>
             <Button
+              className={styles.addBtn}
               size="sm"
               onClick={() => setShowPairModal(true)}
               aria-label="Add device"
               title="Add device"
-              style={{ width: 34, minWidth: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 34, minWidth: 34, height: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 600 }}>+</span>
             </Button>
@@ -517,6 +521,7 @@ export default function SessionsSection({ currentRefreshMonths = 1, compact = fa
               
               return (
                 <div 
+                  className={styles.card}
                   key={s.id} 
                   style={{ 
                     display: 'flex', 
@@ -546,8 +551,8 @@ export default function SessionsSection({ currentRefreshMonths = 1, compact = fa
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
                       <span style={{ fontWeight: 500, fontSize: 14 }}>{device.name}</span>
-                      {browser && <span style={{ fontSize: 12, color: 'var(--neo-text-muted)', background: 'var(--neo-surface-3)', padding: '2px 8px', borderRadius: 4 }}>{browser}</span>}
-                      {s.is_current && <Badge tone="success" style={{ fontSize: 11 }}>This device</Badge>}
+                      {browser && <span className={styles.browserChip}>{browser}</span>}
+                      {s.is_current && <span className={styles.currentChip}>This device</span>}
                     </div>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

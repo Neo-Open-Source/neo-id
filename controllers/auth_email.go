@@ -41,7 +41,9 @@ func (c *AuthController) VerifyEmail() {
 		return
 	}
 
-	if strings.TrimSpace(user.PendingEmail) != "" {
+	wasEmailChange := strings.TrimSpace(user.PendingEmail) != ""
+
+	if wasEmailChange {
 		user.Email = strings.TrimSpace(strings.ToLower(user.PendingEmail))
 		user.PendingEmail = ""
 	}
@@ -59,6 +61,11 @@ func (c *AuthController) VerifyEmail() {
 	if c.GetString("format") == "json" {
 		c.Data["json"] = map[string]interface{}{"verified": true}
 		c.ServeJSON()
+		return
+	}
+
+	if wasEmailChange {
+		c.Redirect("/dashboard?email_changed=1", http.StatusTemporaryRedirect)
 		return
 	}
 

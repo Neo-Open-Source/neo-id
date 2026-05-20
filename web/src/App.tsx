@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './app/ThemeContext'
-import { getAccessToken } from './api/client'
 
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
@@ -20,10 +19,9 @@ import DeviceLoginPage from './pages/DeviceLoginPage'
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 
 function AppRoutes() {
-  const token = getAccessToken()
   return (
     <Routes>
-      <Route path="/" element={token ? <HomePage /> : <Navigate to="/login" replace />} />
+      <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/verify" element={<VerifyPage />} />
       <Route path="/setup" element={<SetupPage />} />

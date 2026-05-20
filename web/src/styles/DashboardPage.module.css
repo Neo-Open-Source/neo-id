@@ -1,0 +1,60 @@
+.shell {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 40px 32px 80px;
+}
+
+.alert {
+  margin-bottom: 20px;
+}
+
+.header {
+  margin-bottom: 28px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--neo-surface-2);
+  color: var(--neo-text-primary);
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .shell {
+    width: 100%;
+    padding: 20px 16px 112px;
+  }
+
+  .alert {
+    margin-bottom: 16px;
+  }
+
+  .header {
+    margin-bottom: 20px;
+  }
+
+  .header {
+    display: none;
+  }
+
+  .back {
+    display: none;
+  }
+
+  .title {
+    display: none;
+  }
+}

@@ -4,7 +4,8 @@ import { Button, Input, AlertBanner, Avatar, Badge, Spinner } from '@neo-open-so
 import { clearTokens } from '../api/client'
 import ResponsiveLayout from '../components/ResponsiveLayout'
 import Modal from '../components/Modal'
-import { getProfile, adminGetUsers, adminSetUserRole, adminBanUser, adminUnbanUser, adminGetServices, adminCreateService, adminGetSites, logout } from '../api/endpoints'
+import { adminGetUsers, adminSetUserRole, adminBanUser, adminUnbanUser, adminGetServices, adminCreateService, adminGetSites, logout } from '../api/endpoints'
+import { useCachedProfile } from '../hooks/useCachedProfile'
 
 interface User { unified_id: string; display_name?: string; email?: string; avatar?: string; role?: string; is_banned?: boolean }
 interface Service { name: string; display_name?: string; description?: string; is_active?: boolean }
@@ -15,7 +16,7 @@ const TABS = ['Users', 'Services', 'Registered services']
 export default function AdminPage() {
   const navigate = useNavigate()
   const [isMobile, setIsMobile] = useState(false)
-  const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
+  const { profile } = useCachedProfile()
   const [tab, setTab] = useState(0)
   const [msg, setMsg] = useState({ type: '', text: '' })
 
@@ -48,7 +49,6 @@ export default function AdminPage() {
   const [sites, setSites] = useState<Site[]>([])
   const [sitesLoading, setSitesLoading] = useState(false)
 
-  const loadProfile = async () => { const p = await getProfile(); setProfile(p); return p }
   const loadUsers = async () => {
     setUsersLoading(true)
     try { const r = await adminGetUsers({ page: usersPage, limit: 20, search: usersSearch || undefined, banned: usersBannedOnly ? 'true' : undefined }); setUsers(r.users || []); setUsersPages(r?.pagination?.pages || 1) }
@@ -66,7 +66,6 @@ export default function AdminPage() {
     finally { setSitesLoading(false) }
   }
 
-  useEffect(() => { loadProfile().catch(() => navigate('/login')) }, [])
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768)
     checkMobile()
@@ -153,7 +152,7 @@ export default function AdminPage() {
                             <p style={{ margin: 0, fontSize: 13, color: 'var(--neo-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr' : 'auto auto auto', gap: 8, alignItems: 'center', marginLeft: isMobile ? 42 : 0, width: isMobile ? 'calc(100% - 42px)' : 'auto', flexWrap: 'wrap' }}>
-                            <Badge tone={u.is_banned ? undefined : 'success'} style={{ flexShrink: 0 }}>{u.is_banned ? 'Banned' : 'Active'}</Badge>
+                            <Badge className={u.is_banned ? 'admin-status-badge admin-status-badge--banned' : 'admin-status-badge admin-status-badge--active'} tone={u.is_banned ? undefined : 'success'} style={{ flexShrink: 0 }}>{u.is_banned ? 'Banned' : 'Active'}</Badge>
                             <select value={u.role || 'User'} onChange={e => onChangeRole(u.unified_id, e.target.value)} style={{ ...selectStyle, minWidth: isMobile ? 96 : undefined, width: isMobile ? '100%' : undefined }}>
                             {['User', 'Developer', 'Moderator', 'Admin'].map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
@@ -200,7 +199,7 @@ export default function AdminPage() {
                               <p style={{ margin: 0, fontSize: 13, color: 'var(--neo-text-muted)' }}>{s.display_name}</p>
                             </div>
                             <p style={{ margin: 0, fontSize: 13, color: 'var(--neo-text-muted)', flex: 1, display: 'none' }}>{s.description}</p>
-                            <Badge tone={s.is_active ? 'success' : undefined}>{s.is_active ? 'Active' : 'Inactive'}</Badge>
+                            <Badge className={s.is_active ? 'admin-status-badge admin-status-badge--active' : 'admin-status-badge admin-status-badge--inactive'} tone={s.is_active ? 'success' : undefined}>{s.is_active ? 'Active' : 'Inactive'}</Badge>
                           </div>
                         ))}
                     </div>
@@ -229,7 +228,7 @@ export default function AdminPage() {
                             {!isMobile ? <p style={{ margin: 0, fontSize: 13, color: 'var(--neo-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.owner_email}</p> : null}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: isMobile ? '100%' : 'auto', marginLeft: isMobile ? 0 : 'auto' }}>
                               <Badge>{s.plan || 'free'}</Badge>
-                              <Badge tone={s.is_active ? 'success' : undefined}>{s.is_active ? 'Active' : 'Inactive'}</Badge>
+                              <Badge className={s.is_active ? 'admin-status-badge admin-status-badge--active' : 'admin-status-badge admin-status-badge--inactive'} tone={s.is_active ? 'success' : undefined}>{s.is_active ? 'Active' : 'Inactive'}</Badge>
                               <Button variant="danger" size="sm" onClick={() => onDeleteSite(s.site_id)} style={{ marginLeft: isMobile ? 'auto' : 0 }}>Delete</Button>
                             </div>
                           </div>
@@ -258,6 +257,25 @@ export default function AdminPage() {
         .neo-id-avatar-sm{width:32px;height:32px;font-size:.75rem;flex-shrink:0;}
         .admin-page-content{padding:16px 24px;}
         .admin-tabs-row::-webkit-scrollbar{height:0;width:0;}
+        .admin-status-badge {
+          font-weight: 600;
+          border: 1px solid transparent;
+        }
+        html[data-theme='light'] .admin-status-badge--active {
+          background: #dcfce8 !important;
+          color: #166534 !important;
+          border-color: #9ed8b5 !important;
+        }
+        html[data-theme='light'] .admin-status-badge--inactive {
+          background: #eef2f7 !important;
+          color: #475569 !important;
+          border-color: #d4dce7 !important;
+        }
+        html[data-theme='light'] .admin-status-badge--banned {
+          background: #fee2e2 !important;
+          color: #b91c1c !important;
+          border-color: #f8b4b4 !important;
+        }
         @media (max-width:768px) {
           .admin-page-content{padding:16px;}
           .admin-page-heading{display:none;}

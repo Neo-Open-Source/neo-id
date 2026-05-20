@@ -23,7 +23,7 @@ export default function HomePage() {
     }
     setLoading(true)
     getProfile().then(setProfile).catch(() => {}).finally(() => setLoading(false))
-  }, [token, navigate])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!token) return null
 

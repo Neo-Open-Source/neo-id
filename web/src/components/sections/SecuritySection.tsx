@@ -187,13 +187,13 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
     setEmailValue(profile?.pending_email || '')
   }, [activeModal, profile?.pending_email, profile?.email])
 
-  // Close email verify modal if pending_email is cleared (e.g., after reload when already verified)
+  // Close email verify modal if pending_email is cleared after profile reload (email already confirmed)
   useEffect(() => {
-    if (activeModal === 'emailVerify' && !profile?.pending_email) {
+    if (activeModal === 'emailVerify' && profile?.pending_email === '' && profile?.email_verified) {
       setActiveModal(null)
       setEmailCode('')
     }
-  }, [activeModal, profile?.pending_email])
+  }, [profile?.pending_email, profile?.email_verified])
 
   const linkProvider = (p: string) => {
     window.location.href = `/api/auth/login/${p}?link=1&token=${encodeURIComponent(getAccessToken())}`
