@@ -91,6 +91,13 @@ GITHUB_CLIENT_SECRET=...
 RESEND_API_KEY=...
 RESEND_FROM=Neo ID <no-reply@yourdomain.com>
 
+# Legal documents change notifications (optional, recommended)
+# Bump LEGAL_DOCS_VERSION when Terms/Privacy text changes.
+# On backend start, Neo ID sends notification email to active users (deduplicated per version + user).
+LEGAL_DOCS_VERSION=2026-05-21
+LEGAL_NOTIFY_BATCH_SIZE=200
+LEGAL_NOTIFY_ACTIVE_WINDOW_DAYS=3650
+
 # Image Uploads (ImageKit, optional)
 IMAGEKIT_PRIVATE_KEY=...
 ```

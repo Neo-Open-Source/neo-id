@@ -31,6 +31,8 @@ const (
 	SitesCollection             = "sites"
 	AuthCodesCollection         = "auth_codes"
 	MFACodesCollection          = "mfa_codes"
+	LegalMetaCollection         = "legal_meta"
+	LegalNoticeEventsCollection = "legal_notice_events"
 )
 
 // InitDatabase initializes MongoDB connection
@@ -171,6 +173,23 @@ func createIndexes() error {
 	}
 	if _, err := authCodesCol.Indexes().CreateMany(ctx, authCodesIndexes); err != nil {
 		return fmt.Errorf("failed to create auth_codes indexes: %w", err)
+	}
+
+	legalMetaCol := GetCollection(LegalMetaCollection)
+	legalMetaIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "key", Value: 1}}, Options: options.Index().SetUnique(true)},
+	}
+	if _, err := legalMetaCol.Indexes().CreateMany(ctx, legalMetaIndexes); err != nil {
+		return fmt.Errorf("failed to create legal_meta indexes: %w", err)
+	}
+
+	legalEventsCol := GetCollection(LegalNoticeEventsCollection)
+	legalEventsIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "version", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "status", Value: 1}, {Key: "updated_at", Value: 1}}},
+	}
+	if _, err := legalEventsCol.Indexes().CreateMany(ctx, legalEventsIndexes); err != nil {
+		return fmt.Errorf("failed to create legal_notice_events indexes: %w", err)
 	}
 
 	return nil

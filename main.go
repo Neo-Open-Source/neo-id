@@ -36,6 +36,9 @@ func main() {
 	if err := models.InitDatabase(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
+	if err := controllers.NotifyLegalDocsUpdateIfNeeded(); err != nil {
+		log.Printf("Legal docs update notification skipped: %v", err)
+	}
 
 	// Cleanup expired sessions every 24 hours
 	go func() {
