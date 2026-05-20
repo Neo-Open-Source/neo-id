@@ -49,6 +49,7 @@ export async function adminUnbanUser(user_id: string) { return (await api.post('
 export async function adminGetServices() { return (await api.get('/api/admin/services')).data }
 export async function adminCreateService(service: Record<string, unknown>) { return (await api.post('/api/admin/services', service)).data }
 export async function adminGetSites() { return (await api.get('/api/admin/sites')).data }
+export async function adminRunLegalNotifyBatch() { return (await api.post('/api/admin/legal/notify/run')).data }
 export async function completeProfile(display_name: string, avatar_url?: string) { return (await api.post('/api/user/profile/complete', { display_name, avatar_url })).data }
 export async function setAvatarStock(avatar_url: string) { return (await api.post('/api/user/avatar', { avatar_url })).data }
 export async function uploadAvatar(file: File) {

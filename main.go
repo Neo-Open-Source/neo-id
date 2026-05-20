@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"unified-id/controllers"
@@ -36,8 +37,13 @@ func main() {
 	if err := models.InitDatabase(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
-	if err := controllers.NotifyLegalDocsUpdateIfNeeded(); err != nil {
-		log.Printf("Legal docs update notification skipped: %v", err)
+	runOnBoot := strings.EqualFold(strings.TrimSpace(os.Getenv("LEGAL_NOTIFY_RUN_ON_BOOT")), "true")
+	if os.Getenv("VERCEL") == "1" && !runOnBoot {
+		log.Printf("Legal docs notification bootstrap skipped on Vercel (set LEGAL_NOTIFY_RUN_ON_BOOT=true to enable)")
+	} else {
+		if err := controllers.NotifyLegalDocsUpdateIfNeeded(); err != nil {
+			log.Printf("Legal docs update notification skipped: %v", err)
+		}
 	}
 
 	// Cleanup expired sessions every 24 hours

@@ -93,10 +93,15 @@ RESEND_FROM=Neo ID <no-reply@yourdomain.com>
 
 # Legal documents change notifications (optional, recommended)
 # Bump LEGAL_DOCS_VERSION when Terms/Privacy text changes.
-# On backend start, Neo ID sends notification email to active users (deduplicated per version + user).
+# Notifications are deduplicated per (version + user) and processed in bounded batches.
 LEGAL_DOCS_VERSION=2026-05-21
 LEGAL_NOTIFY_BATCH_SIZE=200
 LEGAL_NOTIFY_ACTIVE_WINDOW_DAYS=3650
+LEGAL_NOTIFY_MAX_BATCHES_PER_RUN=1
+# For Vercel cron/manual trigger endpoint:
+LEGAL_NOTIFY_CRON_TOKEN=replace-with-long-random-secret
+# Optional: force run on boot even on Vercel (default skipped on Vercel)
+LEGAL_NOTIFY_RUN_ON_BOOT=false
 
 # Image Uploads (ImageKit, optional)
 IMAGEKIT_PRIVATE_KEY=...

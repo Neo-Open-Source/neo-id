@@ -543,6 +543,36 @@ func (c *AdminController) GetSites() {
 	c.ServeJSON()
 }
 
+// RunLegalNotifyBatch triggers one bounded batch run of legal notifications.
+// Access: admin/moderator token OR X-Legal-Cron-Token header matching LEGAL_NOTIFY_CRON_TOKEN.
+func (c *AdminController) RunLegalNotifyBatch() {
+	authorized := false
+
+	if token := strings.TrimSpace(c.Ctx.Request.Header.Get("X-Legal-Cron-Token")); token != "" {
+		if expected := strings.TrimSpace(os.Getenv("LEGAL_NOTIFY_CRON_TOKEN")); expected != "" && token == expected {
+			authorized = true
+		}
+	}
+
+	if !authorized {
+		actor, err := c.authenticateAdminOrModerator()
+		if err != nil || actor == nil {
+			respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+			return
+		}
+	}
+
+	maxBatches := getenvInt("LEGAL_NOTIFY_MAX_BATCHES_PER_RUN", 1)
+	result, err := DispatchLegalDocsNotify(maxBatches)
+	if err != nil {
+		respondError(&c.Controller, http.StatusInternalServerError, "server_error", err.Error())
+		return
+	}
+
+	c.Data["json"] = result
+	c.ServeJSON()
+}
+
 // AdminIndex serves admin dashboard
 func (c *AdminController) AdminIndex() {
 	// Serve admin dashboard HTML

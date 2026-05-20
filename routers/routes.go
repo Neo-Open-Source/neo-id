@@ -75,6 +75,7 @@ func InitRoutes() {
 	web.Router("/api/admin/services", &controllers.AdminController{}, "get:GetServices")
 	web.Router("/api/admin/services", &controllers.AdminController{}, "post:CreateService")
 	web.Router("/api/admin/sites", &controllers.AdminController{}, "get:GetSites")
+	web.Router("/api/admin/legal/notify/run", &controllers.AdminController{}, "post:RunLegalNotifyBatch")
 
 	// Service integration routes (legacy)
 	web.Router("/api/service-app/verify", &controllers.ServiceController{}, "post:VerifyToken")

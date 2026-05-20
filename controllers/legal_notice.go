@@ -24,6 +24,15 @@ type legalMetaRecord struct {
 	UpdatedAt time.Time `bson:"updated_at"`
 }
 
+type legalDispatchResult struct {
+	Version  string `json:"version"`
+	Sent     int    `json:"sent"`
+	Failed   int    `json:"failed"`
+	Skipped  int    `json:"skipped"`
+	HasMore  bool   `json:"has_more"`
+	NextFrom string `json:"next_from,omitempty"`
+}
+
 type legalNoticeEvent struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty"`
 	Version   string             `bson:"version"`
@@ -43,9 +52,23 @@ type legalNoticeEvent struct {
 // - LEGAL_NOTIFY_BATCH_SIZE (optional, default 200)
 // - LEGAL_NOTIFY_ACTIVE_WINDOW_DAYS (optional, default 3650)
 func NotifyLegalDocsUpdateIfNeeded() error {
+	res, err := DispatchLegalDocsNotify(getenvInt("LEGAL_NOTIFY_MAX_BATCHES_PER_RUN", 1))
+	if err != nil {
+		return err
+	}
+	log.Printf("legal notice dispatch finished: version=%s sent=%d failed=%d skipped=%d has_more=%v", res.Version, res.Sent, res.Failed, res.Skipped, res.HasMore)
+	return nil
+}
+
+// DispatchLegalDocsNotify processes legal notice dispatch in bounded batches.
+// Safe for serverless/cron usage.
+func DispatchLegalDocsNotify(maxBatches int) (*legalDispatchResult, error) {
 	version := strings.TrimSpace(os.Getenv("LEGAL_DOCS_VERSION"))
 	if version == "" {
-		return nil
+		return &legalDispatchResult{Version: "", HasMore: false}, nil
+	}
+	if maxBatches < 1 {
+		maxBatches = 1
 	}
 
 	col := models.GetCollection(models.LegalMetaCollection)
@@ -73,11 +96,19 @@ func NotifyLegalDocsUpdateIfNeeded() error {
 
 	activeAfter := time.Now().AddDate(0, 0, -activeWindowDays)
 	var lastID primitive.ObjectID
-	sentCount := 0
-	failCount := 0
-	skippedCount := 0
+	cursorKey := "legal_docs_cursor:" + version
+	var cursorRec legalMetaRecord
+	if err := col.FindOne(ctx, bson.M{"key": cursorKey}).Decode(&cursorRec); err == nil {
+		if oid, parseErr := primitive.ObjectIDFromHex(cursorRec.Value); parseErr == nil {
+			lastID = oid
+		}
+	}
 
-	for {
+	res := &legalDispatchResult{Version: version}
+	hasMore := false
+	batchesDone := 0
+	for batchesDone < maxBatches {
+		batchesDone++
 		filter := bson.M{
 			"email":          bson.M{"$exists": true, "$ne": ""},
 			"email_verified": true,
@@ -100,7 +131,7 @@ func NotifyLegalDocsUpdateIfNeeded() error {
 				SetLimit(int64(batchSize)),
 		)
 		if findErr != nil {
-			return findErr
+			return nil, findErr
 		}
 
 		batchHasRows := false
@@ -112,13 +143,13 @@ func NotifyLegalDocsUpdateIfNeeded() error {
 				Email     string             `bson:"email"`
 			}
 			if decodeErr := cursor.Decode(&user); decodeErr != nil {
-				failCount++
+				res.Failed++
 				continue
 			}
 			lastID = user.ID
 			email := strings.TrimSpace(strings.ToLower(user.Email))
 			if email == "" || user.UnifiedID == "" {
-				skippedCount++
+				res.Skipped++
 				continue
 			}
 
@@ -134,17 +165,17 @@ func NotifyLegalDocsUpdateIfNeeded() error {
 			_, insErr := eventsCol.InsertOne(context.Background(), insert)
 			if insErr != nil {
 				if mongo.IsDuplicateKeyError(insErr) {
-					skippedCount++
+					res.Skipped++
 					continue
 				}
-				failCount++
+				res.Failed++
 				continue
 			}
 
 			body := buildLegalDocsUpdatedHTML(version, termsURL, privacyURL)
 			sendErr := sendResendEmail(email, subject, body)
 			if sendErr != nil {
-				failCount++
+				res.Failed++
 				_, _ = eventsCol.UpdateOne(
 					context.Background(),
 					bson.M{"version": version, "user_id": user.UnifiedID},
@@ -153,7 +184,7 @@ func NotifyLegalDocsUpdateIfNeeded() error {
 				continue
 			}
 			sentAt := time.Now()
-			sentCount++
+			res.Sent++
 			_, _ = eventsCol.UpdateOne(
 				context.Background(),
 				bson.M{"version": version, "user_id": user.UnifiedID},
@@ -162,11 +193,21 @@ func NotifyLegalDocsUpdateIfNeeded() error {
 		}
 		_ = cursor.Close(context.Background())
 		if !batchHasRows {
+			hasMore = false
 			break
 		}
+		hasMore = true
+		_, _ = col.UpdateOne(
+			context.Background(),
+			bson.M{"key": cursorKey},
+			bson.M{"$set": bson.M{"value": lastID.Hex(), "updated_at": time.Now()}},
+			options.Update().SetUpsert(true),
+		)
 	}
-
-	log.Printf("legal notice dispatch finished: version=%s sent=%d failed=%d skipped=%d", version, sentCount, failCount, skippedCount)
+	res.HasMore = hasMore
+	if hasMore {
+		res.NextFrom = lastID.Hex()
+	}
 
 	_, upsertErr := col.UpdateOne(
 		ctx,
@@ -179,7 +220,13 @@ func NotifyLegalDocsUpdateIfNeeded() error {
 		},
 		options.Update().SetUpsert(true),
 	)
-	return upsertErr
+	if upsertErr != nil {
+		return nil, upsertErr
+	}
+	if !hasMore {
+		_, _ = col.DeleteOne(context.Background(), bson.M{"key": cursorKey})
+	}
+	return res, nil
 }
 
 func getenvInt(key string, fallback int) int {

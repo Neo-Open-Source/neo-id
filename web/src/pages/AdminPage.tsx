@@ -4,7 +4,7 @@ import { Button, Input, AlertBanner, Avatar, Badge, Spinner } from '@neo-open-so
 import { clearTokens } from '../api/client'
 import ResponsiveLayout from '../components/ResponsiveLayout'
 import Modal from '../components/Modal'
-import { adminGetUsers, adminSetUserRole, adminBanUser, adminUnbanUser, adminGetServices, adminCreateService, adminGetSites, logout } from '../api/endpoints'
+import { adminGetUsers, adminSetUserRole, adminBanUser, adminUnbanUser, adminGetServices, adminCreateService, adminGetSites, adminRunLegalNotifyBatch, logout } from '../api/endpoints'
 import { useCachedProfile } from '../hooks/useCachedProfile'
 import { buildAppNav } from '../navigation/appNav'
 
@@ -51,6 +51,7 @@ export default function AdminPage() {
   // Sites
   const [sites, setSites] = useState<Site[]>([])
   const [sitesLoading, setSitesLoading] = useState(false)
+  const [legalNotifyLoading, setLegalNotifyLoading] = useState(false)
 
   const loadUsers = async () => {
     setUsersLoading(true)
@@ -105,6 +106,26 @@ export default function AdminPage() {
     } catch (e: unknown) { notify('error', (e as { message?: string })?.message || 'Failed') }
   }
 
+  const onRunLegalNotifyBatch = async () => {
+    setLegalNotifyLoading(true)
+    try {
+      const res = await adminRunLegalNotifyBatch()
+      const sent = Number(res?.sent || 0)
+      const failed = Number(res?.failed || 0)
+      const skipped = Number(res?.skipped || 0)
+      const hasMore = !!res?.has_more
+      const version = (res?.version as string) || 'n/a'
+      notify(
+        failed > 0 ? 'error' : 'success',
+        `Legal notify ${version}: sent ${sent}, failed ${failed}, skipped ${skipped}${hasMore ? '. More users pending, run again.' : ''}`
+      )
+    } catch (e: unknown) {
+      notify('error', (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to run legal notify batch')
+    } finally {
+      setLegalNotifyLoading(false)
+    }
+  }
+
   const selectStyle: React.CSSProperties = { height: 28, padding: '0 6px', border: '1px solid var(--neo-border-subtle)', borderRadius: 'var(--neo-radius-sm)', background: 'var(--neo-surface-2)', color: 'var(--neo-text-primary)', fontSize: 13, cursor: 'pointer', flexShrink: 0 }
 
   return (
@@ -123,7 +144,12 @@ export default function AdminPage() {
           </div>
         ) : !allowed ? <AlertBanner tone="warning" title="Admin or Moderator access required" /> : (
           <div>
-            <h2 className="admin-page-heading" style={{ margin: '0 0 16px', fontWeight: 600, fontSize: '1.1rem' }}>Admin Panel</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+              <h2 className="admin-page-heading" style={{ margin: 0, fontWeight: 600, fontSize: '1.1rem' }}>Admin Panel</h2>
+              <Button variant="secondary" size="sm" disabled={legalNotifyLoading} onClick={onRunLegalNotifyBatch}>
+                {legalNotifyLoading ? 'Running…' : 'Run legal notify batch'}
+              </Button>
+            </div>
 
             {/* Tabs */}
             <div style={{ background: 'var(--neo-surface-2)', border: '1px solid var(--neo-border-subtle)', borderRadius: 'var(--neo-radius-md)', overflow: 'hidden' }}>
