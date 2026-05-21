@@ -75,6 +75,99 @@
   flex-wrap: wrap;
 }
 
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.confirmPanel {
+  width: min(100%, 420px);
+  background: var(--neo-surface-1);
+  border: 1px solid var(--neo-border-subtle);
+  border-radius: 20px;
+  padding: 20px;
+  position: relative;
+  display: grid;
+  gap: 14px;
+}
+
+.confirmClose {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--neo-surface-2);
+  color: var(--neo-text-secondary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.confirmTitle {
+  margin: 0;
+  font-size: 1.9rem;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.confirmSubtitle {
+  margin: 0;
+  color: var(--neo-text-muted);
+}
+
+.confirmButtons {
+  display: grid;
+  gap: 10px;
+}
+
+.fullButton {
+  width: 100%;
+}
+
+.cancelLink {
+  border: 0;
+  background: transparent;
+  color: var(--neo-text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  justify-self: center;
+}
+
+html[data-theme='light'] .confirmOverlay {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+html[data-theme='light'] .confirmPanel {
+  background: #ffffff;
+  border-color: #d8e0eb;
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.16);
+}
+
+html[data-theme='light'] .confirmClose {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+html[data-theme='light'] .deleteCodeCell {
+  background: #f7fafc;
+  border-color: #d6deea;
+  color: #0f172a;
+}
+
+html[data-theme='light'] .deleteCodeCellFilled {
+  border-color: #94a3b8;
+}
+
 @media (max-width: 768px) {
   .shell {
     width: 100%;
@@ -99,5 +192,19 @@
 
   .title {
     display: none;
+  }
+
+  .confirmOverlay {
+    padding: 16px;
+  }
+
+  .confirmPanel {
+    width: min(100%, 480px);
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .confirmTitle {
+    font-size: 1.6rem;
   }
 }

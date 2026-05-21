@@ -4,7 +4,6 @@ import { AlertBanner, Button, Spinner } from '@neo-open-source/ui-web'
 import { ChevronLeft } from '@neo-open-source/icons'
 import { clearTokens } from '../api/client'
 import ResponsiveLayout from '../components/ResponsiveLayout'
-import Modal from '../components/Modal'
 import CodeInput from '../components/CodeInput'
 import SecuritySection from '../components/sections/SecuritySection'
 import ServicesSection from '../components/sections/ServicesSection'
@@ -271,35 +270,43 @@ export default function DashboardPage() {
         </div>
       </ResponsiveLayout>
 
-      <Modal
-        open={deleteModalOpen}
-        onClose={() => !deleteLoading && setDeleteModalOpen(false)}
-        title="Confirm sensitive action"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setDeleteModalOpen(false)} disabled={deleteLoading}>Cancel</Button>
-            <Button variant="secondary" onClick={() => void onExportData()} disabled={deleteLoading}>{deleteLoading ? 'Working…' : 'Export data'}</Button>
-            <Button variant="danger" onClick={() => void onDeleteAccount()} disabled={deleteLoading}>{deleteLoading ? 'Deleting…' : 'Delete permanently'}</Button>
-          </>
-        }
-      >
-        <p className={styles.deleteHint}>Enter MFA/TOTP code, or use passkey confirmation.</p>
-        <div className={styles.deleteCodeGrid}>
-          <CodeInput
-            value={securityCode}
-            onChange={(v) => setSecurityCode(v.replace(/\D/g, '').slice(0, 6))}
-            length={6}
-            autoFocus
-            cellClassName={styles.deleteCodeCell}
-            filledCellClassName={styles.deleteCodeCellFilled}
-          />
+      {deleteModalOpen ? (
+        <div className={styles.confirmOverlay} role="dialog" aria-modal="true" aria-label="Confirm sensitive action">
+          <div className={styles.confirmPanel}>
+            <button type="button" className={styles.confirmClose} onClick={() => !deleteLoading && setDeleteModalOpen(false)} aria-label="Close">
+              ×
+            </button>
+            <h2 className={styles.confirmTitle}>Confirm sensitive action</h2>
+            <p className={styles.confirmSubtitle}>Enter MFA/TOTP code, or use passkey confirmation.</p>
+            <div className={styles.deleteCodeGrid}>
+              <CodeInput
+                value={securityCode}
+                onChange={(v) => setSecurityCode(v.replace(/\D/g, '').slice(0, 6))}
+                length={6}
+                autoFocus
+                cellClassName={styles.deleteCodeCell}
+                filledCellClassName={styles.deleteCodeCellFilled}
+              />
+            </div>
+            <div className={styles.deletePasskeyActions}>
+              <Button variant="ghost" onClick={() => void runPasskeyAction('export')} disabled={deleteLoading}>Use passkey for export</Button>
+              <Button variant="ghost" onClick={() => void runPasskeyAction('delete')} disabled={deleteLoading}>Use passkey for delete</Button>
+            </div>
+            <p className={styles.deleteHint}>Delete will permanently remove account, sessions, passkeys, connected records, and related logs.</p>
+            <div className={styles.confirmButtons}>
+              <Button className={styles.fullButton} variant="secondary" onClick={() => void onExportData()} disabled={deleteLoading}>
+                {deleteLoading ? 'Working…' : 'Export data'}
+              </Button>
+              <Button className={styles.fullButton} variant="danger" onClick={() => void onDeleteAccount()} disabled={deleteLoading}>
+                {deleteLoading ? 'Deleting…' : 'Delete permanently'}
+              </Button>
+              <button type="button" className={styles.cancelLink} onClick={() => setDeleteModalOpen(false)} disabled={deleteLoading}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
-        <div className={styles.deletePasskeyActions}>
-          <Button variant="ghost" onClick={() => void runPasskeyAction('export')} disabled={deleteLoading}>Use passkey for export</Button>
-          <Button variant="ghost" onClick={() => void runPasskeyAction('delete')} disabled={deleteLoading}>Use passkey for delete</Button>
-        </div>
-        <p className={styles.deleteHint}>Delete will permanently remove account, sessions, passkeys, connected records, and related logs.</p>
-      </Modal>
+      ) : null}
 
     </>
   )
