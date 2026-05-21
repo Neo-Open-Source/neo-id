@@ -564,7 +564,26 @@ func (c *AuthController) Callback() {
 	oidcCodeChallenge, _ := oauthSess.Values["oidc_code_challenge"].(string)
 	oidcCodeChallengeMethod, _ := oauthSess.Values["oidc_code_challenge_method"].(string)
 	oidcMode, _ := oauthSess.Values["oidc_mode"].(string)
+
+	clearOIDCContext := func() {
+		delete(oauthSess.Values, "oidc_client_id")
+		delete(oauthSess.Values, "oidc_redirect_uri")
+		delete(oauthSess.Values, "oidc_scope")
+		delete(oauthSess.Values, "oidc_state")
+		delete(oauthSess.Values, "oidc_nonce")
+		delete(oauthSess.Values, "oidc_code_challenge")
+		delete(oauthSess.Values, "oidc_code_challenge_method")
+		delete(oauthSess.Values, "oidc_mode")
+	}
+
 	if oidcClientID != "" && oidcRedirectURI != "" {
+		// Re-validate OIDC context to avoid reusing stale cookie values from older flows.
+		siteCRUD := models.NewSiteCRUD()
+		site, err := siteCRUD.GetSiteBySiteID(oidcClientID)
+		if err != nil || site == nil || !site.IsActive || isAllowedRedirectURL(oidcRedirectURI, site) != nil {
+			clearOIDCContext()
+			_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess)
+		} else {
 		key := newConsentSession(&pendingConsent{
 			ClientID:            oidcClientID,
 			RedirectURI:         oidcRedirectURI,
@@ -578,18 +597,12 @@ func (c *AuthController) Callback() {
 			ExpiresAt:           time.Now().Add(10 * time.Minute),
 		})
 
-		delete(oauthSess.Values, "oidc_client_id")
-		delete(oauthSess.Values, "oidc_redirect_uri")
-		delete(oauthSess.Values, "oidc_scope")
-		delete(oauthSess.Values, "oidc_state")
-		delete(oauthSess.Values, "oidc_nonce")
-		delete(oauthSess.Values, "oidc_code_challenge")
-		delete(oauthSess.Values, "oidc_code_challenge_method")
-		delete(oauthSess.Values, "oidc_mode")
+		clearOIDCContext()
 		_ = saveOAuthCookieSession(c.Ctx.ResponseWriter, c.Ctx.Request, oauthSess)
 
 		c.Redirect("/consent?session="+key, http.StatusFound)
 		return
+		}
 	}
 
 	siteID, _ := oauthSess.Values["site_id"].(string)
