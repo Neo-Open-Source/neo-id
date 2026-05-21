@@ -49,16 +49,7 @@ func corsFilter(ctx *webctx.Context) {
 		return
 	}
 
-	allowedRaw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
-	allowed := map[string]struct{}{}
-	for _, v := range strings.Split(allowedRaw, ",") {
-		vv := strings.TrimSpace(v)
-		if vv != "" {
-			allowed[vv] = struct{}{}
-		}
-	}
-	allowed["http://localhost:3000"] = struct{}{}
-	allowed["http://localhost:5173"] = struct{}{}
+	allowed := buildAllowedOriginsMap()
 
 	if isAllowedOrigin(origin, allowed) {
 		ctx.Output.Header("Access-Control-Allow-Origin", origin)
@@ -72,6 +63,24 @@ func corsFilter(ctx *webctx.Context) {
 		ctx.Output.SetStatus(http.StatusNoContent)
 		_, _ = ctx.ResponseWriter.Write([]byte{})
 	}
+}
+
+func buildAllowedOriginsMap() map[string]struct{} {
+	allowedRaw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
+	allowed := map[string]struct{}{}
+	for _, v := range strings.Split(allowedRaw, ",") {
+		vv := strings.TrimSpace(v)
+		if vv != "" {
+			allowed[vv] = struct{}{}
+		}
+	}
+
+	// Local dev origins are allowed only for non-Vercel runtime.
+	if os.Getenv("VERCEL") != "1" {
+		allowed["http://localhost:3000"] = struct{}{}
+		allowed["http://localhost:5173"] = struct{}{}
+	}
+	return allowed
 }
 
 func initialize() {
@@ -94,16 +103,7 @@ func initialize() {
 		if ctx.Input.Method() == http.MethodOptions {
 			origin := ctx.Input.Header("Origin")
 			if origin != "" {
-				allowedRaw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
-				allowed := map[string]struct{}{}
-				for _, v := range strings.Split(allowedRaw, ",") {
-					vv := strings.TrimSpace(v)
-					if vv != "" {
-						allowed[vv] = struct{}{}
-					}
-				}
-				allowed["http://localhost:3000"] = struct{}{}
-				allowed["http://localhost:5173"] = struct{}{}
+				allowed := buildAllowedOriginsMap()
 
 				if !isAllowedOrigin(origin, allowed) {
 					ctx.Output.SetStatus(http.StatusNoContent)

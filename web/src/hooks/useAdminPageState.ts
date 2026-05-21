@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { adminBanUser, adminCreateService, adminGetServices, adminGetSites, adminGetUsers, adminRunLegalNotifyBatch, adminSetUserRole, adminUnbanUser } from '../api/endpoints'
-import type { AdminNewServicePayload, AdminService, AdminSite, AdminUser } from '../types/app'
+import { adminBanUser, adminCreateService, adminGetServices, adminGetSites, adminGetTelemetry, adminGetUsers, adminRunLegalNotifyBatch, adminSetUserRole, adminUnbanUser } from '../api/endpoints'
+import type { AdminNewServicePayload, AdminService, AdminSite, AdminUser, TelemetryEvent } from '../types/app'
 
 interface NotifyFn {
   (type: string, text: string): void
@@ -26,6 +26,8 @@ export function useAdminPageState(enabled: boolean, notify: NotifyFn) {
 
   const [sites, setSites] = useState<AdminSite[]>([])
   const [sitesLoading, setSitesLoading] = useState(false)
+  const [telemetry, setTelemetry] = useState<TelemetryEvent[]>([])
+  const [telemetryLoading, setTelemetryLoading] = useState(false)
   const [legalNotifyLoading, setLegalNotifyLoading] = useState(false)
 
   const loadUsers = async () => {
@@ -70,11 +72,24 @@ export function useAdminPageState(enabled: boolean, notify: NotifyFn) {
     }
   }
 
+  const loadTelemetry = async () => {
+    setTelemetryLoading(true)
+    try {
+      const r = await adminGetTelemetry(200)
+      setTelemetry(r.events || [])
+    } catch (e: unknown) {
+      notify('error', (e as { message?: string })?.message || 'Failed')
+    } finally {
+      setTelemetryLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!enabled) return
     if (tab === 0) void loadUsers()
     else if (tab === 1) void loadServices()
-    else void loadSites()
+    else if (tab === 2) void loadSites()
+    else void loadTelemetry()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, tab])
 
@@ -201,9 +216,12 @@ export function useAdminPageState(enabled: boolean, notify: NotifyFn) {
     setNewService,
     sites,
     sitesLoading,
+    telemetry,
+    telemetryLoading,
     legalNotifyLoading,
     loadUsers,
     loadSites,
+    loadTelemetry,
     onChangeRole,
     onOpenBan,
     onConfirmBan,

@@ -184,7 +184,7 @@ func (c *AuthController) ResendVerifyEmail() {
 	resendLimiterMutex.RLock()
 	lastSent, exists := resendLimiter[email]
 	resendLimiterMutex.RUnlock()
-	
+
 	if exists && time.Since(lastSent) < resendCooldown {
 		respondError(&c.Controller, http.StatusTooManyRequests, "rate_limit_exceeded", "Too many requests. Please wait before requesting another code.")
 		return
@@ -245,9 +245,10 @@ func (c *AuthController) ResendVerifyEmail() {
 // PasswordRegister registers a new user with email/password
 func (c *AuthController) PasswordRegister() {
 	var requestBody struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		DisplayName string `json:"display_name"`
+		Email              string `json:"email"`
+		Password           string `json:"password"`
+		DisplayName        string `json:"display_name"`
+		AgeConfirmed16Plus bool   `json:"age_confirmed_16_plus"`
 	}
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
@@ -267,6 +268,10 @@ func (c *AuthController) PasswordRegister() {
 
 	if requestBody.Email == "" || requestBody.Password == "" {
 		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "email and password are required")
+		return
+	}
+	if !requestBody.AgeConfirmed16Plus {
+		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "You must confirm that you are 16 or older")
 		return
 	}
 
@@ -297,16 +302,18 @@ func (c *AuthController) PasswordRegister() {
 	}
 
 	user := &models.User{
-		UnifiedID:         generateUnifiedID(),
-		Email:             requestBody.Email,
-		DisplayName:       name,
-		Avatar:            "",
-		Role:              "User",
-		IsBanned:          false,
-		ConnectedServices: []string{},
-		OAuthProviders:    []models.OAuthProvider{},
-		PasswordHash:      string(hash),
-		EmailVerified:     false,
+		UnifiedID:          generateUnifiedID(),
+		Email:              requestBody.Email,
+		DisplayName:        name,
+		Avatar:             "",
+		Role:               "User",
+		IsBanned:           false,
+		ConnectedServices:  []string{},
+		OAuthProviders:     []models.OAuthProvider{},
+		PasswordHash:       string(hash),
+		EmailVerified:      false,
+		AgeConfirmed16Plus: true,
+		AgeConfirmedAt:     &[]time.Time{time.Now()}[0],
 	}
 
 	verifyToken := uuid.NewString()

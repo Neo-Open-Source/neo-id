@@ -261,6 +261,7 @@ GET  /api/service/userinfo  — get user info (requires X-User-Token header)
 ### API Documentation
 - **[API.md](API.md)** - Complete API reference with examples
 - **[INTEGRATION.md](INTEGRATION.md)** - Integration guide for your apps
+- **[INTEGRATION.md#embedded-widget-qr--code-auth](INTEGRATION.md#embedded-widget-qr--code-auth)** - Embeddable QR/text-code auth widget (`/widget/auth`, `/widget/sdk.js`)
 
 ### Frontend Documentation
 - **[web/README.md](web/README.md)** - Frontend development guide
@@ -279,6 +280,7 @@ GET  /api/service/userinfo  — get user info (requires X-User-Token header)
 | Admin | `/api/admin/*` | Users, services, sites, OIDC clients |
 | Site | `/api/site/*` | SaaS integration endpoints |
 | Service | `/api/service/*` | Legacy internal service integration |
+| Widget | `/widget/*` | Embedded QR/text-code auth widget + SDK |
 | OIDC | `/oauth/*`, `/.well-known/*` | Standard OIDC endpoints |
 | A/B Testing | `/api/ab/*` | Experiment management |
 

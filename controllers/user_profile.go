@@ -57,6 +57,8 @@ func (c *UserController) GetProfile() {
 		"email_mfa_enabled":       user.EmailMFAEnabled,
 		"refresh_duration_months": user.RefreshDurationMonths,
 		"passkeys_count":          len(passkeys),
+		"age_confirmed_16_plus":   user.AgeConfirmed16Plus,
+		"age_confirmed_at":        user.AgeConfirmedAt,
 	}
 	c.ServeJSON()
 }

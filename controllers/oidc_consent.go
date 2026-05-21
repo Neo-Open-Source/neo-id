@@ -165,6 +165,11 @@ func (c *OIDCController) Consent() {
 		json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]string{"error": "user not found"})
 		return
 	}
+	if !user.AgeConfirmed16Plus {
+		c.Ctx.ResponseWriter.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]string{"error": "age confirmation required"})
+		return
+	}
 
 	siteCRUD := models.NewSiteCRUD()
 	site, _ := siteCRUD.GetSiteBySiteID(pc.ClientID)

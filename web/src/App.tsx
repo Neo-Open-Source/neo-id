@@ -15,6 +15,8 @@ import PrivacyPage from './pages/PrivacyPage'
 import ConsentPage from './pages/ConsentPage'
 import TwoFAPage from './pages/TwoFAPage'
 import DeviceLoginPage from './pages/DeviceLoginPage'
+import AgeConsentPage from './pages/AgeConsentPage'
+import WidgetAuthPage from './pages/WidgetAuthPage'
 
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 
@@ -35,6 +37,8 @@ function AppRoutes() {
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/tv" element={<DeviceLoginPage />} />
+      <Route path="/age-consent" element={<AgeConsentPage />} />
+      <Route path="/widget/auth" element={<WidgetAuthPage />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

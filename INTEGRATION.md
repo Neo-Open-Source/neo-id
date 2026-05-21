@@ -160,6 +160,51 @@ Neo ID sends `postMessage` with:
 
 ---
 
+### Embedded widget (QR + code auth)
+
+Use this when you want a ready UI widget on your site.
+
+1. Include SDK:
+
+```html
+<script src="https://id.example.com/widget/sdk.js"></script>
+```
+
+2. Add mount container:
+
+```html
+<div id="neo-id-widget"></div>
+```
+
+3. Mount widget:
+
+```html
+<script>
+  const widget = window.NeoIDWidget.mount('#neo-id-widget', {
+    baseUrl: 'https://id.example.com',
+    onSuccess(payload) {
+      // payload: { access_token, refresh_token }
+      // send token to your backend and establish local session
+      console.log(payload)
+    },
+  })
+
+  // optional cleanup
+  // widget.destroy()
+</script>
+```
+
+Widget internals:
+- Renders `GET /widget/auth` inside an iframe
+- Uses QR + text-code flow
+- Waits for auth confirmation and returns tokens via `postMessage`
+
+Security notes:
+- Always verify token server-side before creating your app session
+- Never trust frontend-only auth state
+
+---
+
 ## Database schema
 
 ```sql

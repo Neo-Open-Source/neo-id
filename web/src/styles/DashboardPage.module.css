@@ -44,6 +44,37 @@
   color: var(--neo-text-muted);
 }
 
+.deleteCodeGrid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.deleteCodeCell {
+  width: 100%;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-2);
+  color: var(--neo-text-primary);
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.deleteCodeCellFilled {
+  border-color: var(--neo-text-muted);
+}
+
+.deletePasskeyActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 768px) {
   .shell {
     width: 100%;

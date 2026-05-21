@@ -84,7 +84,7 @@
 
 .searchGrid {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
 }
@@ -94,12 +94,28 @@
   width: auto;
 }
 
-.bannedLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
+.bannedToggle {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-2);
+  color: var(--neo-text-muted);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.bannedToggle:hover {
+  background: var(--neo-surface-3);
+  color: var(--neo-text-primary);
+}
+
+.bannedToggleActive {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.38);
 }
 
 .usersList,
@@ -310,6 +326,23 @@ html[data-theme='light'] .statusBadgeBanned {
   border-color: #f8b4b4 !important;
 }
 
+html[data-theme='light'] .bannedToggle {
+  background: #ffffff;
+  border-color: #d4dce7;
+  color: #526175;
+}
+
+html[data-theme='light'] .bannedToggle:hover {
+  background: #f8fafc;
+  color: #1f2937;
+}
+
+html[data-theme='light'] .bannedToggleActive {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #f8b4b4;
+}
+
 @media (max-width: 768px) {
   .pageContent {
     padding: 16px;
@@ -342,8 +375,8 @@ html[data-theme='light'] .statusBadgeBanned {
     width: 100%;
   }
 
-  .bannedLabel {
-    justify-self: start;
+  .bannedToggle {
+    width: 100%;
   }
 
   .searchButton {

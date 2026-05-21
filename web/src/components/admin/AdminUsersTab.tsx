@@ -47,10 +47,14 @@ export default function AdminUsersTab({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onSearchEnter()}
         />
-        <label className={styles.bannedLabel}>
-          <input type="checkbox" checked={usersBannedOnly} onChange={(e) => onBannedOnlyChange(e.target.checked)} />
-          Banned
-        </label>
+        <button
+          type="button"
+          onClick={() => onBannedOnlyChange(!usersBannedOnly)}
+          className={`${styles.bannedToggle} ${usersBannedOnly ? styles.bannedToggleActive : ''}`}
+          aria-pressed={usersBannedOnly}
+        >
+          Banned only
+        </button>
         <Button className={styles.searchButton} variant="secondary" size="sm" disabled={usersLoading} onClick={onSearch}>
           Search
         </Button>

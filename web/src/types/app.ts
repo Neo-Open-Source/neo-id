@@ -13,6 +13,8 @@ export interface UserProfile {
   email_mfa_enabled?: boolean
   passkeys_count?: number
   refresh_duration_months?: number
+  age_confirmed_16_plus?: boolean
+  age_confirmed_at?: string
   [key: string]: unknown
 }
 
@@ -79,6 +81,23 @@ export interface AdminSite {
 
 export interface AdminSitesResponse {
   sites?: AdminSite[]
+}
+
+export interface TelemetryEvent {
+  id?: string
+  user_id?: string
+  email?: string
+  route?: string
+  message: string
+  details?: string
+  user_agent?: string
+  ip?: string
+  status?: string
+  created_at?: string
+}
+
+export interface AdminTelemetryResponse {
+  events?: TelemetryEvent[]
 }
 
 export interface LegalNotifyRunResponse {

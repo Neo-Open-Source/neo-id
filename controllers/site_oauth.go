@@ -123,6 +123,10 @@ func (c *SiteController) SiteCallback() {
 		respondError(&c.Controller, http.StatusUnauthorized, "unauthorized", "User not authenticated")
 		return
 	}
+	if !user.AgeConfirmed16Plus {
+		respondError(&c.Controller, http.StatusForbidden, "access_denied", "age confirmation required")
+		return
+	}
 
 	connectionCRUD := models.NewUserSiteConnectionCRUD()
 	if err := connectionCRUD.ConnectUserToSite(user.UnifiedID, siteID, site.Name); err != nil {

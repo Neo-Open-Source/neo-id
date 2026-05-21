@@ -6,6 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/beego/beego/v2/server/web"
 )
@@ -115,4 +116,89 @@ func (c *MainController) Favicon() {
 		}
 	}
 	c.Ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
+}
+
+// WidgetSDK serves embeddable JS SDK for QR/code auth widget.
+// Usage:
+// <script src="https://id.example.com/widget/sdk.js"></script>
+// NeoIDWidget.mount("#el", { baseUrl: "https://id.example.com", onSuccess: ({ access_token, refresh_token }) => {} })
+func (c *MainController) WidgetSDK() {
+	baseURL := strings.TrimSpace(os.Getenv("BASE_URL"))
+	if baseURL == "" {
+		scheme := "https"
+		if c.Ctx.Request.TLS == nil {
+			scheme = "http"
+		}
+		baseURL = scheme + "://" + c.Ctx.Request.Host
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	js := `(function(global){
+  function resolveContainer(target){
+    if(!target) return null;
+    if(typeof target === "string") return document.querySelector(target);
+    if(target instanceof HTMLElement) return target;
+    return null;
+  }
+
+  function mount(target, options){
+    var container = resolveContainer(target);
+    if(!container) throw new Error("NeoIDWidget: container not found");
+
+    var opts = options || {};
+    var baseUrl = (opts.baseUrl || "` + baseURL + `").replace(/\/+$/, "");
+    var iframeUrl = baseUrl + "/widget/auth";
+
+    var iframe = document.createElement("iframe");
+    iframe.src = iframeUrl;
+    iframe.style.width = opts.width || "420px";
+    iframe.style.height = opts.height || "620px";
+    iframe.style.border = "0";
+    iframe.style.borderRadius = "16px";
+    iframe.style.background = "transparent";
+    iframe.setAttribute("allow", "clipboard-read; clipboard-write");
+    iframe.setAttribute("loading", "lazy");
+
+    container.innerHTML = "";
+    container.appendChild(iframe);
+
+    function onMessage(event){
+      if(!event || !event.data) return;
+      if(typeof event.data !== "object") return;
+      if(event.data.type !== "neo_id_widget_auth") return;
+      if(event.data.status !== "confirmed") return;
+
+      // Strict origin check against configured base URL.
+      try {
+        var allowedOrigin = new URL(baseUrl).origin;
+        if(event.origin !== allowedOrigin) return;
+      } catch(e) {
+        return;
+      }
+
+      if(typeof opts.onSuccess === "function"){
+        opts.onSuccess({
+          access_token: event.data.access_token || "",
+          refresh_token: event.data.refresh_token || ""
+        });
+      }
+    }
+
+    window.addEventListener("message", onMessage);
+
+    return {
+      iframe: iframe,
+      destroy: function(){
+        window.removeEventListener("message", onMessage);
+        if(iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      }
+    };
+  }
+
+  global.NeoIDWidget = { mount: mount };
+})(window);`
+
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	c.Ctx.ResponseWriter.Header().Set("Cache-Control", "public, max-age=300")
+	_, _ = c.Ctx.ResponseWriter.Write([]byte(js))
 }

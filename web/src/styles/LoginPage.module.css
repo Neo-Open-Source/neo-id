@@ -91,6 +91,19 @@
   width: 100%;
 }
 
+.ageConsent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--neo-text-secondary);
+  font-size: 0.9rem;
+}
+
+.ageConsent input {
+  width: 16px;
+  height: 16px;
+}
+
 .legal {
   margin: 0;
   text-align: center;

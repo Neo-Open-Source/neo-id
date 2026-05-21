@@ -41,10 +41,12 @@ type User struct {
 	Bio       string `bson:"bio,omitempty" json:"bio,omitempty"`
 
 	// MFA / TOTP
-	TOTPSecret            string `bson:"totp_secret,omitempty" json:"-"`
-	TOTPEnabled           bool   `bson:"totp_enabled,omitempty" json:"totp_enabled,omitempty"`
-	EmailMFAEnabled       bool   `bson:"email_mfa_enabled,omitempty" json:"email_mfa_enabled,omitempty"`
-	RefreshDurationMonths int    `bson:"refresh_duration_months,omitempty" json:"refresh_duration_months,omitempty"`
+	TOTPSecret            string     `bson:"totp_secret,omitempty" json:"-"`
+	TOTPEnabled           bool       `bson:"totp_enabled,omitempty" json:"totp_enabled,omitempty"`
+	EmailMFAEnabled       bool       `bson:"email_mfa_enabled,omitempty" json:"email_mfa_enabled,omitempty"`
+	RefreshDurationMonths int        `bson:"refresh_duration_months,omitempty" json:"refresh_duration_months,omitempty"`
+	AgeConfirmed16Plus    bool       `bson:"age_confirmed_16_plus,omitempty" json:"age_confirmed_16_plus,omitempty"`
+	AgeConfirmedAt        *time.Time `bson:"age_confirmed_at,omitempty" json:"age_confirmed_at,omitempty"`
 
 	// Status
 	IsBanned    bool       `bson:"is_banned" json:"is_banned"`
@@ -225,12 +227,12 @@ func (uc *UserCRUD) UpdateUser(user *User) error {
 }
 
 func (uc *UserCRUD) DeleteByUnifiedID(unifiedID string) error {
-  ctx := context.Background()
-  _, err := uc.collection.DeleteOne(ctx, bson.M{"unified_id": unifiedID})
-  if err != nil {
-    return fmt.Errorf("failed to delete user: %w", err)
-  }
-  return nil
+	ctx := context.Background()
+	_, err := uc.collection.DeleteOne(ctx, bson.M{"unified_id": unifiedID})
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return nil
 }
 
 // BanUser bans a user

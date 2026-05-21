@@ -23,7 +23,13 @@ export default function HomePage() {
       return
     }
     setLoading(true)
-    getProfile().then(setProfile).catch(() => {}).finally(() => setLoading(false))
+    getProfile().then((p) => {
+      if (!p?.age_confirmed_16_plus) {
+        navigate('/age-consent', { replace: true })
+        return
+      }
+      setProfile(p)
+    }).catch(() => {}).finally(() => setLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!token) return null

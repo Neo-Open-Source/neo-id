@@ -138,6 +138,9 @@ export default function DeveloperSection({ profile, onNavigateToServices }: { pr
     if (!window.confirm(`Delete "${service.name}"?`)) return
     try { await deleteService(service.site_id); setServices(prev => prev.filter(s => s.site_id !== service.site_id)); if (highlighted?.site_id === service.site_id) setHighlighted(null) } catch {}
   }
+  const openApiDocs = () => {
+    window.open('/docs', '_blank', 'noopener,noreferrer')
+  }
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', marginBottom: 20, gap: 10, flexDirection: isMobile ? 'column' : 'row' }}>
@@ -145,7 +148,10 @@ export default function DeveloperSection({ profile, onNavigateToServices }: { pr
           <h2 style={{ margin: 0, fontWeight: 700, fontSize: '1.3rem', letterSpacing: '-0.03em' }}>Developer</h2>
           <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--neo-text-muted)' }}>Registered services and OIDC clients</p>
         </div>
-        {canManageOidc && <Button variant="secondary" size="sm" onClick={onNavigateToServices} style={{ alignSelf: isMobile ? 'stretch' : 'auto' }}>Manage OIDC Clients</Button>}
+        <div style={{ display: 'flex', gap: 8, alignSelf: isMobile ? 'stretch' : 'auto', flexDirection: isMobile ? 'column' : 'row' }}>
+          <Button variant="ghost" size="sm" onClick={openApiDocs} style={{ width: isMobile ? '100%' : 'auto' }}>API Docs (Scalar)</Button>
+          {canManageOidc && <Button variant="secondary" size="sm" onClick={onNavigateToServices} style={{ width: isMobile ? '100%' : 'auto' }}>Manage OIDC Clients</Button>}
+        </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <RegisterForm onRegistered={onRegistered} />

@@ -3,6 +3,7 @@ import type {
   AdminNewServicePayload,
   AdminServicesResponse,
   AdminSitesResponse,
+  AdminTelemetryResponse,
   AdminUsersResponse,
   DeveloperMyServicesResponse,
   LegalNotifyRunResponse,
@@ -73,8 +74,8 @@ export async function totpLoginVerify(email: string, code: string, siteId?: stri
   })
 }
 
-export async function passwordRegister(email: string, password: string, display_name?: string) {
-  return post('/api/auth/password/register', { email, password, display_name })
+export async function passwordRegister(email: string, password: string, display_name?: string, age_confirmed_16_plus?: boolean) {
+  return post('/api/auth/password/register', { email, password, display_name, age_confirmed_16_plus })
 }
 
 export async function resendVerifyEmail(email: string) {
@@ -87,6 +88,14 @@ export async function verifyEmailCode(email: string, code: string) {
 
 export async function getProfile() {
   return get<UserProfile>('/api/user/profile')
+}
+
+export async function setAgeConsent(confirmed: boolean) {
+  return post('/api/user/age-consent', { confirmed })
+}
+
+export async function reportTelemetry(message: string, details?: string, route?: string) {
+  return post('/api/telemetry/report', { message, details, route })
 }
 
 export async function updateProfile(payload: ProfileUpdatePayload) {
@@ -115,6 +124,19 @@ export async function setPassword(password: string, current_password?: string, m
 
 export async function deleteAccountRequest() {
   return del('/api/user/account')
+}
+
+export async function exportAccountData(payload?: { mfa_code?: string; passkey_assertion?: { rawId: string; response: { clientDataJSON: string } } }) {
+  return post('/api/user/account/export', payload || {})
+}
+
+export async function beginAccountActionPasskeyOptions(action: 'export' | 'delete') {
+  return post('/api/user/account/verify/passkey/options', { action })
+}
+
+export async function deleteAccountConfirmed(payload?: { mfa_code?: string; passkey_assertion?: { rawId: string; response: { clientDataJSON: string } } }) {
+  const response = await api.delete('/api/user/account', { data: payload || {} })
+  return response.data
 }
 
 export async function getServices() {
@@ -187,6 +209,10 @@ export async function adminCreateService(service: AdminNewServicePayload) {
 
 export async function adminGetSites() {
   return get<AdminSitesResponse>('/api/admin/sites')
+}
+
+export async function adminGetTelemetry(limit = 100) {
+  return get<AdminTelemetryResponse>('/api/admin/telemetry', { limit })
 }
 
 export async function adminRunLegalNotifyBatch() {

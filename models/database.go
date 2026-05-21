@@ -33,6 +33,7 @@ const (
 	MFACodesCollection          = "mfa_codes"
 	LegalMetaCollection         = "legal_meta"
 	LegalNoticeEventsCollection = "legal_notice_events"
+	TelemetryEventsCollection   = "telemetry_events"
 )
 
 // InitDatabase initializes MongoDB connection
@@ -190,6 +191,16 @@ func createIndexes() error {
 	}
 	if _, err := legalEventsCol.Indexes().CreateMany(ctx, legalEventsIndexes); err != nil {
 		return fmt.Errorf("failed to create legal_notice_events indexes: %w", err)
+	}
+
+	telemetryCol := GetCollection(TelemetryEventsCollection)
+	telemetryIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "created_at", Value: -1}}},
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}},
+		{Keys: bson.D{{Key: "status", Value: 1}, {Key: "created_at", Value: -1}}},
+	}
+	if _, err := telemetryCol.Indexes().CreateMany(ctx, telemetryIndexes); err != nil {
+		return fmt.Errorf("failed to create telemetry_events indexes: %w", err)
 	}
 
 	return nil

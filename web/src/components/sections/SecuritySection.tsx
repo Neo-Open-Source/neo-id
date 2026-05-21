@@ -18,7 +18,7 @@ import PasswordModal from './security/PasswordModal'
 import { useSecuritySectionState, type SecurityPasskey, type SecurityPasskeyPublicKeyOptions } from './security/useSecuritySectionState'
 import type { OAuthProvider, UserProfile } from '../../types/app'
 
-export default function SecuritySection({ profile, providers, hasPassword, notify, onUnlink, onPasswordChanged, onOpenApps, onDeleteAccount, onLogout }: {
+export default function SecuritySection({ profile, providers, hasPassword, notify, onUnlink, onPasswordChanged, onOpenApps, onDeleteAccount, onExportData, onLogout }: {
   profile?: UserProfile
   providers?: OAuthProvider[]
   hasPassword?: boolean
@@ -27,6 +27,7 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
   onPasswordChanged?: () => void
   onOpenApps?: () => void
   onDeleteAccount?: () => void
+  onExportData?: () => void
   onLogout?: () => void | Promise<void>
 }) {
   const {
@@ -376,6 +377,7 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
 
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <Button variant="ghost" onClick={() => onLogout?.()}><LogOut size={16} /> Log out</Button>
+        <button type="button" onClick={() => onExportData?.()} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: 0, background: 'transparent', color: 'var(--neo-text-primary)', cursor: 'pointer', fontSize: 15 }}><Globe size={16} /> Export data</button>
         <button type="button" onClick={onDeleteAccount} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: 0, background: 'transparent', color: 'var(--neo-text-primary)', cursor: 'pointer', fontSize: 15 }}><Trash size={16} /> Delete account</button>
       </div>
 

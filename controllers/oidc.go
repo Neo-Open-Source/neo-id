@@ -124,6 +124,10 @@ func (c *OIDCController) Authorize() {
 	// Check if user already has a valid session (token in Authorization header or cookie)
 	existingUser := c.tryGetExistingUser()
 	if existingUser != nil {
+		if !existingUser.AgeConfirmed16Plus {
+			c.oidcError("access_denied", "age confirmation required", redirectURI, state)
+			return
+		}
 		// User already logged in — show consent page instead of issuing code immediately
 		key := newConsentSession(&pendingConsent{
 			ClientID:            clientID,
@@ -606,6 +610,13 @@ func (c *OIDCController) OIDCCallback() {
 	})
 	if err != nil || !tok.Valid {
 		c.Redirect("/login?oidc=1&client_id="+clientID, http.StatusFound)
+		return
+	}
+
+	userCRUD := models.NewUserCRUD()
+	user, userErr := userCRUD.GetUserByUnifiedID(claims.UnifiedID)
+	if userErr != nil || user == nil || !user.AgeConfirmed16Plus {
+		respondError(&c.Controller, http.StatusForbidden, "access_denied", "age confirmation required")
 		return
 	}
 

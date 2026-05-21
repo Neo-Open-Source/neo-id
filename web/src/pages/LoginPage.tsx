@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [totpRequired, setTotpRequired] = useState(false)
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
 
   const siteId = get('client_id') || get('site_id')
   const redirectUrl = get('redirect_uri') || get('redirect_url')
@@ -161,7 +162,11 @@ export default function LoginPage() {
     setError('')
 
     try {
-      await passwordRegister(email, password)
+      if (!ageConfirmed) {
+        setError('Please confirm that you are 16 or older to create an account.')
+        return
+      }
+      await passwordRegister(email, password, undefined, true)
       
       storeMFASession({
         email,
@@ -202,6 +207,7 @@ export default function LoginPage() {
     setTab(newTab)
     setError('')
     setInfo('')
+    if (newTab === 'login') setAgeConfirmed(false)
   }
 
   if (totpRequired) {
@@ -248,6 +254,12 @@ export default function LoginPage() {
         onSubmit={tab === 'login' ? handleLogin : handleRegister}
         onKeyDown={handleKeyDown}
       />
+      {tab === 'register' ? (
+        <label className={styles.ageConsent}>
+          <input type="checkbox" checked={ageConfirmed} onChange={(e) => setAgeConfirmed(e.target.checked)} />
+          <span>I am 16 years old or older.</span>
+        </label>
+      ) : null}
 
       <p className={styles.legal}>
         By continuing, you agree to our <Link to={ROUTES.TERMS}>Terms</Link> and{' '}

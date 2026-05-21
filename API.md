@@ -258,6 +258,51 @@ X-API-Key: <site_api_key>
 
 ---
 
+## Widget Auth
+
+### GET /widget/auth
+Device-login page for embedded widget flow (QR + text code).  
+This page is intended to be loaded inside an iframe by the Neo ID widget SDK.
+
+**Behavior:**
+- Creates a device code via `POST /api/device/code`
+- Polls `POST /api/device/poll` until confirmation
+- Sends `postMessage` to parent window on success
+
+**postMessage payload:**
+```json
+{
+  "type": "neo_id_widget_auth",
+  "status": "confirmed",
+  "access_token": "eyJhbGc...",
+  "refresh_token": "eyJhbGc..."
+}
+```
+
+---
+
+### GET /widget/sdk.js
+Browser SDK for mounting the embedded widget.
+
+**Usage:**
+```html
+<script src="https://id.example.com/widget/sdk.js"></script>
+<div id="neo-widget"></div>
+<script>
+  const widget = window.NeoIDWidget.mount('#neo-widget', {
+    baseUrl: 'https://id.example.com',
+    onSuccess(tokens) {
+      console.log('Neo ID auth success', tokens)
+    },
+  })
+
+  // later, if needed:
+  // widget.destroy()
+</script>
+```
+
+---
+
 ### POST /api/site/verify
 Verify user token from callback.
 

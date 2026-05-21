@@ -1,0 +1,180 @@
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--neo-text-secondary);
+}
+
+.checkInput {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.checkInput:checked {
+  border-color: var(--neo-text-primary);
+  background: var(--neo-surface-1);
+  /* Draw the checkmark in background so it persists after blur in all browsers. */
+  background-image:
+    linear-gradient(-45deg, transparent 46%, var(--neo-text-primary) 46%, var(--neo-text-primary) 58%, transparent 58%),
+    linear-gradient(45deg, transparent 52%, var(--neo-text-primary) 52%, var(--neo-text-primary) 64%, transparent 64%);
+  background-size: 12px 12px, 12px 12px;
+  background-repeat: no-repeat, no-repeat;
+  background-position: 5px 8px, 8px 4px;
+}
+
+.checkLabel {
+  color: var(--neo-text-secondary);
+}
+
+.full {
+  width: 100%;
+}
+
+.actions {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--neo-text-muted);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.verifyCodeWrap {
+  display: grid;
+  gap: 14px;
+}
+
+.codeRow {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+
+.codeMethodRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.codeMethodBtn {
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-3);
+  color: var(--neo-text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.codeMethodBtnActive {
+  background: var(--neo-surface-1);
+  color: var(--neo-text-primary);
+  border-color: var(--neo-text-muted);
+}
+
+.codeCell {
+  width: 44px;
+  height: 52px;
+  display: inline-flex;
+  border-radius: 12px;
+  border: 1px solid var(--neo-border-subtle);
+  background: var(--neo-surface-3);
+  color: var(--neo-text-primary);
+  text-align: center;
+  font-size: 1.18rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
+  caret-color: var(--neo-text-primary);
+}
+
+.codeCell:focus {
+  border-color: var(--neo-text-primary);
+}
+
+.codeCellFilled {
+  border-color: var(--neo-text-muted);
+}
+
+.passkeyHint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--neo-text-muted);
+}
+
+.fallbackBtn {
+  justify-self: center;
+  border: 0;
+  background: transparent;
+  color: var(--neo-text-secondary);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+
+.fallbackBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.verifySwitches {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.cancelLink {
+  border: 0;
+  background: transparent;
+  color: var(--neo-text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  justify-self: center;
+}
+
+@media (max-width: 768px) {
+  .row {
+    flex-wrap: wrap;
+  }
+
+  .row > * {
+    flex: 1 1 100%;
+  }
+
+  .codeRow {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

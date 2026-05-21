@@ -11,9 +11,10 @@ import { useAdminPageState } from '../hooks/useAdminPageState'
 import AdminUsersTab from '../components/admin/AdminUsersTab'
 import AdminServicesTab from '../components/admin/AdminServicesTab'
 import AdminSitesTab from '../components/admin/AdminSitesTab'
+import AdminTelemetryTab from '../components/admin/AdminTelemetryTab'
 import BanUserModal from '../components/admin/BanUserModal'
 
-const TABS = ['Users', 'Services', 'Registered services']
+const TABS = ['Users', 'Services', 'Registered services', 'Telemetry']
 
 export default function AdminPage() {
   const navigate = useNavigate()
@@ -53,9 +54,12 @@ export default function AdminPage() {
     setNewService,
     sites,
     sitesLoading,
+    telemetry,
+    telemetryLoading,
     legalNotifyLoading,
     loadUsers,
     loadSites,
+    loadTelemetry,
     onChangeRole,
     onOpenBan,
     onConfirmBan,
@@ -134,6 +138,7 @@ export default function AdminPage() {
                 ) : null}
 
                 {tab === 2 ? <AdminSitesTab sites={sites} sitesLoading={sitesLoading} onRefresh={() => void loadSites()} onDeleteSite={onDeleteSite} /> : null}
+                {tab === 3 ? <AdminTelemetryTab events={telemetry} loading={telemetryLoading} onRefresh={() => void loadTelemetry()} /> : null}
               </div>
             </div>
           </div>
