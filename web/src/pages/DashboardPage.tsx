@@ -7,7 +7,7 @@ import ResponsiveLayout from '../components/ResponsiveLayout'
 import CodeInput from '../components/CodeInput'
 import SecuritySection from '../components/sections/SecuritySection'
 import ServicesSection from '../components/sections/ServicesSection'
-import { beginAccountActionPasskeyOptions, deleteAccountConfirmed, exportAccountData, getProfile, getProviders, unlinkProvider, getServices, connectService, disconnectService, logout } from '../api/endpoints'
+import { beginAccountActionPasskeyOptions, deleteAccountConfirmed, exportAccountData, getProfile, getProviders, unlinkProvider, getServices, connectService, disconnectService, logout, sendMFACode } from '../api/endpoints'
 import { buildAppNav } from '../navigation/appNav'
 import type { OAuthProvider, UserProfile, UserServicesResponse } from '../types/app'
 import styles from '../styles/DashboardPage.module.css'
@@ -35,7 +35,9 @@ export default function DashboardPage() {
   const [services, setServices] = useState<UserServicesResponse>({})
   const [msg, setMsg] = useState({ type: '', text: '' })
   const [loading, setLoading] = useState(() => !readCachedProfile())
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [sensitiveAction, setSensitiveAction] = useState<null | 'export' | 'delete'>(null)
+  const [codeMethod, setCodeMethod] = useState<'totp' | 'email'>('totp')
+  const [resendCooldown, setResendCooldown] = useState(0)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [securityCode, setSecurityCode] = useState('')
 
@@ -128,7 +130,8 @@ export default function DashboardPage() {
     setDeleteLoading(true)
     try {
       await deleteAccountConfirmed(payload?.passkey_assertion ? payload : { mfa_code: securityCode.trim() })
-      setDeleteModalOpen(false)
+      setSensitiveAction(null)
+      setSecurityCode('')
       clearTokens()
       notify('success', 'Account and related data deleted')
       setTimeout(() => navigate('/login'), 400)
@@ -151,6 +154,8 @@ export default function DashboardPage() {
       a.click()
       a.remove()
       window.URL.revokeObjectURL(url)
+      setSensitiveAction(null)
+      setSecurityCode('')
       notify('success', 'Data export downloaded')
     } catch (e: unknown) {
       notify('error', (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to export data')
@@ -211,6 +216,43 @@ export default function DashboardPage() {
   }
 
   const role = ((profile?.role as string) || '').toLowerCase()
+  const hasTotp = !!profile?.totp_enabled
+  const hasEmailMFA = !!profile?.email_mfa_enabled
+  const hasPasskey = (profile?.passkeys_count || 0) > 0
+  const canSwitchMethod = hasTotp && hasEmailMFA
+
+  const startResendCooldown = () => {
+    setResendCooldown(60)
+    const timer = setInterval(() => {
+      setResendCooldown((v) => {
+        if (v <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return v - 1
+      })
+    }, 1000)
+  }
+
+  const onSendEmailCode = async (opts?: { silent?: boolean }) => {
+    try {
+      await sendMFACode()
+      if (!opts?.silent) notify('success', 'Code sent — check your email.')
+      startResendCooldown()
+    } catch {
+      notify('error', 'Failed to send code to email.')
+    }
+  }
+
+  const openSensitiveAction = (action: 'export' | 'delete') => {
+    const defaultMethod: 'totp' | 'email' = hasTotp ? 'totp' : 'email'
+    setSensitiveAction(action)
+    setCodeMethod(defaultMethod)
+    setSecurityCode('')
+    setResendCooldown(0)
+    if (defaultMethod === 'email' && hasEmailMFA) void onSendEmailCode({ silent: true })
+  }
+
   const navItems = buildAppNav(role, 'settings', navigate).map((item) =>
     item.id === 'settings' ? { ...item, onClick: () => setActiveSection('security') } : item
   )
@@ -230,6 +272,73 @@ export default function DashboardPage() {
     return (
       <div className={styles.fullPageLoading}>
         <Spinner />
+      </div>
+    )
+  }
+
+  if (sensitiveAction) {
+    return (
+      <div className={styles.fullPageConfirm}>
+        <div className={styles.confirmStandalone}>
+          {msg.text ? (
+            <AlertBanner tone={msg.type === 'error' ? 'danger' : 'success'} title={msg.text} onDismiss={() => setMsg({ type: '', text: '' })} />
+          ) : null}
+          <h1 className={styles.confirmStandaloneTitle}>Confirm sensitive action</h1>
+          <p className={styles.confirmStandaloneSubtitle}>
+            {codeMethod === 'totp' ? 'Enter the 6-digit code from your authenticator.' : 'Enter the 6-digit code sent to your email.'}
+          </p>
+          {canSwitchMethod ? (
+            <div className={styles.codeMethodRow}>
+              <button type="button" className={`${styles.codeMethodBtn} ${codeMethod === 'totp' ? styles.codeMethodBtnActive : ''}`} onClick={() => setCodeMethod('totp')}>
+                Authenticator
+              </button>
+              <button
+                type="button"
+                className={`${styles.codeMethodBtn} ${codeMethod === 'email' ? styles.codeMethodBtnActive : ''}`}
+                onClick={() => {
+                  setCodeMethod('email')
+                  if (resendCooldown === 0) void onSendEmailCode({ silent: true })
+                }}
+              >
+                Email code
+              </button>
+            </div>
+          ) : null}
+          <div className={styles.deleteCodeGrid}>
+            <CodeInput
+              value={securityCode}
+              onChange={(v) => setSecurityCode(v.replace(/\D/g, '').slice(0, 6))}
+              length={6}
+              autoFocus
+              cellClassName={styles.deleteCodeCell}
+              filledCellClassName={styles.deleteCodeCellFilled}
+            />
+          </div>
+          {codeMethod === 'email' ? (
+            <button type="button" className={styles.codeResendBtn} disabled={resendCooldown > 0} onClick={() => void onSendEmailCode()}>
+              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Send code again'}
+            </button>
+          ) : null}
+          {hasPasskey ? (
+            <Button variant="ghost" onClick={() => void runPasskeyAction(sensitiveAction)} disabled={deleteLoading}>
+              {sensitiveAction === 'export' ? 'Use passkey for export' : 'Use passkey for delete'}
+            </Button>
+          ) : null}
+          <div className={styles.confirmButtons}>
+            {sensitiveAction === 'export' ? (
+              <Button className={styles.fullButton} variant="secondary" onClick={() => void onExportData()} disabled={deleteLoading}>
+                {deleteLoading ? 'Working…' : 'Export data'}
+              </Button>
+            ) : (
+              <Button className={styles.fullButton} variant="danger" onClick={() => void onDeleteAccount()} disabled={deleteLoading}>
+                {deleteLoading ? 'Deleting…' : 'Delete permanently'}
+              </Button>
+            )}
+            <button type="button" className={styles.cancelLink} onClick={() => { setSensitiveAction(null); setSecurityCode('') }} disabled={deleteLoading}>
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -264,49 +373,11 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            {activeSection === 'security' && <SecuritySection profile={profile || undefined} providers={providers} hasPassword={hasPassword} notify={notify} onUnlink={onUnlink} onPasswordChanged={load} onOpenApps={() => setActiveSection('apps')} onDeleteAccount={() => setDeleteModalOpen(true)} onExportData={() => setDeleteModalOpen(true)} onLogout={handleLogout} />}
+            {activeSection === 'security' && <SecuritySection profile={profile || undefined} providers={providers} hasPassword={hasPassword} notify={notify} onUnlink={onUnlink} onPasswordChanged={load} onOpenApps={() => setActiveSection('apps')} onDeleteAccount={() => openSensitiveAction('delete')} onExportData={() => openSensitiveAction('export')} onLogout={handleLogout} />}
             {activeSection === 'apps' && <ServicesSection services={services} onConnect={onConnectService} onDisconnect={onDisconnectService} />}
           </div>
         </div>
       </ResponsiveLayout>
-
-      {deleteModalOpen ? (
-        <div className={styles.confirmOverlay} role="dialog" aria-modal="true" aria-label="Confirm sensitive action">
-          <div className={styles.confirmPanel}>
-            <button type="button" className={styles.confirmClose} onClick={() => !deleteLoading && setDeleteModalOpen(false)} aria-label="Close">
-              ×
-            </button>
-            <h2 className={styles.confirmTitle}>Confirm sensitive action</h2>
-            <p className={styles.confirmSubtitle}>Enter MFA/TOTP code, or use passkey confirmation.</p>
-            <div className={styles.deleteCodeGrid}>
-              <CodeInput
-                value={securityCode}
-                onChange={(v) => setSecurityCode(v.replace(/\D/g, '').slice(0, 6))}
-                length={6}
-                autoFocus
-                cellClassName={styles.deleteCodeCell}
-                filledCellClassName={styles.deleteCodeCellFilled}
-              />
-            </div>
-            <div className={styles.deletePasskeyActions}>
-              <Button variant="ghost" onClick={() => void runPasskeyAction('export')} disabled={deleteLoading}>Use passkey for export</Button>
-              <Button variant="ghost" onClick={() => void runPasskeyAction('delete')} disabled={deleteLoading}>Use passkey for delete</Button>
-            </div>
-            <p className={styles.deleteHint}>Delete will permanently remove account, sessions, passkeys, connected records, and related logs.</p>
-            <div className={styles.confirmButtons}>
-              <Button className={styles.fullButton} variant="secondary" onClick={() => void onExportData()} disabled={deleteLoading}>
-                {deleteLoading ? 'Working…' : 'Export data'}
-              </Button>
-              <Button className={styles.fullButton} variant="danger" onClick={() => void onDeleteAccount()} disabled={deleteLoading}>
-                {deleteLoading ? 'Deleting…' : 'Delete permanently'}
-              </Button>
-              <button type="button" className={styles.cancelLink} onClick={() => setDeleteModalOpen(false)} disabled={deleteLoading}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
     </>
   )
