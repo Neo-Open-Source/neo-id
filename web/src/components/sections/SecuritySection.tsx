@@ -62,10 +62,16 @@ export default function SecuritySection({ profile, providers, hasPassword, notif
     canSendEmailChange,
   } = useSecuritySectionState(profile, (providers || []).length)
   const hasPasskey = (profile?.passkeys_count || 0) > 0
-  const dismissKey = `neoid:passkey-prompt:dismissed:${(profile?.email || 'anon').toLowerCase()}`
-  const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(true)
+  const profileKey = ((profile?.id as string | undefined) || profile?.email || '').toLowerCase()
+  const dismissKey = `neoid:passkey-prompt:dismissed:${profileKey || 'pending'}`
+  const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false)
 
   useEffect(() => {
+    if (!profileKey) {
+      // Wait until profile identity is known to avoid flicker/re-show on first mount.
+      setShowPasskeyPrompt(false)
+      return
+    }
     if (hasPasskey) {
       setShowPasskeyPrompt(false)
       return
