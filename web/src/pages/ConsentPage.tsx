@@ -50,7 +50,7 @@ export default function ConsentPage() {
   const scopes = (info?.scope || '').split(/[\s+]/).filter(s => SCOPES[s]) || []
 
   return (
-    <AuthShell title="Allow access" description="Review the permissions before continuing." backTo="/login">
+    <AuthShell title="Allow access" description="Review the permissions before continuing." backTo="/login" desktopSimple>
       {loading ? (
         <div className={styles.loadingWrap}><Spinner /></div>
       ) : error && !info ? (

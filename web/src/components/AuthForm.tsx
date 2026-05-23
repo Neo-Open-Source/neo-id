@@ -1,4 +1,5 @@
 import { Input, Button, Spinner } from '@neo-open-source/ui-web'
+import type { ReactNode } from 'react'
 import PasswordInput from './PasswordInput'
 import styles from '../styles/LoginPage.module.css'
 
@@ -11,6 +12,7 @@ interface AuthFormProps {
   onPasswordChange: (value: string) => void
   onSubmit: () => void
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
+  captchaSlot?: ReactNode
 }
 
 export default function AuthForm({
@@ -22,6 +24,7 @@ export default function AuthForm({
   onPasswordChange,
   onSubmit,
   onKeyDown,
+  captchaSlot,
 }: AuthFormProps) {
   return (
     <div className={styles.form}>
@@ -40,6 +43,7 @@ export default function AuthForm({
         autoComplete={isLogin ? 'current-password' : 'new-password'}
         onKeyDown={onKeyDown}
       />
+      {captchaSlot}
       <Button disabled={loading} onClick={onSubmit} className={styles.submit}>
         {loading ? <Spinner /> : isLogin ? 'Continue' : 'Create account'}
       </Button>

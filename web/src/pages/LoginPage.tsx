@@ -30,12 +30,14 @@ export default function LoginPage() {
   const [info, setInfo] = useState('')
   const [totpRequired, setTotpRequired] = useState(false)
   const [ageConfirmed, setAgeConfirmed] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState('')
 
   const siteId = get('client_id') || get('site_id')
   const redirectUrl = get('redirect_uri') || get('redirect_url')
   const siteState = get('state') || get('site_state')
   const isOIDCFlow = !!(get('client_id') && get('redirect_uri'))
   const popupMode = get('mode')
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
 
   const { initiateOAuth, handleAuthSuccess } = useOAuthFlow({
     siteId,
@@ -75,6 +77,45 @@ export default function LoginPage() {
     }
   }, [navigate])
 
+  useEffect(() => {
+    if (!turnstileSiteKey) return
+
+    const mount = document.getElementById('turnstile-widget')
+    if (!mount) return
+
+    mount.innerHTML = ''
+    setTurnstileToken('')
+
+    const renderWidget = () => {
+      if (!window.turnstile) return
+      window.turnstile.render('#turnstile-widget', {
+        sitekey: turnstileSiteKey,
+        callback: (token: string) => setTurnstileToken(token),
+        'expired-callback': () => setTurnstileToken(''),
+        'error-callback': () => setTurnstileToken(''),
+      })
+    }
+
+    if (window.turnstile) {
+      renderWidget()
+      return
+    }
+
+    const existingScript = document.getElementById('cf-turnstile-script') as HTMLScriptElement | null
+    if (existingScript) {
+      existingScript.addEventListener('load', renderWidget, { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'cf-turnstile-script'
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.addEventListener('load', renderWidget, { once: true })
+    document.body.appendChild(script)
+  }, [turnstileSiteKey, tab])
+
   const handleLogin = async () => {
     if (loading) return
 
@@ -82,7 +123,16 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const data = await passwordLogin(email, password, siteId, redirectUrl, siteState) as Record<string, unknown>
+      if (!turnstileSiteKey) {
+        setError('Captcha is not configured. Please contact support.')
+        return
+      }
+      if (!turnstileToken) {
+        setError('Please complete the captcha challenge.')
+        return
+      }
+
+      const data = await passwordLogin(email, password, turnstileToken, siteId, redirectUrl, siteState) as Record<string, unknown>
 
       if (data.totp_required) {
         setTotpRequired(true)
@@ -166,7 +216,15 @@ export default function LoginPage() {
         setError('Please confirm that you are 16 or older to create an account.')
         return
       }
-      await passwordRegister(email, password, undefined, true)
+      if (!turnstileSiteKey) {
+        setError('Captcha is not configured. Please contact support.')
+        return
+      }
+      if (!turnstileToken) {
+        setError('Please complete the captcha challenge.')
+        return
+      }
+      await passwordRegister(email, password, turnstileToken, undefined, true)
       
       storeMFASession({
         email,
@@ -253,6 +311,7 @@ export default function LoginPage() {
         onPasswordChange={setPassword}
         onSubmit={tab === 'login' ? handleLogin : handleRegister}
         onKeyDown={handleKeyDown}
+        captchaSlot={<div id="turnstile-widget" className={styles.turnstileWrap} />}
       />
       {tab === 'register' ? (
         <label className={styles.ageConsent}>

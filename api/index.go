@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -91,6 +92,20 @@ func initialize() {
 	web.BConfig.WebConfig.Session.SessionOn = false
 
 	controllers.InitOAuthProviders()
+
+	// Required for OIDC /oauth/token (id_token RS256 signing) in serverless runtime.
+	km, err := controllers.NewKeyManager()
+	if err != nil {
+		// Do not crash the whole origin on malformed RSA env vars.
+		log.Printf("KeyManager init failed with configured RSA key, falling back to auto-generated key: %v", err)
+		_ = os.Unsetenv("RSA_PRIVATE_KEY")
+		_ = os.Unsetenv("RSA_PRIVATE_KEY_FILE")
+		km, err = controllers.NewKeyManager()
+		if err != nil {
+			panic("Failed to initialize KeyManager after fallback: " + err.Error())
+		}
+	}
+	controllers.GlobalKeyManager = km
 
 	if err := models.InitDatabase(); err != nil {
 		panic("Failed to initialize database: " + err.Error())

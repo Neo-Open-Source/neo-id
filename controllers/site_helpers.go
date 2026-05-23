@@ -194,6 +194,12 @@ func (c *SiteController) verifySiteToken(tokenString string) (string, string, er
 	if claims.TokenType != "" && claims.TokenType != "service_access" {
 		return "", "", jwt.ErrTokenInvalidClaims
 	}
+	// Guard: OIDC/session tokens can be signed with same secret but do not contain
+	// service token claims. Treat them as invalid here so caller can fallback to
+	// session-token validation for mobile/native flows.
+	if claims.UserID == "" || claims.SiteID == "" {
+		return "", "", jwt.ErrTokenInvalidClaims
+	}
 	return claims.UserID, claims.SiteID, nil
 }
 

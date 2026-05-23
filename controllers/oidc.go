@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -380,11 +381,12 @@ func (c *OIDCController) processAuthCodeGrant(code, clientID, clientSecret, redi
 		return
 	}
 
-	// Generate ID token (OIDC)
+	// Generate ID token (OIDC). If signing key is unavailable, continue without id_token
+	// so mobile/API flows can still complete with access/refresh tokens.
 	idToken, err := generateIDToken(user, site, authCode.Nonce)
 	if err != nil {
-		c.tokenError("server_error", "failed to generate id_token")
-		return
+		log.Printf("OIDC warning: failed to generate id_token for client_id=%s: %v", clientID, err)
+		idToken = ""
 	}
 
 	// Store session with full refresh token data so user stays logged in
@@ -652,7 +654,7 @@ func (c *OIDCController) OIDCCallback() {
 	if state != "" {
 		q.Set("state", state)
 	}
-	c.Redirect(redirectURI+"?"+q.Encode(), http.StatusFound)
+	c.Redirect(appendQueryParams(redirectURI, q), http.StatusFound)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -665,7 +667,7 @@ func (c *OIDCController) oidcError(errCode, description, redirectURI, state stri
 		if state != "" {
 			q.Set("state", state)
 		}
-		c.Redirect(redirectURI+"?"+q.Encode(), http.StatusFound)
+		c.Redirect(appendQueryParams(redirectURI, q), http.StatusFound)
 		return
 	}
 	c.Ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
@@ -723,6 +725,29 @@ func verifyCodeChallenge(verifier, challenge, method string) bool {
 	default:
 		return false
 	}
+}
+
+func appendQueryParams(rawURL string, extra url.Values) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		encoded := extra.Encode()
+		if encoded == "" {
+			return rawURL
+		}
+		sep := "?"
+		if strings.Contains(rawURL, "?") {
+			sep = "&"
+		}
+		return rawURL + sep + encoded
+	}
+	q := u.Query()
+	for key, values := range extra {
+		for _, value := range values {
+			q.Add(key, value)
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // keep unused imports satisfied

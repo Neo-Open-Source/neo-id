@@ -91,6 +91,14 @@
   width: 100%;
 }
 
+.turnstileWrap {
+  width: 100%;
+  min-height: 65px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .ageConsent {
   display: flex;
   align-items: center;

@@ -249,6 +249,7 @@ func (c *AuthController) PasswordRegister() {
 		Password           string `json:"password"`
 		DisplayName        string `json:"display_name"`
 		AgeConfirmed16Plus bool   `json:"age_confirmed_16_plus"`
+		TurnstileToken     string `json:"turnstile_token"`
 	}
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
@@ -268,6 +269,10 @@ func (c *AuthController) PasswordRegister() {
 
 	if requestBody.Email == "" || requestBody.Password == "" {
 		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "email and password are required")
+		return
+	}
+	if err := verifyTurnstileToken(requestBody.TurnstileToken, getRealIP(c.Ctx.Request)); err != nil {
+		respondError(&c.Controller, http.StatusForbidden, "captcha_required", "Turnstile verification failed")
 		return
 	}
 	if !requestBody.AgeConfirmed16Plus {
@@ -350,11 +355,12 @@ func (c *AuthController) PasswordRegister() {
 // PasswordLogin authenticates a user with email/password
 func (c *AuthController) PasswordLogin() {
 	var requestBody struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		SiteID      string `json:"site_id"`
-		RedirectURL string `json:"redirect_url"`
-		SiteState   string `json:"site_state"`
+		Email          string `json:"email"`
+		Password       string `json:"password"`
+		SiteID         string `json:"site_id"`
+		RedirectURL    string `json:"redirect_url"`
+		SiteState      string `json:"site_state"`
+		TurnstileToken string `json:"turnstile_token"`
 	}
 
 	body, err := io.ReadAll(c.Ctx.Request.Body)
@@ -369,6 +375,10 @@ func (c *AuthController) PasswordLogin() {
 
 	if requestBody.Email == "" || requestBody.Password == "" {
 		respondError(&c.Controller, http.StatusBadRequest, "invalid_request", "email and password are required")
+		return
+	}
+	if err := verifyTurnstileToken(requestBody.TurnstileToken, getRealIP(c.Ctx.Request)); err != nil {
+		respondError(&c.Controller, http.StatusForbidden, "captcha_required", "Turnstile verification failed")
 		return
 	}
 

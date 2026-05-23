@@ -50,10 +50,18 @@ async function del<T = unknown>(url: string): Promise<T> {
   return response.data
 }
 
-export async function passwordLogin(email: string, password: string, siteId?: string, redirectUrl?: string, siteState?: string) {
+export async function passwordLogin(
+  email: string,
+  password: string,
+  turnstileToken: string,
+  siteId?: string,
+  redirectUrl?: string,
+  siteState?: string
+) {
   return post('/api/auth/password/login', {
     email,
     password,
+    turnstile_token: turnstileToken,
     site_id: siteId || undefined,
     redirect_url: redirectUrl || undefined,
     site_state: siteState || undefined,
@@ -74,8 +82,14 @@ export async function totpLoginVerify(email: string, code: string, siteId?: stri
   })
 }
 
-export async function passwordRegister(email: string, password: string, display_name?: string, age_confirmed_16_plus?: boolean) {
-  return post('/api/auth/password/register', { email, password, display_name, age_confirmed_16_plus })
+export async function passwordRegister(
+  email: string,
+  password: string,
+  turnstileToken: string,
+  display_name?: string,
+  age_confirmed_16_plus?: boolean
+) {
+  return post('/api/auth/password/register', { email, password, turnstile_token: turnstileToken, display_name, age_confirmed_16_plus })
 }
 
 export async function resendVerifyEmail(email: string) {

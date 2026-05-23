@@ -10,6 +10,24 @@ import (
 	"unified-id/models"
 )
 
+func (c *SiteController) resolveUserFromSessionToken(token string) *models.User {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil
+	}
+	sessionCRUD := models.NewSessionCRUD()
+	sess, err := sessionCRUD.GetSessionByToken(token)
+	if err != nil || sess == nil {
+		return nil
+	}
+	userCRUD := models.NewUserCRUD()
+	user, err := userCRUD.GetUserByUnifiedID(sess.UserID)
+	if err != nil || user == nil || user.IsBanned {
+		return nil
+	}
+	return user
+}
+
 // SiteLogin handles login requests from integrated sites.
 func (c *SiteController) SiteLogin() {
 	origin := c.Ctx.Request.Header.Get("Origin")
@@ -210,23 +228,28 @@ func (c *SiteController) VerifySiteToken() {
 	}
 
 	userID, tokenSiteID, err := c.verifySiteToken(requestData.Token)
-	if err != nil {
-		c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
-		c.Data["json"] = map[string]interface{}{"error": "Invalid token: " + err.Error()}
-		c.ServeJSON()
-		return
-	}
-
-	if tokenSiteID != site.SiteID {
-		respondError(&c.Controller, http.StatusForbidden, "forbidden", "Token is not valid for this site")
-		return
-	}
-
-	userCRUD := models.NewUserCRUD()
-	user, err := userCRUD.GetUserByUnifiedID(userID)
-	if err != nil || user == nil {
-		respondError(&c.Controller, http.StatusNotFound, "not_found", "User not found")
-		return
+	var user *models.User
+	if err == nil {
+		if tokenSiteID != site.SiteID {
+			respondError(&c.Controller, http.StatusForbidden, "forbidden", "Token is not valid for this site")
+			return
+		}
+		userCRUD := models.NewUserCRUD()
+		user, err = userCRUD.GetUserByUnifiedID(userID)
+		if err != nil || user == nil {
+			respondError(&c.Controller, http.StatusNotFound, "not_found", "User not found")
+			return
+		}
+	} else {
+		// Support OIDC/session access tokens (from /oauth/token) for mobile/native flows.
+		user = c.resolveUserFromSessionToken(requestData.Token)
+		if user == nil {
+			c.Ctx.ResponseWriter.WriteHeader(http.StatusUnauthorized)
+			c.Data["json"] = map[string]interface{}{"error": "Invalid token"}
+			c.ServeJSON()
+			return
+		}
+		userID = user.UnifiedID
 	}
 	connected := false
 	for _, s := range user.ConnectedServices {

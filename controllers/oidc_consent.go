@@ -152,7 +152,7 @@ func (c *OIDCController) Consent() {
 			q.Set("state", pc.State)
 		}
 		json.NewEncoder(c.Ctx.ResponseWriter).Encode(map[string]string{
-			"redirect": pc.RedirectURI + "?" + q.Encode(),
+			"redirect": appendQueryParams(pc.RedirectURI, q),
 		})
 		return
 	}
@@ -201,7 +201,7 @@ func (c *OIDCController) Consent() {
 	if pc.State != "" {
 		q.Set("state", pc.State)
 	}
-	finalURL := pc.RedirectURI + "?" + q.Encode()
+	finalURL := appendQueryParams(pc.RedirectURI, q)
 
 	// Popup mode: return tokens for postMessage
 	if pc.Mode == "popup" {

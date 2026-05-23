@@ -109,6 +109,24 @@ func (c *AuthController) Login() {
 	siteID := c.GetString("site_id")
 	redirectURL := c.GetString("redirect_url")
 	siteState := c.GetString("site_state")
+	oidcModeParam := strings.TrimSpace(c.GetString("oidc"))
+
+	// If this is a plain account login (not OIDC/site/link flow), wipe stale flow context
+	// from previous sessions so user is not unexpectedly redirected to consent/connect pages.
+	if !linkMode && siteID == "" && redirectURL == "" && oidcModeParam != "1" {
+		delete(oauthSess.Values, "site_id")
+		delete(oauthSess.Values, "redirect_url")
+		delete(oauthSess.Values, "site_state")
+		delete(oauthSess.Values, "oidc_client_id")
+		delete(oauthSess.Values, "oidc_redirect_uri")
+		delete(oauthSess.Values, "oidc_scope")
+		delete(oauthSess.Values, "oidc_state")
+		delete(oauthSess.Values, "oidc_nonce")
+		delete(oauthSess.Values, "oidc_code_challenge")
+		delete(oauthSess.Values, "oidc_code_challenge_method")
+		delete(oauthSess.Values, "oidc_mode")
+	}
+
 	if siteID != "" && redirectURL != "" {
 		siteCRUD := models.NewSiteCRUD()
 		site, err := siteCRUD.GetSiteBySiteID(siteID)
