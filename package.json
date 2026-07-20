@@ -10,7 +10,6 @@
     "test:e2e": "turbo test:e2e",
     "lint": "turbo lint",
     "db:migrate": "pnpm --filter @neo-id/db migrate",
-    "db:seed": "pnpm --filter @neo-id/db seed",
     "db:generate": "pnpm --filter @neo-id/db generate"
   },
   "devDependencies": {

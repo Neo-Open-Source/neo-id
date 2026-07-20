@@ -59,6 +59,9 @@ import {
 } from "./routes/admin/users";
 import { requireAdmin } from "./middleware/auth";
 
+// Setup Routes
+import { setupCheck } from "./routes/setup/check";
+
 const app = new Hono();
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
@@ -141,6 +144,10 @@ app.post("/api/v1/admin/users/:id/ban", requireAuth, requireAdmin, banUser);
 app.post("/api/v1/admin/users/:id/role", requireAuth, requireAdmin, setRole);
 app.get("/api/v1/admin/stats", requireAuth, requireAdmin, getStats);
 app.get("/api/v1/admin/audit", requireAuth, requireAdmin, getAuditLogs);
+
+// ─── Setup Routes ────────────────────────────────────────────────────────────
+
+app.get("/api/v1/setup/check", setupCheck);
 
 // ─── OIDC ────────────────────────────────────────────────────────────────────
 
