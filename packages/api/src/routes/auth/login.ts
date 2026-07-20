@@ -34,8 +34,11 @@ export async function login(c: Context) {
     return error(c, "INVALID_CREDENTIALS", "Email or password is incorrect");
   }
 
-  // Check if MFA is enabled
-  if (user.totpEnabled || user.emailMfaEnabled) {
+  // Check if MFA is enabled (passkey, TOTP, or email)
+  const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
+  const hasMfa = passkeyCount > 0 || user.totpEnabled || user.emailMfaEnabled;
+
+  if (hasMfa) {
     // Create MFA code for email (if email MFA enabled)
     if (user.emailMfaEnabled) {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -53,9 +56,14 @@ export async function login(c: Context) {
     return success(c, {
       mfaRequired: true,
       mfaMethods: [
+        ...(passkeyCount > 0 ? ["passkey"] : []),
         ...(user.totpEnabled ? ["totp"] : []),
         ...(user.emailMfaEnabled ? ["email"] : []),
       ],
+      passkeyAvailable: passkeyCount > 0,
+      emailHint: user.emailMfaEnabled
+        ? user.email.replace(/(.{2}).*(@.*)/, "$1***$2")
+        : undefined,
     });
   }
 

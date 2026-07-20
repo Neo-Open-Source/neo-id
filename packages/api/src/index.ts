@@ -30,6 +30,14 @@ import {
 } from "./routes/passkeys/authenticate";
 import { listPasskeys, deletePasskey } from "./routes/passkeys/list";
 
+// OAuth Routes
+import { authorize } from "./routes/oauth/authorize";
+import { token } from "./routes/oauth/token";
+import { userinfo } from "./routes/oauth/userinfo";
+
+// Session Routes
+import { listSessions, deleteSession, deleteAllSessions } from "./routes/sessions/list";
+
 const app = new Hono();
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
@@ -82,6 +90,18 @@ app.post("/api/v1/passkeys/authenticate/finish", finishPasskeyAuthentication);
 // Management
 app.get("/api/v1/passkeys", requireAuth, listPasskeys);
 app.delete("/api/v1/passkeys/:id", requireAuth, deletePasskey);
+
+// ─── OAuth Routes ────────────────────────────────────────────────────────────
+
+app.get("/api/v1/oauth/authorize", authorize);
+app.post("/api/v1/oauth/token", token);
+app.get("/api/v1/oauth/userinfo", requireAuth, userinfo);
+
+// ─── Session Routes ──────────────────────────────────────────────────────────
+
+app.get("/api/v1/sessions", requireAuth, listSessions);
+app.delete("/api/v1/sessions/:id", requireAuth, deleteSession);
+app.delete("/api/v1/sessions", requireAuth, deleteAllSessions);
 
 // ─── OIDC ────────────────────────────────────────────────────────────────────
 
