@@ -12,11 +12,13 @@
   "dependencies": {
     "@flaticon/flaticon-uicons": "^3.3.1",
     "@neo-id/shared": "workspace:*",
+    "clsx": "^2.1.1",
     "jose": "^6.0.0",
     "next": "15.1.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "sonner": "^1.7.0"
+    "sonner": "^1.7.0",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
