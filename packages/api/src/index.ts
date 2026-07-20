@@ -59,6 +59,15 @@ import {
 } from "./routes/admin/users";
 import { requireAdmin } from "./middleware/auth";
 
+// Device Code Routes (RFC 8628)
+import { requestDeviceCode } from "./routes/device/code";
+import { pollDeviceToken } from "./routes/device/token";
+import {
+  getDeviceCodeInfo,
+  approveDeviceCode,
+  denyDeviceCode,
+} from "./routes/device/verify";
+
 const app = new Hono();
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
@@ -141,6 +150,14 @@ app.post("/api/v1/admin/users/:id/ban", requireAuth, requireAdmin, banUser);
 app.post("/api/v1/admin/users/:id/role", requireAuth, requireAdmin, setRole);
 app.get("/api/v1/admin/stats", requireAuth, requireAdmin, getStats);
 app.get("/api/v1/admin/audit", requireAuth, requireAdmin, getAuditLogs);
+
+// ─── Device Code Routes (RFC 8628 — TV/IoT/Console) ─────────────────────────
+
+app.post("/api/v1/device/code", requestDeviceCode);
+app.post("/api/v1/device/token", pollDeviceToken);
+app.get("/api/v1/device/verify", getDeviceCodeInfo);
+app.post("/api/v1/device/approve", requireAuth, approveDeviceCode);
+app.post("/api/v1/device/deny", requireAuth, denyDeviceCode);
 
 // ─── OIDC ────────────────────────────────────────────────────────────────────
 

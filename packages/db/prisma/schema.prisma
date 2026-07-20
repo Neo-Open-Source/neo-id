@@ -232,3 +232,23 @@ model AuditLog {
   @@index([actorId])
   @@map("audit_logs")
 }
+
+// ─── Device Code (RFC 8628) ──────────────────────────────────────────────────
+
+model DeviceCode {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  deviceCode      String   @unique  // opaque token for polling — index from @unique
+  userCode        String   @unique  // "ABC-123" — index from @unique
+  clientId        String
+  userId          String?  @db.ObjectId
+  status          String   @default("pending") // pending | approved | denied | expired
+  scopes          String[]
+  location        String?  // Device name (e.g. "Living Room TV")
+
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  approvedAt      DateTime?
+
+  @@index([expiresAt])
+  @@map("device_codes")
+}
