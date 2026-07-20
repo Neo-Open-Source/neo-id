@@ -19,10 +19,16 @@ model User {
   firstName     String?
   lastName      String?
   avatar        String?
-  role          String    @default("user") // user | developer | admin
-  status        String    @default("active") // active | banned | invited
 
-  // Metadata (Auth0 pattern)
+  // Roles — validated via Zod in shared/validation.ts
+  // Allowed values: "user" | "developer" | "admin"
+  role          String    @default("user")
+
+  // Status — validated via Zod in shared/validation.ts
+  // Allowed values: "active" | "banned" | "invited"
+  status        String    @default("active")
+
+  // Metadata (Auth0 pattern) — JsonValue, type-guard in shared/types.ts
   userMetadata  Json?     @default("{}")
   appMetadata   Json?     @default("{}")
 
@@ -79,7 +85,7 @@ model RefreshToken {
   sessionId     String?   @db.ObjectId
 
   // Token
-  tokenHash     String    @unique // Index created by @unique
+  tokenHash     String    @unique
   parentId      String?   @db.ObjectId // For reuse detection chain
 
   // Device
@@ -96,6 +102,7 @@ model RefreshToken {
   revokeReason  String?
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("refresh_tokens")
 }
 
@@ -107,7 +114,7 @@ model ServiceApp {
   owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   // Identity
-  clientId        String   @unique // Index created by @unique
+  clientId        String   @unique
   clientSecretHash String?
   name            String
   displayName     String?
@@ -143,7 +150,7 @@ model Identity {
 
   createdAt       DateTime @default(now())
 
-  @@unique([provider, providerUserId])
+  @@unique([provider, providerUserId], map: "provider_providerUserId_unique")
   @@index([userId])
   @@map("identities")
 }
@@ -172,7 +179,7 @@ model Passkey {
 
 model OAuthState {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  state           String   @unique // Index created by @unique
+  state           String   @unique
   codeVerifier    String?
   codeChallenge   String?
   redirectUri     String?
@@ -182,6 +189,8 @@ model OAuthState {
   createdAt       DateTime @default(now())
   expiresAt       DateTime
 
+  // Index for TTL cleanup — expired states are deleted periodically
+  @@index([expiresAt])
   @@map("oauth_states")
 }
 
@@ -192,13 +201,16 @@ model MfaCode {
   userId          String   @db.ObjectId
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   code            String
-  purpose         String   // "login", "email_change", "delete_account"
+  purpose         String   // "login", "mfa_login", "mfa_setup", "mfa_disable", "email_change", "delete_account", "verify_email"
 
   createdAt       DateTime @default(now())
   expiresAt       DateTime
   usedAt          DateTime?
 
+  // Compound index for lookup: find unused, non-expired code for user+purpose
   @@index([userId, purpose])
+  // Index for code verification: find specific code for user
+  @@index([userId, code])
   @@map("mfa_codes")
 }
 
@@ -217,5 +229,6 @@ model AuditLog {
   createdAt       DateTime @default(now())
 
   @@index([createdAt])
+  @@index([actorId])
   @@map("audit_logs")
 }

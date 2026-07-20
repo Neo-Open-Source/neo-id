@@ -14,14 +14,44 @@ export interface User {
   avatar?: string;
   role: UserRole;
   status: UserStatus;
-  userMetadata?: Record<string, unknown>;
-  appMetadata?: Record<string, unknown>;
+  userMetadata?: UserMetadata;
+  appMetadata?: AppMetadata;
   totpEnabled: boolean;
   emailMfaEnabled: boolean;
   hasPassword: boolean;
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;
+}
+
+// ─── Metadata Type Guards (Prisma returns JsonValue = any) ────────────────────
+
+export interface UserMetadata {
+  [key: string]: unknown;
+}
+
+export interface AppMetadata {
+  roles?: string[];
+  plan?: string;
+  [key: string]: unknown;
+}
+
+export function isUserMetadata(value: unknown): value is UserMetadata {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function isAppMetadata(value: unknown): value is AppMetadata {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function safeUserMetadata(value: unknown): UserMetadata {
+  if (isUserMetadata(value)) return value;
+  return {};
+}
+
+export function safeAppMetadata(value: unknown): AppMetadata {
+  if (isAppMetadata(value)) return value;
+  return {};
 }
 
 // ─── Session ─────────────────────────────────────────────────────────────────

@@ -69,9 +69,10 @@ export const OAUTH_PROVIDERS = ["google", "github"] as const;
 
 export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
 
-// ─── Roles ───────────────────────────────────────────────────────────────────
+// ─── Roles & Statuses ────────────────────────────────────────────────────────
 
 export const ROLES = ["user", "developer", "admin"] as const;
+export const STATUSES = ["active", "banned", "invited"] as const;
 
 // ─── Audit Actions ───────────────────────────────────────────────────────────
 
