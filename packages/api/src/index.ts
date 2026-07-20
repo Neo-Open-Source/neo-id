@@ -38,6 +38,27 @@ import { userinfo } from "./routes/oauth/userinfo";
 // Session Routes
 import { listSessions, deleteSession, deleteAllSessions } from "./routes/sessions/list";
 
+// Service Routes (Developer Portal)
+import {
+  listServices,
+  getService,
+  createService,
+  updateService,
+  deleteService,
+  rotateSecret,
+} from "./routes/services/list";
+
+// Admin Routes
+import {
+  listUsers,
+  getUser,
+  banUser,
+  setRole,
+  getStats,
+  getAuditLogs,
+} from "./routes/admin/users";
+import { requireAdmin } from "./middleware/auth";
+
 const app = new Hono();
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
@@ -102,6 +123,24 @@ app.get("/api/v1/oauth/userinfo", requireAuth, userinfo);
 app.get("/api/v1/sessions", requireAuth, listSessions);
 app.delete("/api/v1/sessions/:id", requireAuth, deleteSession);
 app.delete("/api/v1/sessions", requireAuth, deleteAllSessions);
+
+// ─── Service Routes (Developer Portal) ───────────────────────────────────────
+
+app.get("/api/v1/services", requireAuth, listServices);
+app.get("/api/v1/services/:id", requireAuth, getService);
+app.post("/api/v1/services", requireAuth, createService);
+app.put("/api/v1/services/:id", requireAuth, updateService);
+app.delete("/api/v1/services/:id", requireAuth, deleteService);
+app.post("/api/v1/services/:id/rotate-secret", requireAuth, rotateSecret);
+
+// ─── Admin Routes ────────────────────────────────────────────────────────────
+
+app.get("/api/v1/admin/users", requireAuth, requireAdmin, listUsers);
+app.get("/api/v1/admin/users/:id", requireAuth, requireAdmin, getUser);
+app.post("/api/v1/admin/users/:id/ban", requireAuth, requireAdmin, banUser);
+app.post("/api/v1/admin/users/:id/role", requireAuth, requireAdmin, setRole);
+app.get("/api/v1/admin/stats", requireAuth, requireAdmin, getStats);
+app.get("/api/v1/admin/audit", requireAuth, requireAdmin, getAuditLogs);
 
 // ─── OIDC ────────────────────────────────────────────────────────────────────
 
