@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Icon } from "@/components/ui/Icon";
 
 function DeviceContent() {
   const searchParams = useSearchParams();
@@ -75,7 +76,7 @@ function DeviceContent() {
       <AuthLayout title="Device connected" subtitle="You can close this page">
         <div className="text-center py-8">
           <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">✓</span>
+            <Icon name="check-circle" size={32} className="text-success" />
           </div>
           <p className="text-sm text-muted">Your device has been authorized successfully.</p>
         </div>

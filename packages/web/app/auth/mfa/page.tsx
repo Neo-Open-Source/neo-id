@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Icon } from "@/components/ui/Icon";
 
 function MfaContent() {
   const router = useRouter();
@@ -72,7 +73,7 @@ function MfaContent() {
               className="flex items-center gap-3 px-5 py-4 bg-surface border border-border rounded-card hover:bg-surface-hover transition-colors text-left cursor-pointer"
             >
               <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="text-lg">🔑</span>
+                <Icon name="fingerprint" size={20} className="text-accent" />
               </div>
               <div>
                 <div className="text-sm font-medium text-content">Passkey</div>
@@ -88,7 +89,7 @@ function MfaContent() {
               className="flex items-center gap-3 px-5 py-4 bg-surface border border-border rounded-card hover:bg-surface-hover transition-colors text-left cursor-pointer"
             >
               <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="text-lg">📱</span>
+                <Icon name="shield" size={20} className="text-accent" />
               </div>
               <div>
                 <div className="text-sm font-medium text-content">Authenticator app</div>
@@ -104,7 +105,7 @@ function MfaContent() {
               className="flex items-center gap-3 px-5 py-4 bg-surface border border-border rounded-card hover:bg-surface-hover transition-colors text-left cursor-pointer"
             >
               <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="text-lg">📧</span>
+                <Icon name="envelope" size={20} className="text-accent" />
               </div>
               <div>
                 <div className="text-sm font-medium text-content">Email code</div>
