@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc --build --force",
     "dev": "tsup --watch",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",

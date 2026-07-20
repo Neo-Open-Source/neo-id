@@ -2,7 +2,6 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { generateCode } from "@neo-id/auth-core";
 import { EMAIL } from "@neo-id/shared";
-import { requireAuth } from "../../middleware/auth";
 import { success, error } from "../../helpers/response";
 
 export async function setupEmailMfa(c: Context) {

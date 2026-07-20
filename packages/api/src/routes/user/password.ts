@@ -1,7 +1,6 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { hash, verify } from "@neo-id/auth-core";
-import { requireAuth } from "../../middleware/auth";
 import { changePasswordSchema, type ChangePasswordInput } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
 

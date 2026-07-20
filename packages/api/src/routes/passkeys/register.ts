@@ -4,7 +4,6 @@ import {
   generateRegistrationOpts,
   verifyRegistration,
 } from "@neo-id/auth-core";
-import { requireAuth } from "../../middleware/auth";
 import { success, error } from "../../helpers/response";
 
 export async function startPasskeyRegistration(c: Context) {

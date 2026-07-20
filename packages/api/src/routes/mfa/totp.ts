@@ -1,7 +1,6 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { generateTotpSecret, verifyTotp } from "@neo-id/auth-core";
-import { requireAuth } from "../../middleware/auth";
 import { success, error } from "../../helpers/response";
 
 export async function setupTotp(c: Context) {

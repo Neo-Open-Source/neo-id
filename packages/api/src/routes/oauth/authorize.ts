@@ -1,10 +1,10 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { generateToken } from "@neo-id/auth-core";
-import { success, error } from "../../helpers/response";
+import { error } from "../../helpers/response";
 
 export async function authorize(c: Context) {
-  const { response_type, client_id, redirect_uri, scope, state, code_challenge, code_challenge_method } =
+  const { response_type, client_id, redirect_uri, state, code_challenge, code_challenge_method } =
     c.req.query();
 
   // Validate required params

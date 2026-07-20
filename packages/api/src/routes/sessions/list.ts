@@ -1,6 +1,5 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
-import { requireAuth } from "../../middleware/auth";
 import { success } from "../../helpers/response";
 
 export async function listSessions(c: Context) {

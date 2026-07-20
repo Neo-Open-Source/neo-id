@@ -1,6 +1,5 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
-import { requireAuth } from "../../middleware/auth";
 import { updateProfileSchema, type UpdateProfileInput } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
 

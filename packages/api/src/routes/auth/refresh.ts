@@ -5,7 +5,6 @@ import {
   signIdToken,
   generateToken,
   hashToken,
-  constantTimeEqual,
 } from "@neo-id/auth-core";
 import { TOKEN } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
