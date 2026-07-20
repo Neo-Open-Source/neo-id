@@ -4,7 +4,10 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "lib": ["ES2022", "DOM"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true
   },
-  "include": ["src"]
+  "include": ["src/react"]
 }
