@@ -1,5 +1,6 @@
 import { PrismaClient } from "./__generated__/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 
 export { PrismaClient, PrismaPg };
 export type * from "./__generated__/prisma/client";
@@ -7,9 +8,18 @@ export type * from "./__generated__/prisma/client";
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({
+  const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
+    max: 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
   });
+
+  pool.on("error", (err) => {
+    console.error("[db] pool error:", err.message);
+  });
+
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }
 
