@@ -1,10 +1,9 @@
 {
-  "rootDirectory": "packages/web",
-  "buildCommand": "pnpm run build",
-  "devCommand": "pnpm run dev",
-  "outputDirectory": ".next",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "pnpm install",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter @neo-id/db exec prisma generate && pnpm turbo run build --filter=@neo-id/web...",
+  "devCommand": "pnpm run dev",
   "regions": ["fra1"],
   "headers": [
     {
@@ -24,12 +23,6 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api"
     }
   ]
 }
