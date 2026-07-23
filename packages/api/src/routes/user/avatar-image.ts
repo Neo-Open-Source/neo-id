@@ -29,7 +29,7 @@ export async function getAvatarImage(c: Context) {
     return error(c, "NOT_FOUND", "Avatar not found", 404);
   }
 
-  return new Response(bytes.buffer, {
+  return new Response(new Uint8Array(bytes.buffer), {
     status: 200,
     headers: {
       "Content-Type": bytes.contentType,

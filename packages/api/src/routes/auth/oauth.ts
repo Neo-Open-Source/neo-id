@@ -234,6 +234,23 @@ export async function socialOAuthCallback(c: Context) {
     await cacheExternalAvatar(user.id, userInfo.picture);
   }
 
+  const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
+  const hasMfa = user.totpEnabled || user.emailMfaEnabled;
+
+  if (hasMfa) {
+    const mfaMethods = [
+      ...(passkeyCount > 0 ? ["passkey"] : []),
+      ...(user.totpEnabled ? ["totp"] : []),
+      ...(user.emailMfaEnabled ? ["email"] : []),
+    ];
+    const mfaUrl = new URL("/auth/2fa", WEB_URL);
+    mfaUrl.searchParams.set("email", user.email);
+    mfaUrl.searchParams.set("methods", mfaMethods.join(","));
+    mfaUrl.searchParams.set("oauth_ticket", generateToken(32));
+    if (user.emailMfaEnabled) mfaUrl.searchParams.set("emailHint", user.email);
+    return c.redirect(mfaUrl.toString(), 302);
+  }
+
   const tokens = await issueTokens({
     userId: user.id,
     email: user.email,
