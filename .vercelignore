@@ -1,0 +1,17 @@
+node_modules/
+.turbo/
+.next/
+dist/
+*.md
+.env
+.env.*
+!.env.example
+.git/
+tests/
+scripts/
+packages/api/
+packages/db/
+packages/auth-core/
+packages/shared/
+packages/sdk/
+netlify/

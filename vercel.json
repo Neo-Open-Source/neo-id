@@ -1,0 +1,39 @@
+{
+  "buildCommand": "pnpm build",
+  "outputDirectory": "packages/web/.next",
+  "framework": "nextjs",
+  "installCommand": "pnpm install",
+  "regions": ["fra1"],
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "packages/api/src/**",
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/v1/uploads/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/avatars/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    }
+  ]
+}
