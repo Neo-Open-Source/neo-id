@@ -26,10 +26,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [openTicketCount, setOpenTicketCount] = useState(0);
-  const [supportMode, setSupportMode] = useState<"pending" | "anon" | "authed">("pending");
 
   const isSupportPage = pathname.startsWith("/support");
   const isSupportChat = /^\/support\/[^/]+$/.test(pathname);
+
+  // Initialize from cache so support page doesn't flash a spinner
+  const [supportMode, setSupportMode] = useState<"pending" | "anon" | "authed">(() => {
+    if (isSupportPage && readCache<UserData>("/user/profile")) return "authed";
+    return "pending";
+  });
 
   useEffect(() => {
     if (!isSupportPage) {
@@ -37,7 +42,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Already loaded profile elsewhere in this session — treat as authenticated.
     if (readCache<UserData>("/user/profile")) {
       setSupportMode("authed");
       return;
@@ -59,10 +63,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     enabled: loadProfile,
   });
 
+  // Redirect to auth on error, but only after a short delay to avoid
+  // flashing on transient network failures
   useEffect(() => {
     if (isSupportPage) return;
     if (error && !user) {
-      router.replace("/auth");
+      const timer = setTimeout(() => {
+        // Re-check — cached data may have arrived by now
+        if (!readCache<UserData>("/user/profile")) {
+          router.replace("/auth");
+        }
+      }, 800);
+      return () => clearTimeout(timer);
     }
   }, [error, user, router, isSupportPage]);
 
@@ -73,7 +85,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       const openCount = tickets.filter((t) => t.status === "open").length;
       setOpenTicketCount(openCount);
     } catch {
-      // silently fail - badge is non-critical
+      // silently fail — badge is non-critical
     }
   }, [user]);
 
