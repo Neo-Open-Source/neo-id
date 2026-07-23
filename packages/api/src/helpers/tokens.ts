@@ -1,6 +1,6 @@
 import { db } from "@neo-id/db";
 import { signAccessToken, signIdToken, generateToken, hashToken, lookupIp, formatLocation } from "@neo-id/auth-core";
-import { TOKEN } from "@neo-id/shared";
+import { TOKEN, SESSION } from "@neo-id/shared";
 
 interface SessionInfo {
   userId: string;
@@ -35,6 +35,7 @@ export async function issueTokens(info: SessionInfo): Promise<TokenResult> {
       userId: info.userId,
       deviceInfo: info.deviceInfo,
       ipAddress: info.ipAddress,
+      expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
     },
   });
 
@@ -135,6 +136,7 @@ export async function rotateSessionTokens(info: {
       lastActiveAt: new Date(),
       ipAddress: info.ipAddress,
       deviceInfo: info.deviceInfo,
+      expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
     },
   });
 
