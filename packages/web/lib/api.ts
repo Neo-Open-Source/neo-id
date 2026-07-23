@@ -13,6 +13,7 @@ interface ApiOptions {
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
+let pendingRefreshToken: string | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
@@ -22,15 +23,26 @@ async function refreshSession(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
     try {
+      const body: Record<string, string> = {};
+      if (pendingRefreshToken) {
+        body.refresh_token = pendingRefreshToken;
+      }
       const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: Object.keys(body).length ? JSON.stringify(body) : undefined,
       });
       const json = await res.json();
       if (json.ok && json.data?.accessToken) {
         accessToken = json.data.accessToken;
+        // Save the new refresh token as fallback in case Set-Cookie fails
+        if (json.data.refreshToken) {
+          pendingRefreshToken = json.data.refreshToken;
+        }
         return json.data.accessToken;
       }
+      pendingRefreshToken = null;
       return null;
     } catch {
       return null;

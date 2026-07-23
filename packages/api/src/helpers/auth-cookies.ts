@@ -26,15 +26,13 @@ export function setAuthCookies(
   });
   setCookie(c, REFRESH_COOKIE, tokens.refreshToken, {
     ...baseCookieOpts(),
-    // Narrow path: refresh/logout only
-    path: "/api/v1/auth",
     maxAge: TOKEN.REFRESH_TOKEN_EXPIRY,
   });
 }
 
 export function clearAuthCookies(c: Context) {
   deleteCookie(c, ACCESS_COOKIE, { path: "/" });
-  deleteCookie(c, REFRESH_COOKIE, { path: "/api/v1/auth" });
+  deleteCookie(c, REFRESH_COOKIE, { path: "/" });
 }
 
 export function getAccessTokenFromRequest(c: Context): string | null {
