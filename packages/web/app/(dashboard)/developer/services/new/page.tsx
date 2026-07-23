@@ -2,8 +2,8 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
 import { Input } from "@/components/ui/Input";
@@ -69,10 +69,7 @@ export default function NewServicePage() {
 
   return (
     <div className="page max-w-2xl mx-auto">
-      <Link href="/developer/services" className="page-back">
-        <Icon name="arrow-left" size={16} />
-        {t.developer.backToServices}
-      </Link>
+      <BackButton href="/developer/services" label={t.developer.backToServices} />
 
       <h1 className="text-2xl font-bold text-content">{t.developer.createService}</h1>
 

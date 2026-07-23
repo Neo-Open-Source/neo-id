@@ -378,7 +378,7 @@ export default function AdminUsersPage() {
         size="md"
         footer={
           selected && selected.role !== "admin" ? (
-            <div className="flex items-center gap-2 w-full">
+            <div className="admin-user-modal__actions">
               <Button
                 variant="secondary"
                 loading={resetPassLoading}
@@ -406,6 +406,7 @@ export default function AdminUsersPage() {
             </div>
           ) : undefined
         }
+        footerLayout="stacked"
       >
         {selected && (
           <div className="admin-user-modal">

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Modal } from "@/components/ui/Modal";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
@@ -134,15 +134,12 @@ export default function ServiceDetailPage() {
   if (!service) return null;
 
   return (
-    <div className="page max-w-5xl mx-auto">
-      <Link href="/developer/services" className="page-back">
-        <Icon name="arrow-left" size={16} />
-        {t.developer.backToServices}
-      </Link>
+    <div className="page service-detail-page max-w-5xl mx-auto">
+      <BackButton href="/developer/services" label={t.developer.backToServices} />
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-5">
+      <div className="service-detail-page__header">
+        <div className="service-detail-page__identity">
           <input
             ref={fileInputRef}
             type="file"
@@ -169,9 +166,9 @@ export default function ServiceDetailPage() {
               )}
             </div>
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-content tracking-tight">{service.displayName || service.name}</h1>
-            <p className="text-sm text-muted mt-1">{service.name}</p>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-content tracking-tight break-words">{service.displayName || service.name}</h1>
+            <p className="text-sm text-muted mt-1 break-all">{service.name}</p>
           </div>
         </div>
         <Button variant="ghost" onClick={() => setEditing(!editing)}>
@@ -180,7 +177,7 @@ export default function ServiceDetailPage() {
       </div>
 
       {/* Settings */}
-      <div className="bg-surface rounded-2xl border border-border p-6">
+      <div className="bg-surface rounded-2xl border border-border p-4 sm:p-6">
         <h2 className="text-base font-semibold text-content mb-5">{t.developer.settings}</h2>
 
         {editing ? (
@@ -225,25 +222,25 @@ export default function ServiceDetailPage() {
           </div>
         ) : (
           <div className="flex flex-col">
-            <div className="flex items-center justify-between py-4 border-b border-border/50">
+            <div className="service-detail-page__row">
               <span className="text-sm text-muted">{t.profile.displayName}</span>
-              <span className="text-sm text-content font-medium">{service.displayName || "—"}</span>
+              <span className="text-sm text-content font-medium break-words">{service.displayName || "—"}</span>
             </div>
-            <div className="flex items-center justify-between py-4 border-b border-border/50">
+            <div className="service-detail-page__row">
               <span className="text-sm text-muted">{t.developer.description}</span>
-              <span className="text-sm text-content max-w-[60%] text-right">{service.description || "—"}</span>
+              <span className="text-sm text-content break-words text-right max-sm:text-left">{service.description || "—"}</span>
             </div>
-            <div className="flex items-center justify-between py-4 border-b border-border/50">
+            <div className="service-detail-page__row">
               <span className="text-sm text-muted">{t.developer.website}</span>
               {service.website ? (
-                <a href={service.website} target="_blank" rel="noopener" className="text-sm text-accent hover:text-accent-hover transition-colors">
+                <a href={service.website} target="_blank" rel="noopener" className="text-sm text-accent hover:text-accent-hover transition-colors break-all text-right max-sm:text-left">
                   {service.website}
                 </a>
               ) : (
                 <span className="text-sm text-content">—</span>
               )}
             </div>
-            <div className="flex items-center justify-between py-4">
+            <div className="service-detail-page__row service-detail-page__row--last">
               <span className="text-sm text-muted">{t.developer.redirectUris}</span>
               <span className="text-sm text-content">{(service.redirectUris || []).length} URIs</span>
             </div>
@@ -252,7 +249,7 @@ export default function ServiceDetailPage() {
       </div>
 
       {/* Credentials */}
-      <div className="bg-surface rounded-2xl border border-border p-6 w-148.5 h-86 flex flex-col">
+      <div className="bg-surface rounded-2xl border border-border p-4 sm:p-6 w-full flex flex-col">
         <h2 className="text-base font-semibold text-content mb-5">{t.developer.credentials}</h2>
 
         <div className="flex flex-col gap-4 flex-1">
@@ -296,7 +293,7 @@ export default function ServiceDetailPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="service-detail-page__actions">
             <Button variant="secondary" onClick={() => setShowRotateModal(true)}>
               <Icon name="refresh" size={15} />
               {t.developer.rotateSecret}
