@@ -167,18 +167,18 @@
 }
 
 .dark {
-  --color-app: #111118;
-  --color-surface: #1C1C27;
-  --color-surface-hover: #262635;
-  --color-surface-row: #30304A;
+  --color-app: #111113;
+  --color-surface: #1A1A1E;
+  --color-surface-hover: #242428;
+  --color-surface-row: #2A2A2E;
   --color-surface-overlay: rgba(0, 0, 0, 0.7);
-  --color-content: #EEEEF4;
-  --color-muted: #9898B4;
-  --color-dim: #6E6E8C;
-  --color-very-dim: #44445E;
-  --color-border: #30304A;
-  --color-border-hover: #44445E;
-  --color-skeleton: #30304A;
+  --color-content: #EEEEF0;
+  --color-muted: #8E8E93;
+  --color-dim: #636366;
+  --color-very-dim: #3A3A3C;
+  --color-border: #2A2A2E;
+  --color-border-hover: #3A3A3C;
+  --color-skeleton: #2A2A2E;
   --color-accent: #5B8DEF;
   --color-accent-hover: #4A7DE8;
   --color-accent-active: #3A6DD8;
