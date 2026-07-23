@@ -13,3 +13,5 @@ coverage/
 
 # JWT keys (sensitive)
 *.pem
+.vercel
+.env*

@@ -1,16 +1,11 @@
 {
-  "buildCommand": "pnpm build",
-  "devCommand": "pnpm --filter @neo-id/web dev",
-  "outputDirectory": "packages/web/.next",
+  "rootDirectory": "packages/web",
+  "buildCommand": "pnpm run build",
+  "devCommand": "pnpm run dev",
+  "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "pnpm install",
   "regions": ["fra1"],
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "packages/api/src/**",
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
       "source": "/api/v1/uploads/(.*)",
