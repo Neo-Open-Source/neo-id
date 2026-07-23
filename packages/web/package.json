@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@flaticon/flaticon-uicons": "^3.3.1",
+    "@neo-id/api": "workspace:*",
+    "@neo-id/auth-core": "workspace:*",
+    "@neo-id/db": "workspace:*",
     "@neo-id/shared": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

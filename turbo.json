@@ -1,5 +1,26 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "DATABASE_URL",
+    "JWT_PRIVATE_KEY",
+    "JWT_PUBLIC_KEY",
+    "JWT_ISSUER",
+    "RP_ID",
+    "ORIGIN",
+    "WEB_URL",
+    "CORS_ORIGIN",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_REDIRECT_URI",
+    "GITHUB_CLIENT_ID",
+    "GITHUB_CLIENT_SECRET",
+    "GITHUB_REDIRECT_URI",
+    "EMAIL_FROM",
+    "RESEND_API_KEY",
+    "TURNSTILE_SECRET_KEY",
+    "TURNSTILE_SITE_KEY",
+    "API_PORT"
+  ],
   "tasks": {
     "dev": {
       "cache": false,
@@ -8,7 +29,7 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "test": {
       "dependsOn": ["build"]
