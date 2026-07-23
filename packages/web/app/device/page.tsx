@@ -5,9 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useI18n } from "@/lib/i18n/context";
+import { usePageTitle } from "@/lib/use-page-title";
 import { Icon } from "@/components/ui/Icon";
 
 function DeviceContent() {
+  const { t } = useI18n();
+  usePageTitle(t.pages.deviceSignIn);
   const searchParams = useSearchParams();
   const initialCode = searchParams.get("code") || "";
 
@@ -49,10 +53,8 @@ function DeviceContent() {
     try {
       const res = await fetch("/api/v1/device/approve", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("neo_id_access_token")}`,
-        },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_code: userCode }),
       });
 

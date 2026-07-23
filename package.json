@@ -13,7 +13,9 @@
     "db:generate": "pnpm --filter @neo-id/db generate"
   },
   "devDependencies": {
-    "turbo": "^2.3.0",
-    "typescript": "^5.7.0"
+    "mongodb": "^7.5.0",
+    "tsx": "^4.19.0",
+    "turbo": "^2.10.6",
+    "typescript": "^5.9.3"
   }
 }
