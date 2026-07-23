@@ -144,18 +144,8 @@ export function Modal({
     if (!visible) return;
 
     const body = document.body;
-    const html = document.documentElement;
-    const prevBodyOverflow = body.style.overflow;
-    const prevHtmlOverflow = html.style.overflow;
-    const prevBodyPadding = body.style.paddingRight;
-
-    // Compensate for scrollbar width to prevent layout jump
-    const scrollbarWidth = window.innerWidth - html.clientWidth;
-    if (scrollbarWidth > 0) {
-      body.style.paddingRight = `${scrollbarWidth}px`;
-    }
+    const prevOverflow = body.style.overflow;
     body.style.overflow = "hidden";
-    html.style.overflow = "hidden";
     closeBtnRef.current?.focus();
 
     const handleEsc = (e: KeyboardEvent) => {
@@ -164,9 +154,7 @@ export function Modal({
     document.addEventListener("keydown", handleEsc);
 
     return () => {
-      body.style.overflow = prevBodyOverflow;
-      html.style.overflow = prevHtmlOverflow;
-      body.style.paddingRight = prevBodyPadding;
+      body.style.overflow = prevOverflow;
       document.removeEventListener("keydown", handleEsc);
     };
   }, [visible, requestClose]);
