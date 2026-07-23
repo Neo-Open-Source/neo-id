@@ -38,14 +38,11 @@ export function useMfa() {
     [client],
   );
 
-  const disableTotp = useCallback(
-    async (code: string) => {
-      const res = await client.disableTotp(code);
-      if (res.ok) setTotpEnabled(false);
-      return res.ok;
-    },
-    [client],
-  );
+  const disableTotp = useCallback(async () => {
+    const res = await client.disableTotp();
+    if (res.ok) setTotpEnabled(false);
+    return res.ok;
+  }, [client]);
 
   const setupEmailMfa = useCallback(async () => {
     const res = await client.setupEmailMfa();
@@ -61,14 +58,11 @@ export function useMfa() {
     [client],
   );
 
-  const disableEmailMfa = useCallback(
-    async (code: string) => {
-      const res = await client.disableEmailMfa(code);
-      if (res.ok) setEmailMfaEnabled(false);
-      return res.ok;
-    },
-    [client],
-  );
+  const disableEmailMfa = useCallback(async () => {
+    const res = await client.disableEmailMfa();
+    if (res.ok) setEmailMfaEnabled(false);
+    return res.ok;
+  }, [client]);
 
   const deletePasskey = useCallback(
     async (id: string) => {

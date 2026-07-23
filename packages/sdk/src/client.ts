@@ -1,13 +1,11 @@
 import type { ApiResponse, User, Session, ServiceApp, Passkey } from "@neo-id/shared";
+import { ApiError } from "@neo-id/shared";
+
+export { ApiError } from "@neo-id/shared";
 
 export interface NeoIdClientConfig {
   baseUrl: string;
   onError?: (error: ApiError) => void;
-}
-
-export interface ApiError {
-  code: string;
-  message: string;
 }
 
 export class NeoIdClient {
@@ -67,6 +65,31 @@ export class NeoIdClient {
     return json;
   }
 
+  private async upload<T>(
+    path: string,
+    formData: FormData
+  ): Promise<ApiResponse<T>> {
+    const headers: Record<string, string> = {};
+
+    if (this.accessToken) {
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
+    }
+
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    const json: ApiResponse<T> = await res.json();
+
+    if (!json.ok && json.error) {
+      this.onError?.(json.error);
+    }
+
+    return json;
+  }
+
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
   async register(data: {
@@ -113,6 +136,24 @@ export class NeoIdClient {
     return result;
   }
 
+  async forgotPassword(email: string) {
+    return this.request<{ sent: boolean }>(
+      "POST",
+      "/api/v1/auth/forgot-password",
+      { email },
+      false
+    );
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<{ reset: boolean }>(
+      "POST",
+      "/api/v1/auth/reset-password",
+      { token, newPassword },
+      false
+    );
+  }
+
   // ─── User ──────────────────────────────────────────────────────────────────
 
   async getProfile() {
@@ -134,6 +175,16 @@ export class NeoIdClient {
     });
   }
 
+  async uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return this.upload<{ avatar: string }>("/api/v1/user/avatar", formData);
+  }
+
+  async deleteAccount(password?: string) {
+    return this.request<{ ok: boolean }>("DELETE", "/api/v1/user", { password });
+  }
+
   // ─── Sessions ──────────────────────────────────────────────────────────────
 
   async getSessions() {
@@ -146,6 +197,19 @@ export class NeoIdClient {
 
   async revokeAllSessions() {
     return this.request<{ ok: boolean }>("DELETE", "/api/v1/sessions");
+  }
+
+  // ─── Connected Apps ────────────────────────────────────────────────────────
+
+  async getConnections() {
+    return this.request<Array<{ id: string; serviceApp: { name: string; logoUrl?: string } }>>(
+      "GET",
+      "/api/v1/user/connections"
+    );
+  }
+
+  async disconnectIdentity(provider: string) {
+    return this.request<{ ok: boolean }>("DELETE", `/api/v1/user/identities/${provider}`);
   }
 
   // ─── Passkeys ──────────────────────────────────────────────────────────────
@@ -183,8 +247,8 @@ export class NeoIdClient {
     return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/totp/enable", { code });
   }
 
-  async disableTotp(code: string) {
-    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/totp/disable", { code });
+  async disableTotp() {
+    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/totp/disable");
   }
 
   async setupEmailMfa() {
@@ -195,15 +259,15 @@ export class NeoIdClient {
     return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/email/enable", { code });
   }
 
-  async disableEmailMfa(code: string) {
-    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/email/disable", { code });
+  async disableEmailMfa() {
+    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/email/disable");
   }
 
-  async verifyMfa(userId: string, method: string, code: string) {
-    return this.request<{ mfa_verified: boolean }>(
+  async verifyMfa(email: string, method: string, code: string, purpose?: string) {
+    return this.request<{ accessToken?: string; user?: any }>(
       "POST",
       "/api/v1/mfa/verify",
-      { user_id: userId, method, code },
+      { email, method, code, purpose },
       false
     );
   }
@@ -218,6 +282,7 @@ export class NeoIdClient {
     name: string;
     displayName?: string;
     description?: string;
+    website?: string;
     redirectUris: string[];
   }) {
     return this.request<ServiceApp & { client_secret: string }>(
@@ -231,7 +296,7 @@ export class NeoIdClient {
     return this.request<ServiceApp>("GET", `/api/v1/services/${id}`);
   }
 
-  async updateService(id: string, data: Partial<ServiceApp>) {
+  async updateService(id: string, data: Partial<Pick<ServiceApp, "displayName" | "description" | "website" | "redirectUris">>) {
     return this.request<ServiceApp>("PUT", `/api/v1/services/${id}`, data);
   }
 
@@ -243,6 +308,54 @@ export class NeoIdClient {
     return this.request<{ client_secret: string }>(
       "POST",
       `/api/v1/services/${id}/rotate-secret`
+    );
+  }
+
+  async uploadServiceLogo(id: string, file: File) {
+    const formData = new FormData();
+    formData.append("logo", file);
+    return this.upload<{ url: string }>(`/api/v1/services/${id}/logo`, formData);
+  }
+
+  // ─── Support ───────────────────────────────────────────────────────────────
+
+  async createSupportTicket(subject: string, message: string) {
+    return this.request<{ id: string }>(
+      "POST",
+      "/api/v1/support/tickets",
+      { subject, message }
+    );
+  }
+
+  async getSupportTickets() {
+    return this.request<Array<{
+      id: string;
+      subject: string;
+      status: string;
+      updatedAt: string;
+      messageCount: number;
+    }>>("GET", "/api/v1/support/tickets");
+  }
+
+  async getSupportTicket(id: string) {
+    return this.request<{
+      id: string;
+      subject: string;
+      status: string;
+      messages: Array<{
+        id: string;
+        authorRole: string;
+        body: string;
+        createdAt: string;
+      }>;
+    }>(`GET`, `/api/v1/support/tickets/${id}`);
+  }
+
+  async sendSupportMessage(ticketId: string, message: string) {
+    return this.request<{ id: string }>(
+      "POST",
+      `/api/v1/support/tickets/${ticketId}/messages`,
+      { message }
     );
   }
 
@@ -277,6 +390,17 @@ export class NeoIdClient {
     });
   }
 
+  async adminResetPassword(id: string) {
+    return this.request<{ newPassword: string }>(
+      "POST",
+      `/api/v1/admin/users/${id}/reset-password`
+    );
+  }
+
+  async adminDeleteUser(id: string) {
+    return this.request<{ ok: boolean }>("DELETE", `/api/v1/admin/users/${id}`);
+  }
+
   async adminGetStats() {
     return this.request<{
       totalUsers: number;
@@ -286,5 +410,17 @@ export class NeoIdClient {
       totalServices: number;
       recentLogins: number;
     }>("GET", "/api/v1/admin/stats");
+  }
+
+  async adminGetServices() {
+    return this.request<Array<{
+      id: string;
+      clientId: string;
+      name: string;
+      displayName?: string;
+      isActive: boolean;
+      owner: { id: string; email: string };
+      connectionCount: number;
+    }>>("GET", "/api/v1/admin/services");
   }
 }
