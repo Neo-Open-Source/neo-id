@@ -91,7 +91,7 @@ export default function NewServicePage() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="relative w-16 h-16 rounded-2xl bg-surface-hover border border-dashed border-border flex items-center justify-center flex-shrink-0 group overflow-hidden cursor-pointer hover:border-accent transition-colors"
+              className="relative w-16 h-16 rounded-2xl bg-surface-hover border border-dashed border-border flex items-center justify-center shrink-0 group overflow-hidden cursor-pointer hover:border-accent transition-colors"
             >
               {logoPreview ? (
                 <img src={logoPreview} alt="" className="w-full h-full object-cover rounded-2xl" />

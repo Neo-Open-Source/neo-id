@@ -154,7 +154,7 @@ export default function ServiceDetailPage() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingLogo}
-            className="relative w-16 h-16 rounded-2xl bg-surface-row border border-border flex items-center justify-center flex-shrink-0 group overflow-hidden cursor-pointer hover:border-accent transition-colors"
+            className="relative w-16 h-16 rounded-2xl bg-surface-row border border-border flex items-center justify-center shrink-0 group overflow-hidden cursor-pointer hover:border-accent transition-colors"
           >
             {service.logoUrl ? (
               <img src={service.logoUrl} alt="" className="w-full h-full object-cover rounded-2xl" />
@@ -252,12 +252,12 @@ export default function ServiceDetailPage() {
       </div>
 
       {/* Credentials */}
-      <div className="bg-surface rounded-2xl border border-border p-6 w-[594px] h-[344px] flex flex-col">
+      <div className="bg-surface rounded-2xl border border-border p-6 w-148.5 h-86 flex flex-col">
         <h2 className="text-base font-semibold text-content mb-5">{t.developer.credentials}</h2>
 
         <div className="flex flex-col gap-4 flex-1">
           {/* Client ID */}
-          <div className="flex items-center gap-4 p-4 bg-surface-hover rounded-xl min-h-[72px]">
+          <div className="flex items-center gap-4 p-4 bg-surface-hover rounded-xl min-h-18">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-muted mb-1.5">{t.developer.clientId}</p>
               <p className="text-sm font-mono text-content break-all">{service.clientId}</p>
@@ -265,14 +265,14 @@ export default function ServiceDetailPage() {
             <button
               type="button"
               onClick={() => copyToClipboard(service.clientId, "Client ID")}
-              className="flex-shrink-0 w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center text-muted hover:text-content hover:border-border-hover transition-all"
+              className="shrink-0 w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center text-muted hover:text-content hover:border-border-hover transition-all"
             >
               <Icon name="copy" size={15} />
             </button>
           </div>
 
           {/* Client Secret */}
-          <div className="flex items-start gap-4 p-4 bg-surface-hover rounded-xl min-h-[72px]">
+          <div className="flex items-start gap-4 p-4 bg-surface-hover rounded-xl min-h-18">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-muted mb-1.5">{t.developer.clientSecret}</p>
               <p className="text-sm font-mono text-content break-all">
@@ -289,7 +289,7 @@ export default function ServiceDetailPage() {
               <button
                 type="button"
                 onClick={() => copyToClipboard(revealedSecret, "Client secret")}
-                className="flex-shrink-0 w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center text-muted hover:text-content hover:border-border-hover transition-all"
+                className="shrink-0 w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center text-muted hover:text-content hover:border-border-hover transition-all"
               >
                 <Icon name="copy" size={15} />
               </button>

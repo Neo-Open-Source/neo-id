@@ -79,7 +79,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-app">
       <Sidebar user={user} onLogout={handleLogout} openTicketCount={openTicketCount} />
       <main className="dashboard-main ml-20 min-h-svh max-md:ml-0">
-        <div className="dashboard-content w-full max-w-[68rem] mx-auto px-10 py-14 max-md:px-4 max-md:py-6">{children}</div>
+        <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:py-6">{children}</div>
       </main>
       <BottomNav user={user} onLogout={handleLogout} openTicketCount={openTicketCount} />
       <ScrollToTop />

@@ -30,7 +30,7 @@ export function BottomNav({ user, onLogout, openTicketCount }: BottomNavProps) {
         )}
         aria-label={t.nav.profile}
       >
-        <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
+        <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
           <AvatarImage src={user?.avatar} name={user?.displayName || user?.email} size="sm" proxy />
         </div>
       </Link>
@@ -77,7 +77,7 @@ export function BottomNav({ user, onLogout, openTicketCount }: BottomNavProps) {
         >
           <Icon name="shield" size={20} />
           {openTicketCount != null && openTicketCount > 0 && (
-            <span className="absolute top-0 right-1 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-accent text-white text-[9px] font-bold px-1 leading-none">
+            <span className="absolute top-0 right-1 min-w-4 h-4 flex items-center justify-center rounded-full bg-accent text-white text-[9px] font-bold px-1 leading-none">
               {openTicketCount > 99 ? "99+" : openTicketCount}
             </span>
           )}

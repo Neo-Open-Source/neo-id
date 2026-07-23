@@ -19,7 +19,7 @@ export function SecondaryNav({ items }: SecondaryNavProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="secondary-nav sticky top-0 self-start w-56 flex-shrink-0 min-h-svh p-6 pr-3 border-r border-border bg-app overflow-y-auto max-md:relative max-md:w-full max-md:h-auto max-md:border-r-0 max-md:border-b max-md:border-border max-md:p-4">
+    <aside className="secondary-nav sticky top-0 self-start w-56 shrink-0 min-h-svh p-6 pr-3 border-r border-border bg-app overflow-y-auto max-md:relative max-md:w-full max-md:h-auto max-md:border-r-0 max-md:border-b max-md:border-border max-md:p-4">
       <nav className="secondary-nav__list flex flex-col gap-0.5 max-md:flex-row max-md:flex-wrap">
         {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
