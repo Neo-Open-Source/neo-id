@@ -47,11 +47,14 @@
   max-width: 30rem;
   max-height: 90vh;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   background: var(--color-surface);
   border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
   border-radius: var(--radius-modal);
   box-shadow: var(--shadow-modal);
   animation: slideUp 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  contain: layout style;
 }
 
 .modal-content--sm {
