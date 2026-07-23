@@ -246,6 +246,9 @@ const en = {
     language: "Language",
     uploadPhotoHint: "Upload a photo or pick a stock avatar.",
     orChooseAvatar: "Or choose an avatar",
+    cropPhoto: "Crop photo",
+    cropApply: "Apply",
+    cropBack: "Back",
   },
   language: {
     title: "Language",

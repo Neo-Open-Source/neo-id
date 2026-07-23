@@ -246,6 +246,9 @@ const ru: Translations = {
     language: "Язык",
     uploadPhotoHint: "Загрузите фото или выберите аватар.",
     orChooseAvatar: "Или выберите аватар",
+    cropPhoto: "Обрезать фото",
+    cropApply: "Применить",
+    cropBack: "Назад",
   },
   language: {
     title: "Язык",

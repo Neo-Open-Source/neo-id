@@ -22,31 +22,47 @@ export function setAccessToken(token: string | null) {
 async function refreshSession(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
-    try {
-      const body: Record<string, string> = {};
-      if (pendingRefreshToken) {
-        body.refresh_token = pendingRefreshToken;
+    // Retry refresh up to 3 times with backoff — handles brief server restarts
+    // where the API is momentarily unavailable when the browser first reconnects.
+    const MAX_ATTEMPTS = 3;
+    const BACKOFF_MS = [0, 800, 1500];
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
       }
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: Object.keys(body).length ? JSON.stringify(body) : undefined,
-      });
-      const json = await res.json();
-      if (json.ok && json.data?.accessToken) {
-        accessToken = json.data.accessToken;
-        // Save the new refresh token as fallback in case Set-Cookie fails
-        if (json.data.refreshToken) {
-          pendingRefreshToken = json.data.refreshToken;
+      try {
+        const body: Record<string, string> = {};
+        if (pendingRefreshToken) {
+          body.refresh_token = pendingRefreshToken;
         }
-        return json.data.accessToken;
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: Object.keys(body).length ? JSON.stringify(body) : undefined,
+        });
+        const json = await res.json();
+        if (json.ok && json.data?.accessToken) {
+          accessToken = json.data.accessToken;
+          if (json.data.refreshToken) {
+            pendingRefreshToken = json.data.refreshToken;
+          }
+          return json.data.accessToken;
+        }
+        // Token genuinely invalid (not a network/server error) — stop retrying
+        if (res.status === 400 || res.status === 401) {
+          pendingRefreshToken = null;
+          return null;
+        }
+        // Server error (5xx) or network issue — retry
+      } catch {
+        // Network error — retry
       }
-      pendingRefreshToken = null;
-      return null;
-    } catch {
-      return null;
     }
+
+    pendingRefreshToken = null;
+    return null;
   })();
   try {
     return await refreshPromise;

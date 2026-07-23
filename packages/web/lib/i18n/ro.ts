@@ -265,6 +265,9 @@ const ro = {
     uploadPhotoHint:
       "Încarcă o fotografie sau alege un avatar prestabilit.",
     orChooseAvatar: "Sau alege un avatar",
+    cropPhoto: "Decupează fotografia",
+    cropApply: "Aplică",
+    cropBack: "Înapoi",
   },
   language: {
     title: "Limbă",

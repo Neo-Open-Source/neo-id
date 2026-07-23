@@ -253,6 +253,9 @@ export interface Translations {
     language: string;
     uploadPhotoHint: string;
     orChooseAvatar: string;
+    cropPhoto: string;
+    cropApply: string;
+    cropBack: string;
   };
   language: {
     title: string;

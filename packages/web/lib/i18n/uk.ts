@@ -246,6 +246,9 @@ const uk: Translations = {
     language: "Мова",
     uploadPhotoHint: "Завантажте фото або оберіть аватар.",
     orChooseAvatar: "Або оберіть аватар",
+    cropPhoto: "Обрізати фото",
+    cropApply: "Застосувати",
+    cropBack: "Назад",
   },
   language: {
     title: "Мова",

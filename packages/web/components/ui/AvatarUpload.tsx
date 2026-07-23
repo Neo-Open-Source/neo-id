@@ -5,6 +5,7 @@ import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
 import { AvatarImage, DEFAULT_AVATAR } from "./AvatarImage";
+import { AvatarCrop } from "./AvatarCrop";
 import { useI18n } from "@/lib/i18n/context";
 import { api, apiUpload, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -40,8 +41,10 @@ export function AvatarUpload({
   const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [step, setStep] = useState<"pick" | "crop">("pick");
   const [selected, setSelected] = useState("");
   const [preview, setPreview] = useState("");
+  const [cropSrc, setCropSrc] = useState("");        // raw file URL fed into cropper
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,17 +55,38 @@ export function AvatarUpload({
   const reset = () => {
     setSelected("");
     setPreview("");
+    setCropSrc("");
     setUploadFile(null);
     setError(null);
+    setStep("pick");
     if (inputRef.current) inputRef.current.value = "";
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadFile(file);
+    // Reset file input so the same file can be re-selected after going back
+    if (inputRef.current) inputRef.current.value = "";
+    const rawUrl = URL.createObjectURL(file);
+    setCropSrc(rawUrl);
+    setStep("crop");
+  };
+
+  const handleCropConfirm = (croppedBlob: Blob, previewUrl: string) => {
+    const croppedFile = new File([croppedBlob], "avatar.jpg", { type: "image/jpeg" });
+    setUploadFile(croppedFile);
+    setPreview(previewUrl);
     setSelected("");
-    setPreview(URL.createObjectURL(file));
+    setStep("pick");
+    // Release the raw object URL — cropped preview URL is now the active one
+    URL.revokeObjectURL(cropSrc);
+    setCropSrc("");
+  };
+
+  const handleCropCancel = () => {
+    URL.revokeObjectURL(cropSrc);
+    setCropSrc("");
+    setStep("pick");
   };
 
   const handleSave = async () => {
@@ -137,67 +161,77 @@ export function AvatarUpload({
           reset();
           setModalOpen(false);
         }}
-        title={t.profile.changePhoto}
+        title={step === "crop" ? t.profile.cropPhoto : t.profile.changePhoto}
         footer={
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                reset();
-                setModalOpen(false);
-              }}
-              disabled={saving}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              size="sm"
-              loading={saving}
-              disabled={!uploadFile && !selected}
-              onClick={handleSave}
-            >
-              {t.common.save}
-            </Button>
-          </>
+          step === "crop" ? undefined : (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  reset();
+                  setModalOpen(false);
+                }}
+                disabled={saving}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                size="sm"
+                loading={saving}
+                disabled={!uploadFile && !selected}
+                onClick={handleSave}
+              >
+                {t.common.save}
+              </Button>
+            </>
+          )
         }
       >
-        <div className="avatar-picker">
-          {error && <div className="alert alert--error">{error}</div>}
+        {step === "crop" && cropSrc ? (
+          <AvatarCrop
+            imageSrc={cropSrc}
+            onConfirm={handleCropConfirm}
+            onCancel={handleCropCancel}
+          />
+        ) : (
+          <div className="avatar-picker">
+            {error && <div className="alert alert--error">{error}</div>}
 
-          <button
-            type="button"
-            className="avatar-picker__preview"
-            onClick={() => inputRef.current?.click()}
-            aria-label={t.profile.uploadPhoto}
-          >
-            <div className="avatar avatar--md">
-              <img src={displayPreview} alt="" className="avatar__image" />
+            <button
+              type="button"
+              className="avatar-picker__preview"
+              onClick={() => inputRef.current?.click()}
+              aria-label={t.profile.uploadPhoto}
+            >
+              <div className="avatar avatar--md">
+                <img src={displayPreview} alt="" className="avatar__image" />
+              </div>
+            </button>
+            <p className="avatar-picker__hint">{t.profile.uploadPhotoHint}</p>
+
+            <p className="avatar-picker__label">{t.profile.orChooseAvatar}</p>
+            <div className="avatar-picker__grid">
+              {STOCK_AVATARS.map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  className={cn(
+                    "avatar-picker__stock",
+                    selected === url && "avatar-picker__stock--active",
+                  )}
+                  onClick={() => {
+                    setSelected(url);
+                    setPreview(url);
+                    setUploadFile(null);
+                  }}
+                >
+                  <img src={url} alt="" />
+                </button>
+              ))}
             </div>
-          </button>
-          <p className="avatar-picker__hint">{t.profile.uploadPhotoHint}</p>
-
-          <p className="avatar-picker__label">{t.profile.orChooseAvatar}</p>
-          <div className="avatar-picker__grid">
-            {STOCK_AVATARS.map((url) => (
-              <button
-                key={url}
-                type="button"
-                className={cn(
-                  "avatar-picker__stock",
-                  selected === url && "avatar-picker__stock--active",
-                )}
-                onClick={() => {
-                  setSelected(url);
-                  setPreview(url);
-                  setUploadFile(null);
-                }}
-              >
-                <img src={url} alt="" />
-              </button>
-            ))}
           </div>
-        </div>
+        )}
       </Modal>
     </div>
   );
