@@ -1,6 +1,7 @@
 import type { Context, Next } from "hono";
 import { verifyAccessToken, type JwtPayload } from "@neo-id/auth-core";
 import { error } from "../helpers/response";
+import { getAccessTokenFromRequest } from "../helpers/auth-cookies";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -9,12 +10,11 @@ declare module "hono" {
 }
 
 export async function requireAuth(c: Context, next: Next) {
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return error(c, "UNAUTHORIZED", "Missing or invalid authorization header", 401);
+  const token = getAccessTokenFromRequest(c);
+  if (!token) {
+    return error(c, "UNAUTHORIZED", "Missing or invalid authorization", 401);
   }
 
-  const token = authHeader.slice(7);
   try {
     const payload = await verifyAccessToken(token);
     c.set("user", payload);
@@ -26,7 +26,10 @@ export async function requireAuth(c: Context, next: Next) {
 
 export async function requireAdmin(c: Context, next: Next) {
   const user = c.get("user");
-  if (!user || user.role !== "admin") {
+  if (!user) {
+    return error(c, "UNAUTHORIZED", "Authentication required", 401);
+  }
+  if (user.role !== "admin") {
     return error(c, "FORBIDDEN", "Admin access required", 403);
   }
   await next();
