@@ -6,13 +6,18 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname, "../.."),
   },
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  serverExternalPackages: ["geoip-lite"],
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: "http://localhost:3000/api/:path*",
-      },
-    ];
+    if (process.env.EXTERNAL_API) {
+      const apiBase = process.env.EXTERNAL_API;
+      return [
+        {
+          source: "/api/:path*",
+          destination: `${apiBase}/api/:path*`,
+        },
+      ];
+    }
+    return [];
   },
 };
 
