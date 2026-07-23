@@ -1,19 +1,17 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { hash, verify } from "@neo-id/auth-core";
-import { changePasswordSchema, type ChangePasswordInput } from "@neo-id/shared";
+import { changePasswordSchema } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
+import { validate } from "../../helpers/request";
 
 export async function changePassword(c: Context) {
   const user = c.get("user");
   const body = await c.req.json();
-  const parsed = changePasswordSchema.safeParse(body);
+  const parsed = validate(changePasswordSchema, body);
+  if (!parsed.success) return error(c, "INVALID_REQUEST", parsed.error);
 
-  if (!parsed.success) {
-    return error(c, "INVALID_REQUEST", parsed.error.errors[0]?.message || "Invalid input");
-  }
-
-  const { currentPassword, newPassword } = parsed.data as ChangePasswordInput;
+  const { currentPassword, newPassword } = parsed.data;
 
   // Get current password hash
   const currentUser = await db.user.findUnique({

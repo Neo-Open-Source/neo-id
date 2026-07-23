@@ -30,20 +30,16 @@ export async function deleteSession(c: Context) {
   });
 
   if (!session) {
-    return success(c, { ok: true }); // Already deleted or not found
+    return success(c, { ok: true });
   }
 
-  // Deactivate session
-  await db.session.update({
-    where: { id },
-    data: { isActive: false },
-  });
-
-  // Revoke all refresh tokens for this session
-  await db.refreshToken.updateMany({
-    where: { sessionId: id },
-    data: { revokedAt: new Date(), revokeReason: "session_revoked" },
-  });
+  await db.$transaction([
+    db.refreshToken.updateMany({
+      where: { sessionId: id },
+      data: { revokedAt: new Date(), revokeReason: "session_revoked" },
+    }),
+    db.session.delete({ where: { id } }),
+  ]);
 
   return success(c, { ok: true });
 }
@@ -51,17 +47,22 @@ export async function deleteSession(c: Context) {
 export async function deleteAllSessions(c: Context) {
   const user = c.get("user");
 
-  // Deactivate all sessions
-  await db.session.updateMany({
+  const activeSessions = await db.session.findMany({
     where: { userId: user.sub, isActive: true },
-    data: { isActive: false },
+    select: { id: true },
   });
 
-  // Revoke all refresh tokens
-  await db.refreshToken.updateMany({
-    where: { userId: user.sub, revokedAt: null },
-    data: { revokedAt: new Date(), revokeReason: "all_sessions_revoked" },
-  });
+  const ids = activeSessions.map((s) => s.id);
+
+  await db.$transaction([
+    db.refreshToken.updateMany({
+      where: { userId: user.sub, revokedAt: null },
+      data: { revokedAt: new Date(), revokeReason: "all_sessions_revoked" },
+    }),
+    ...(ids.length > 0
+      ? [db.session.deleteMany({ where: { id: { in: ids } } })]
+      : []),
+  ]);
 
   return success(c, { ok: true });
 }

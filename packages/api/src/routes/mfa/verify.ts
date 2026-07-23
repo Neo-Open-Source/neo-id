@@ -2,18 +2,25 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { verifyTotp } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
+import { issueTokens } from "../../helpers/tokens";
+import { setAuthCookies } from "../../helpers/auth-cookies";
+import { getRequestInfo } from "../../helpers/request";
+import { normalizeEmail, verifyAndUseMfaCode } from "../../helpers/mfa-code";
 
 export async function verifyMfa(c: Context) {
   const body = await c.req.json();
-  const { user_id, method, code } = body;
+  const email = normalizeEmail(String(body.email || ""));
+  const method = body.method as string | undefined;
+  const code = String(body.code || "").trim();
+  const purpose = body.purpose as string | undefined;
 
-  if (!user_id || !method || !code) {
-    return error(c, "INVALID_REQUEST", "user_id, method, and code are required");
+  if (!email || !method || !code) {
+    return error(c, "INVALID_REQUEST", "email, method, and code are required");
   }
 
   // Find user
   const user = await db.user.findUnique({
-    where: { id: user_id },
+    where: { email },
     select: {
       id: true,
       email: true,
@@ -22,6 +29,7 @@ export async function verifyMfa(c: Context) {
       totpEnabled: true,
       totpSecret: true,
       emailMfaEnabled: true,
+      emailVerified: true,
     },
   });
 
@@ -33,6 +41,25 @@ export async function verifyMfa(c: Context) {
     return error(c, "USER_BANNED", "Your account has been banned");
   }
 
+  // ─── Email verification (registration) ──────────────────────────────────
+  if (purpose === "verify_email") {
+    if (user.emailVerified) return success(c, { verified: true });
+
+    const { valid } = await verifyAndUseMfaCode(user.id, "verify_email", code);
+    if (!valid) return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
+
+    await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+
+    const { deviceInfo, ipAddress } = getRequestInfo(c);
+    const tokens = await issueTokens({ userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress });
+
+    setAuthCookies(c, tokens);
+
+    return success(c, { verified: true });
+  }
+
+  // ─── MFA during login (totp / email) ────────────────────────────────────
+
   if (method === "totp") {
     if (!user.totpEnabled || !user.totpSecret) {
       return error(c, "MFA_NOT_ENABLED", "TOTP is not enabled");
@@ -43,40 +70,30 @@ export async function verifyMfa(c: Context) {
       return error(c, "MFA_INVALID_CODE", "Invalid TOTP code");
     }
   } else if (method === "email") {
-    if (!user.emailMfaEnabled) {
-      return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
-    }
+    if (!user.emailMfaEnabled) return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
 
-    // Find and verify code
-    const mfaCode = await db.mfaCode.findFirst({
-      where: {
-        userId: user.id,
-        purpose: "mfa_login",
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!mfaCode || mfaCode.code !== code) {
-      return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
-    }
-
-    // Mark code as used
-    await db.mfaCode.update({
-      where: { id: mfaCode.id },
-      data: { usedAt: new Date() },
-    });
+    const { valid } = await verifyAndUseMfaCode(user.id, "mfa_login", code);
+    if (!valid) return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
   } else {
     return error(c, "INVALID_REQUEST", "Invalid MFA method. Use 'totp' or 'email'.");
   }
 
-  // MFA verified — the calling route should handle token generation
-  // Return success so the login flow can continue
-  return success(c, {
-    mfa_verified: true,
-    user_id: user.id,
+  // MFA verified — issue tokens
+  const { deviceInfo, ipAddress } = getRequestInfo(c);
+  const tokens = await issueTokens({
+    userId: user.id,
     email: user.email,
     role: user.role,
+    deviceInfo,
+    ipAddress,
+  });
+
+  setAuthCookies(c, tokens);
+
+  return success(c, {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    idToken: tokens.idToken,
+    user: { id: user.id, email: user.email, role: user.role },
   });
 }

@@ -1,28 +1,27 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
+import { verifyAccessToken } from "@neo-id/auth-core";
 import { success } from "../../helpers/response";
+import { clearAuthCookies, getAccessTokenFromRequest } from "../../helpers/auth-cookies";
 
 export async function logout(c: Context) {
-  // Get token from header
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return success(c, { ok: true });
+  const token = getAccessTokenFromRequest(c);
+  if (token) {
+    try {
+      const user = await verifyAccessToken(token);
+      await db.refreshToken.updateMany({
+        where: { userId: user.sub, revokedAt: null },
+        data: { revokedAt: new Date(), revokeReason: "logout" },
+      });
+      await db.session.updateMany({
+        where: { userId: user.sub, isActive: true },
+        data: { isActive: false },
+      });
+    } catch {
+      // Expired/invalid token — still clear cookies
+    }
   }
 
-  // Find and revoke all refresh tokens for this session
-  // For now, revoke all tokens for the user
-  const user = c.get("user");
-  if (user) {
-    await db.refreshToken.updateMany({
-      where: { userId: user.sub, revokedAt: null },
-      data: { revokedAt: new Date(), revokeReason: "logout" },
-    });
-
-    await db.session.updateMany({
-      where: { userId: user.sub, isActive: true },
-      data: { isActive: false },
-    });
-  }
-
+  clearAuthCookies(c);
   return success(c, { ok: true });
 }

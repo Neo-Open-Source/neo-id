@@ -2,15 +2,17 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { generateToken } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
+import { randomBytes } from "node:crypto";
 
 function generateUserCode(): string {
-  // Generate 8-char code like "ABC-1234"
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const digits = "23456789";
+  const charBytes = randomBytes(3);
+  const digitBytes = randomBytes(4);
   let code = "";
-  for (let i = 0; i < 3; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 3; i++) code += chars[charBytes[i] % chars.length];
   code += "-";
-  for (let i = 0; i < 4; i++) code += digits[Math.floor(Math.random() * digits.length)];
+  for (let i = 0; i < 4; i++) code += digits[digitBytes[i] % digits.length];
   return code;
 }
 

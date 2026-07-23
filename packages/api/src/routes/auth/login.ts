@@ -1,20 +1,31 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
-import { verify, signAccessToken, signIdToken, generateToken, hashToken } from "@neo-id/auth-core";
-import { loginSchema, TOKEN, type LoginInput } from "@neo-id/shared";
+import { verify } from "@neo-id/auth-core";
+import { loginSchema } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
+import { issueTokens } from "../../helpers/tokens";
+import { setAuthCookies } from "../../helpers/auth-cookies";
+import { verifyTurnstileToken } from "../../helpers/turnstile";
+import { normalizeEmail } from "../../helpers/mfa-code";
+import { getRequestInfo, validate } from "../../helpers/request";
 
 export async function login(c: Context) {
   const body = await c.req.json();
-  const parsed = loginSchema.safeParse(body);
+  const parsed = validate(loginSchema, body);
+  if (!parsed.success) return error(c, "INVALID_REQUEST", parsed.error);
 
-  if (!parsed.success) {
-    return error(c, "INVALID_REQUEST", parsed.error.errors[0]?.message || "Invalid input");
+  const { password } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
+
+  if (process.env.NODE_ENV === "production") {
+    const turnstileToken = body.cfTurnstileToken as string | undefined;
+    const validTurnstile = await verifyTurnstileToken(turnstileToken || "", c.req.header("X-Forwarded-For"));
+    if (!validTurnstile) {
+      return error(c, "RATE_LIMITED", "Security check failed", 429);
+    }
   }
+  const { deviceInfo, ipAddress } = getRequestInfo(c);
 
-  const { email, password } = parsed.data as LoginInput;
-
-  // Find user
   const user = await db.user.findUnique({ where: { email } });
   if (!user) {
     return error(c, "INVALID_CREDENTIALS", "Email or password is incorrect");
@@ -28,31 +39,17 @@ export async function login(c: Context) {
     return error(c, "INVALID_CREDENTIALS", "Please sign in with your connected account");
   }
 
-  // Verify password
   const valid = await verify(password, user.passwordHash);
   if (!valid) {
     return error(c, "INVALID_CREDENTIALS", "Email or password is incorrect");
   }
 
-  // Check if MFA is enabled (passkey, TOTP, or email)
+  // Check MFA
   const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
-  const hasMfa = passkeyCount > 0 || user.totpEnabled || user.emailMfaEnabled;
+  const hasMfa = user.totpEnabled || user.emailMfaEnabled;
 
   if (hasMfa) {
-    // Create MFA code for email (if email MFA enabled)
-    if (user.emailMfaEnabled) {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      await db.mfaCode.create({
-        data: {
-          userId: user.id,
-          code,
-          purpose: "mfa_login",
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-        },
-      });
-      // TODO: Send MFA code via email
-    }
-
+    // Don't send email code here — send it only when user selects email method
     return success(c, {
       mfaRequired: true,
       mfaMethods: [
@@ -61,63 +58,24 @@ export async function login(c: Context) {
         ...(user.emailMfaEnabled ? ["email"] : []),
       ],
       passkeyAvailable: passkeyCount > 0,
-      emailHint: user.emailMfaEnabled
-        ? user.email.replace(/(.{2}).*(@.*)/, "$1***$2")
-        : undefined,
+      emailHint: user.emailMfaEnabled ? user.email : undefined,
     });
   }
 
-  // Create session
-  const session = await db.session.create({
-    data: {
-      userId: user.id,
-      deviceInfo: c.req.header("User-Agent"),
-      ipAddress: c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP"),
-    },
-  });
-
-  // Generate tokens
-  const accessToken = await signAccessToken(
-    { sub: user.id, email: user.email, role: user.role },
-    session.id
-  );
-  const idToken = await signIdToken({
-    sub: user.id,
+  const tokens = await issueTokens({
+    userId: user.id,
     email: user.email,
     role: user.role,
+    deviceInfo,
+    ipAddress,
   });
 
-  // Create refresh token
-  const refreshToken = generateToken(TOKEN.REFRESH_TOKEN_LENGTH);
-  await db.refreshToken.create({
-    data: {
-      userId: user.id,
-      sessionId: session.id,
-      tokenHash: hashToken(refreshToken),
-      deviceInfo: c.req.header("User-Agent"),
-      ipAddress: c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP"),
-      expiresAt: new Date(Date.now() + TOKEN.REFRESH_TOKEN_EXPIRY * 1000),
-    },
-  });
-
-  // Update last login
-  await db.user.update({
-    where: { id: user.id },
-    data: {
-      lastLoginAt: new Date(),
-      lastLoginIp: c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP"),
-    },
-  });
+  setAuthCookies(c, tokens);
 
   return success(c, {
-    accessToken,
-    refreshToken,
-    idToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      role: user.role,
-    },
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    idToken: tokens.idToken,
+    user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role },
   });
 }

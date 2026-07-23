@@ -75,29 +75,14 @@ export async function enableTotp(c: Context) {
 
 export async function disableTotp(c: Context) {
   const user = c.get("user");
-  const body = await c.req.json();
-  const { code } = body;
-
-  if (!code || code.length !== 6) {
-    return error(c, "INVALID_REQUEST", "Code must be 6 digits");
-  }
 
   const dbUser = await db.user.findUnique({
     where: { id: user.sub },
-    select: { totpSecret: true, totpEnabled: true },
+    select: { totpEnabled: true },
   });
 
   if (!dbUser?.totpEnabled) {
     return error(c, "MFA_NOT_ENABLED", "TOTP is not enabled");
-  }
-
-  if (!dbUser.totpSecret) {
-    return error(c, "INTERNAL_ERROR", "TOTP secret not found");
-  }
-
-  const valid = verifyTotp(dbUser.totpSecret, code);
-  if (!valid) {
-    return error(c, "MFA_INVALID_CODE", "Invalid TOTP code");
   }
 
   await db.user.update({

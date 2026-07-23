@@ -1,12 +1,17 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
+import { hash, generateToken } from "@neo-id/auth-core";
+import type { JwtPayload } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
+import { parsePagination } from "../../helpers/request";
+
+function getAdmin(c: Context): JwtPayload {
+  return c.get("user") as unknown as JwtPayload;
+}
 
 export async function listUsers(c: Context) {
-  const { page = "1", limit = "20", search } = c.req.query();
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
-  const skip = (pageNum - 1) * limitNum;
+  const { page, limit: limitParam, search } = c.req.query();
+  const { page: pageNum, limit: limitNum, skip } = parsePagination({ page, limit: limitParam }, 20);
 
   const where = search
     ? {
@@ -144,7 +149,7 @@ export async function banUser(c: Context) {
   }
 
   // Log audit
-  const admin = (c as any).get("user");
+  const admin = getAdmin(c);
   await db.auditLog.create({
     data: {
       actorId: admin.sub,
@@ -182,7 +187,7 @@ export async function setRole(c: Context) {
   });
 
   // Log audit
-  const admin = (c as any).get("user");
+  const admin = getAdmin(c);
   await db.auditLog.create({
     data: {
       actorId: admin.sub,
@@ -228,10 +233,8 @@ export async function getStats(c: Context) {
 }
 
 export async function getAuditLogs(c: Context) {
-  const { page = "1", limit = "50" } = c.req.query();
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
-  const skip = (pageNum - 1) * limitNum;
+  const { page, limit: limitParam } = c.req.query();
+  const { page: pageNum, limit: limitNum, skip } = parsePagination({ page, limit: limitParam }, 50);
 
   const [logs, total] = await Promise.all([
     db.auditLog.findMany({
@@ -251,4 +254,74 @@ export async function getAuditLogs(c: Context) {
       pages: Math.ceil(total / limitNum),
     },
   });
+}
+
+export async function resetUserPassword(c: Context) {
+  const { id } = c.req.param();
+
+  const user = await db.user.findUnique({
+    where: { id },
+    select: { id: true, role: true, email: true },
+  });
+
+  if (!user) return error(c, "NOT_FOUND", "User not found", 404);
+  if (user.role === "admin") return error(c, "FORBIDDEN", "Cannot reset password of admin users");
+
+  const newPassword = generateToken(16);
+  const passwordHash = await hash(newPassword);
+
+  await db.user.update({
+    where: { id },
+    data: { passwordHash },
+  });
+
+  await db.refreshToken.updateMany({
+    where: { userId: id, revokedAt: null },
+    data: { revokedAt: new Date(), revokeReason: "admin_password_reset" },
+  });
+
+  await db.session.updateMany({
+    where: { userId: id, isActive: true },
+    data: { isActive: false },
+  });
+
+  const admin = getAdmin(c);
+  await db.auditLog.create({
+    data: {
+      actorId: admin.sub,
+      actorEmail: admin.email,
+      action: "user.password_reset",
+      targetId: id,
+      details: { email: user.email },
+    },
+  });
+
+  return success(c, { newPassword });
+}
+
+export async function deleteUserAccount(c: Context) {
+  const { id } = c.req.param();
+
+  const user = await db.user.findUnique({
+    where: { id },
+    select: { id: true, role: true, email: true },
+  });
+
+  if (!user) return error(c, "NOT_FOUND", "User not found", 404);
+  if (user.role === "admin") return error(c, "FORBIDDEN", "Cannot delete admin users");
+
+  await db.user.delete({ where: { id } });
+
+  const admin = getAdmin(c);
+  await db.auditLog.create({
+    data: {
+      actorId: admin.sub,
+      actorEmail: admin.email,
+      action: "user.delete",
+      targetId: id,
+      details: { email: user.email },
+    },
+  });
+
+  return success(c, { deleted: true });
 }

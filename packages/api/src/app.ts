@@ -2,20 +2,31 @@ import { Hono } from "hono";
 import { corsMiddleware } from "./middleware/cors";
 import { requestIdMiddleware } from "./middleware/request-id";
 import { requireAuth } from "./middleware/auth";
+import { rateLimit } from "./middleware/rate-limit";
+import { startCleanup } from "./helpers/cleanup";
 
 // Auth Routes
 import { register } from "./routes/auth/register";
 import { login } from "./routes/auth/login";
 import { refresh } from "./routes/auth/refresh";
 import { logout } from "./routes/auth/logout";
+import { startSocialOAuth, socialOAuthCallback, completeSocialOAuth, startSocialOAuthLink } from "./routes/auth/oauth";
+import { verifyEmail, verifyEmailByToken } from "./routes/auth/verify-email";
 
 // User Routes
-import { getProfile, updateProfile } from "./routes/user/profile";
+import { getProfile, updateProfile, checkUsername } from "./routes/user/profile";
 import { changePassword } from "./routes/user/password";
+import { uploadAvatar, deleteAvatar, setStockAvatar } from "./routes/user/avatar";
+import { getAvatarImage } from "./routes/user/avatar-image";
+import { deleteAccount } from "./routes/user/delete";
+import { exportUserData, sendExportCode } from "./routes/user/export";
+import { listIdentities, disconnectIdentity } from "./routes/user/identities";
+import { listConnections, revokeConnection } from "./routes/user/connections";
+import { requestEmailChange, confirmEmailChange } from "./routes/user/email";
 
 // MFA Routes
 import { setupTotp, enableTotp, disableTotp } from "./routes/mfa/totp";
-import { setupEmailMfa, enableEmailMfa, disableEmailMfa } from "./routes/mfa/email";
+import { setupEmailMfa, enableEmailMfa, disableEmailMfa, resendLoginEmailMfa } from "./routes/mfa/email";
 import { verifyMfa } from "./routes/mfa/verify";
 
 // Passkey Routes
@@ -46,6 +57,7 @@ import {
   deleteService,
   rotateSecret,
 } from "./routes/services/list";
+import { uploadServiceLogo } from "./routes/services/logo";
 
 // Admin Routes
 import {
@@ -55,8 +67,21 @@ import {
   setRole,
   getStats,
   getAuditLogs,
+  resetUserPassword,
+  deleteUserAccount,
 } from "./routes/admin/users";
+import {
+  listAllServices,
+  setServiceActive,
+  deleteAnyService,
+  sendBroadcast,
+} from "./routes/admin/services";
 import { requireAdmin } from "./middleware/auth";
+
+// Support Routes
+import { createTicket, listMyTickets, getTicket, addMessage, closeMyTicket, reopenMyTicket, createAnonymousTicket, getAnonymousTicket, addAnonymousMessage } from "./routes/support/tickets";
+import { ticketEvents } from "./routes/support/events";
+import { listAllTickets, getTicketDetail, replyTicket, closeTicket, reopenTicket, deleteTicket } from "./routes/admin/support";
 
 // Device Code Routes (RFC 8628)
 import { requestDeviceCode } from "./routes/device/code";
@@ -67,7 +92,12 @@ import {
   denyDeviceCode,
 } from "./routes/device/verify";
 
+// Password Reset
+import { requestPasswordReset, resetPassword } from "./routes/auth/forgot-password";
+
 const app = new Hono();
+
+startCleanup();
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
 
@@ -80,16 +110,40 @@ app.get("/health", (c) => c.json({ status: "ok", version: "4.0.0" }));
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
 
-app.post("/api/v1/auth/register", register);
-app.post("/api/v1/auth/login", login);
-app.post("/api/v1/auth/refresh", refresh);
-app.post("/api/v1/auth/logout", requireAuth, logout);
+app.post("/api/v1/auth/register", rateLimit("REGISTER"), register);
+app.post("/api/v1/auth/verify-email", rateLimit("EMAIL_VERIFY"), verifyEmail);
+app.post("/api/v1/auth/verify-email/token", rateLimit("EMAIL_VERIFY"), verifyEmailByToken);
+app.post("/api/v1/auth/login", rateLimit("LOGIN"), login);
+app.post("/api/v1/auth/refresh", rateLimit("REFRESH"), refresh);
+app.post("/api/v1/auth/logout", logout);
+
+app.post("/api/v1/auth/forgot-password", rateLimit("FORGOT_PASSWORD"), requestPasswordReset);
+app.post("/api/v1/auth/reset-password", rateLimit("RESET_PASSWORD"), resetPassword);
+
+app.get("/api/v1/auth/oauth/:provider", startSocialOAuth);
+app.post("/api/v1/auth/oauth/:provider/link", requireAuth, startSocialOAuthLink);
+app.get("/api/v1/auth/oauth/:provider/callback", socialOAuthCallback);
+app.post("/api/v1/auth/oauth/complete", completeSocialOAuth);
 
 // ─── User Routes ─────────────────────────────────────────────────────────────
 
 app.get("/api/v1/user/profile", requireAuth, getProfile);
 app.put("/api/v1/user/profile", requireAuth, updateProfile);
+app.get("/api/v1/user/username/check", requireAuth, checkUsername);
 app.put("/api/v1/user/password", requireAuth, changePassword);
+app.post("/api/v1/user/avatar", requireAuth, uploadAvatar);
+app.put("/api/v1/user/avatar/stock", requireAuth, setStockAvatar);
+app.get("/api/v1/user/avatar/image", requireAuth, getAvatarImage);
+app.delete("/api/v1/user/avatar", requireAuth, deleteAvatar);
+app.delete("/api/v1/user", requireAuth, deleteAccount);
+app.post("/api/v1/user/export", requireAuth, exportUserData);
+app.post("/api/v1/user/export/send-code", requireAuth, sendExportCode);
+app.post("/api/v1/user/email/change/request", requireAuth, requestEmailChange);
+app.post("/api/v1/user/email/change/confirm", requireAuth, confirmEmailChange);
+app.get("/api/v1/user/identities", requireAuth, listIdentities);
+app.delete("/api/v1/user/identities/:provider", requireAuth, disconnectIdentity);
+app.get("/api/v1/user/connections", requireAuth, listConnections);
+app.delete("/api/v1/user/connections/:id", requireAuth, revokeConnection);
 
 // ─── MFA Routes ──────────────────────────────────────────────────────────────
 
@@ -99,7 +153,8 @@ app.post("/api/v1/mfa/totp/disable", requireAuth, disableTotp);
 app.post("/api/v1/mfa/email/setup", requireAuth, setupEmailMfa);
 app.post("/api/v1/mfa/email/enable", requireAuth, enableEmailMfa);
 app.post("/api/v1/mfa/email/disable", requireAuth, disableEmailMfa);
-app.post("/api/v1/mfa/verify", verifyMfa);
+app.post("/api/v1/mfa/email/resend", resendLoginEmailMfa);
+app.post("/api/v1/mfa/verify", rateLimit("MFA"), verifyMfa);
 
 // ─── Passkey Routes ──────────────────────────────────────────────────────────
 
@@ -130,6 +185,7 @@ app.post("/api/v1/services", requireAuth, createService);
 app.put("/api/v1/services/:id", requireAuth, updateService);
 app.delete("/api/v1/services/:id", requireAuth, deleteService);
 app.post("/api/v1/services/:id/rotate-secret", requireAuth, rotateSecret);
+app.post("/api/v1/services/:id/logo", requireAuth, uploadServiceLogo);
 
 // ─── Admin Routes ────────────────────────────────────────────────────────────
 
@@ -137,8 +193,36 @@ app.get("/api/v1/admin/users", requireAuth, requireAdmin, listUsers);
 app.get("/api/v1/admin/users/:id", requireAuth, requireAdmin, getUser);
 app.post("/api/v1/admin/users/:id/ban", requireAuth, requireAdmin, banUser);
 app.post("/api/v1/admin/users/:id/role", requireAuth, requireAdmin, setRole);
+app.post("/api/v1/admin/users/:id/reset-password", requireAuth, requireAdmin, resetUserPassword);
+app.delete("/api/v1/admin/users/:id", requireAuth, requireAdmin, deleteUserAccount);
 app.get("/api/v1/admin/stats", requireAuth, requireAdmin, getStats);
 app.get("/api/v1/admin/audit", requireAuth, requireAdmin, getAuditLogs);
+app.get("/api/v1/admin/services", requireAuth, requireAdmin, listAllServices);
+app.post("/api/v1/admin/services/:id/active", requireAuth, requireAdmin, setServiceActive);
+app.delete("/api/v1/admin/services/:id", requireAuth, requireAdmin, deleteAnyService);
+app.post("/api/v1/admin/broadcast", requireAuth, requireAdmin, sendBroadcast);
+app.get("/api/v1/admin/support/tickets", requireAuth, requireAdmin, listAllTickets);
+app.get("/api/v1/admin/support/tickets/:id", requireAuth, requireAdmin, getTicketDetail);
+app.post("/api/v1/admin/support/tickets/:id/reply", requireAuth, requireAdmin, replyTicket);
+app.post("/api/v1/admin/support/tickets/:id/close", requireAuth, requireAdmin, closeTicket);
+app.post("/api/v1/admin/support/tickets/:id/reopen", requireAuth, requireAdmin, reopenTicket);
+app.delete("/api/v1/admin/support/tickets/:id", requireAuth, requireAdmin, deleteTicket);
+
+// ─── Support Routes ───────────────────────────────────────────────────────────
+
+app.post("/api/v1/support/tickets", requireAuth, createTicket);
+app.get("/api/v1/support/tickets", requireAuth, listMyTickets);
+app.get("/api/v1/support/tickets/:id", requireAuth, getTicket);
+app.post("/api/v1/support/tickets/:id/messages", requireAuth, addMessage);
+app.post("/api/v1/support/tickets/:id/close", requireAuth, closeMyTicket);
+app.post("/api/v1/support/tickets/:id/reopen", requireAuth, reopenMyTicket);
+app.get("/api/v1/support/tickets/:id/events", requireAuth, ticketEvents);
+
+// ─── Anonymous Support Routes ────────────────────────────────────────────────
+
+app.post("/api/v1/support/anonymous", createAnonymousTicket);
+app.get("/api/v1/support/anonymous/:id", getAnonymousTicket);
+app.post("/api/v1/support/anonymous/:id/messages", addAnonymousMessage);
 
 // ─── Device Code Routes (RFC 8628 — TV/IoT/Console) ─────────────────────────
 

@@ -46,37 +46,41 @@ export async function finishPasskeyRegistration(c: Context) {
     return error(c, "INVALID_REQUEST", "response and expectedChallenge are required");
   }
 
-  const result = await verifyRegistration(response, expectedChallenge, user.sub);
+  try {
+    const result = await verifyRegistration(response, expectedChallenge, user.sub);
 
-  if (!result.verified || !result.credentialId || !result.credentialPublicKey) {
-    return error(c, "INVALID_REQUEST", "Passkey registration failed");
+    if (!result.verified || !result.credentialId || !result.credentialPublicKey) {
+      return error(c, "INVALID_REQUEST", "Passkey registration failed");
+    }
+
+    // Check if credential already exists
+    const existing = await db.passkey.findUnique({
+      where: { credentialId: result.credentialId },
+    });
+
+    if (existing) {
+      return error(c, "CONFLICT", "Passkey already registered");
+    }
+
+    // Save passkey
+    const passkey = await db.passkey.create({
+      data: {
+        userId: user.sub,
+        credentialId: result.credentialId,
+        publicKey: result.credentialPublicKey,
+        counter: result.counter || 0,
+        transports: result.transports ? JSON.stringify(result.transports) : null,
+        deviceName: deviceName || null,
+      },
+    });
+
+    return success(c, {
+      id: passkey.id,
+      credentialId: passkey.credentialId,
+      deviceName: passkey.deviceName,
+      createdAt: passkey.createdAt.toISOString(),
+    });
+  } catch (e: any) {
+    return error(c, "INVALID_REQUEST", e.message || "Passkey registration failed");
   }
-
-  // Check if credential already exists
-  const existing = await db.passkey.findUnique({
-    where: { credentialId: result.credentialId },
-  });
-
-  if (existing) {
-    return error(c, "CONFLICT", "Passkey already registered");
-  }
-
-  // Save passkey
-  const passkey = await db.passkey.create({
-    data: {
-      userId: user.sub,
-      credentialId: result.credentialId,
-      publicKey: result.credentialPublicKey,
-      counter: result.counter || 0,
-      transports: result.transports ? JSON.stringify(result.transports) : null,
-      deviceName: deviceName || null,
-    },
-  });
-
-  return success(c, {
-    id: passkey.id,
-    credentialId: passkey.credentialId,
-    deviceName: passkey.deviceName,
-    createdAt: passkey.createdAt.toISOString(),
-  });
 }

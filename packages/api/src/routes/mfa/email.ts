@@ -2,7 +2,16 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { generateCode } from "@neo-id/auth-core";
 import { EMAIL } from "@neo-id/shared";
+import { sendLoginCodeEmail, sendEmailCode, sendEmailVerificationEmail } from "../../helpers/email";
 import { success, error } from "../../helpers/response";
+import {
+  normalizeEmail,
+  maskEmail,
+  unusedMfaCodeWhere,
+  assertResendAllowed,
+  verifyAndUseMfaCode,
+  invalidatePendingCodes,
+} from "../../helpers/mfa-code";
 
 export async function setupEmailMfa(c: Context) {
   const user = c.get("user");
@@ -20,7 +29,17 @@ export async function setupEmailMfa(c: Context) {
     return error(c, "MFA_ALREADY_ENABLED", "Email MFA is already enabled");
   }
 
-  // Generate and send code
+  const gate = await assertResendAllowed(user.sub, "mfa_setup");
+  if (!gate.ok) {
+    return error(
+      c,
+      "RATE_LIMITED",
+      `Please wait ${gate.retryAfter}s before requesting another code`,
+      429,
+      { retryAfter: gate.retryAfter },
+    );
+  }
+
   const code = generateCode(EMAIL.CODE_LENGTH);
   await db.mfaCode.create({
     data: {
@@ -31,57 +50,30 @@ export async function setupEmailMfa(c: Context) {
     },
   });
 
-  // TODO: Send email via Resend
+  await sendEmailCode(dbUser.email, code);
 
   return success(c, {
-    email_hint: dbUser.email.replace(/(.{2}).*(@.*)/, "$1***$2"),
+    email_hint: maskEmail(dbUser.email),
+    cooldown: EMAIL.RESEND_COOLDOWN,
   });
 }
 
 export async function enableEmailMfa(c: Context) {
   const user = c.get("user");
   const body = await c.req.json();
-  const { code } = body;
+  const code = String(body.code || "").trim();
 
-  if (!code || code.length !== EMAIL.CODE_LENGTH) {
-    return error(c, "INVALID_REQUEST", `Code must be ${EMAIL.CODE_LENGTH} digits`);
-  }
-
-  const dbUser = await db.user.findUnique({
+  const existing = await db.user.findUnique({
     where: { id: user.sub },
     select: { emailMfaEnabled: true },
   });
 
-  if (!dbUser) {
-    return error(c, "USER_NOT_FOUND", "User not found", 404);
-  }
+  if (!existing) return error(c, "USER_NOT_FOUND", "User not found", 404);
+  if (existing.emailMfaEnabled) return error(c, "MFA_ALREADY_ENABLED", "Email MFA is already enabled");
 
-  if (dbUser.emailMfaEnabled) {
-    return error(c, "MFA_ALREADY_ENABLED", "Email MFA is already enabled");
-  }
+  const { valid } = await verifyAndUseMfaCode(user.sub, "mfa_setup", code);
+  if (!valid) return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
 
-  // Verify code
-  const mfaCode = await db.mfaCode.findFirst({
-    where: {
-      userId: user.sub,
-      purpose: "mfa_setup",
-      usedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!mfaCode || mfaCode.code !== code) {
-    return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
-  }
-
-  // Mark code as used
-  await db.mfaCode.update({
-    where: { id: mfaCode.id },
-    data: { usedAt: new Date() },
-  });
-
-  // Enable email MFA
   await db.user.update({
     where: { id: user.sub },
     data: { emailMfaEnabled: true },
@@ -92,59 +84,92 @@ export async function enableEmailMfa(c: Context) {
 
 export async function disableEmailMfa(c: Context) {
   const user = c.get("user");
-  const body = await c.req.json();
-  const { code } = body;
 
-  if (!code || code.length !== EMAIL.CODE_LENGTH) {
-    return error(c, "INVALID_REQUEST", `Code must be ${EMAIL.CODE_LENGTH} digits`);
-  }
-
-  const dbUser = await db.user.findUnique({
+  const existing = await db.user.findUnique({
     where: { id: user.sub },
     select: { emailMfaEnabled: true },
   });
 
-  if (!dbUser?.emailMfaEnabled) {
-    return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
-  }
+  if (!existing?.emailMfaEnabled) return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
 
-  // Verify code
-  const mfaCode = await db.mfaCode.findFirst({
-    where: {
-      userId: user.sub,
-      purpose: "mfa_disable",
-      usedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!mfaCode || mfaCode.code !== code) {
-    // Generate new code for disable
-    const newCode = generateCode(EMAIL.CODE_LENGTH);
-    await db.mfaCode.create({
-      data: {
-        userId: user.sub,
-        code: newCode,
-        purpose: "mfa_disable",
-        expiresAt: new Date(Date.now() + EMAIL.CODE_EXPIRY * 1000),
-      },
-    });
-    // TODO: Send email
-    return error(c, "MFA_INVALID_CODE", "Invalid code. A new code has been sent to your email.");
-  }
-
-  // Mark code as used
-  await db.mfaCode.update({
-    where: { id: mfaCode.id },
-    data: { usedAt: new Date() },
-  });
-
-  // Disable email MFA
   await db.user.update({
     where: { id: user.sub },
     data: { emailMfaEnabled: false },
   });
 
   return success(c, { ok: true });
+}
+
+/** Resend login MFA email code (unauthenticated — used during sign-in). */
+export async function resendLoginEmailMfa(c: Context) {
+  const body = await c.req.json().catch(() => ({}));
+  const email = normalizeEmail(String(body.email || ""));
+  const purpose = String(body.purpose || "mfa_login").trim();
+
+  if (!email) {
+    return error(c, "INVALID_REQUEST", "Email is required");
+  }
+
+  const user = await db.user.findUnique({
+    where: { email },
+    select: { id: true, emailMfaEnabled: true, email: true, emailVerified: true },
+  });
+
+  if (!user) {
+    return success(c, { sent: true, cooldown: EMAIL.RESEND_COOLDOWN });
+  }
+
+  if (purpose !== "verify_email" && !user.emailMfaEnabled) {
+    return success(c, { sent: true, cooldown: EMAIL.RESEND_COOLDOWN });
+  }
+
+  const codePurpose = purpose === "verify_email" ? "verify_email" : "mfa_login";
+  const gate = await assertResendAllowed(user.id, codePurpose);
+  if (!gate.ok) {
+    return error(
+      c,
+      "RATE_LIMITED",
+      `Please wait ${gate.retryAfter}s before requesting another code`,
+      429,
+      { retryAfter: gate.retryAfter },
+    );
+  }
+
+  await invalidatePendingCodes(user.id, codePurpose);
+
+  const code = generateCode(EMAIL.CODE_LENGTH);
+  await db.mfaCode.create({
+    data: {
+      userId: user.id,
+      code,
+      purpose: codePurpose,
+      usedAt: null,
+      expiresAt: new Date(Date.now() + EMAIL.CODE_EXPIRY * 1000),
+    },
+  });
+
+  let sent: boolean;
+  if (purpose === "verify_email") {
+    const linkRecord = await db.mfaCode.findFirst({
+      where: {
+        userId: user.id,
+        purpose: "verify_email_link",
+        expiresAt: { gte: new Date() },
+        ...unusedMfaCodeWhere(),
+      },
+      orderBy: { createdAt: "desc" },
+      select: { code: true },
+    });
+    const webUrl = process.env.WEB_URL || "http://localhost:3001";
+    const verifyLink = linkRecord ? `${webUrl}/auth/verify-email?token=${linkRecord.code}` : "";
+    sent = await sendEmailVerificationEmail(user.email, code, verifyLink);
+  } else {
+    sent = await sendLoginCodeEmail(user.email, code);
+  }
+
+  if (!sent) {
+    return error(c, "EMAIL_FAILED", "Failed to send email. Please try again.", 500);
+  }
+
+  return success(c, { sent: true, cooldown: EMAIL.RESEND_COOLDOWN });
 }
