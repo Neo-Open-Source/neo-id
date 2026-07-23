@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Input } from "@/components/ui/Input";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
@@ -334,10 +335,7 @@ export function AnonymousTicket() {
     return (
       <div className="flex flex-col h-screen bg-app">
         <div className="flex-none px-4 py-3 bg-surface border-b border-border">
-          <button type="button" className="page-back mb-0" onClick={handleClear}>
-            <Icon name="arrow-left" size={16} />
-            {t.support.title}
-          </button>
+          <BackButton onClick={handleClear} label={t.support.title} className="mb-0" />
           <h1 className="text-lg font-bold text-content mt-1">{ticket.subject}</h1>
           <span className="text-xs text-dim">{ticket.email}</span>
         </div>

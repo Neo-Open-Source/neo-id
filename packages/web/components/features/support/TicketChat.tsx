@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
 import { toast } from "sonner";
@@ -162,10 +163,7 @@ export function TicketChat({
     <div className="panel-page chat-page-root">
       <div className="chat-page">
         <div className="chat-page__header">
-          <button type="button" className="page-back" onClick={() => router.push(backPath)}>
-            <Icon name="arrow-left" size={16} />
-            {backLabel}
-          </button>
+          <BackButton onClick={() => router.push(backPath)} label={backLabel} />
           <div className="chat-page__header-info">
             <h1>{ticket.subject}</h1>
             <div className="chat-page__header-meta">

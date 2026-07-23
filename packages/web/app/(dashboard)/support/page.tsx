@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { toast } from "sonner";
 import { usePageTitle } from "@/lib/use-page-title";
 import { api, ApiError, hasSession } from "@/lib/api";
+import { readCache } from "@/lib/cache";
 import { AnonymousTicket } from "@/components/features/support/AnonymousTicket";
 
 interface Ticket {
@@ -24,21 +25,15 @@ export default function SupportPage() {
   const router = useRouter();
   usePageTitle(t.support.title);
 
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(() =>
+    readCache("/user/profile") ? true : null,
+  );
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    hasSession().then((authed) => {
-      setAuthenticated(authed);
-      if (authed) fetchTickets();
-      else setLoaded(true);
-    });
-  }, []);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -50,6 +45,29 @@ export default function SupportPage() {
       setLoaded(true);
     }
   }, [t.common.error]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const boot = async () => {
+      if (readCache("/user/profile")) {
+        setAuthenticated(true);
+        await fetchTickets();
+        return;
+      }
+
+      const authed = await hasSession();
+      if (cancelled) return;
+      setAuthenticated(authed);
+      if (authed) await fetchTickets();
+      else setLoaded(true);
+    };
+
+    void boot();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchTickets]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
-import { Icon } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 import { usePageTitle } from "@/lib/use-page-title";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -22,10 +22,7 @@ export default function TermsPage() {
   return (
     <div className="legal-root">
       <nav className="legal-nav">
-        <button type="button" onClick={() => router.back()} className="legal-back">
-          <Icon name="arrow-left" size={16} />
-          {t.legal.back}
-        </button>
+        <BackButton onClick={() => router.back()} label={t.legal.back} className="legal-back" />
       </nav>
 
       <main className="legal-main">
