@@ -1,0 +1,307 @@
+@import "tailwindcss";
+@import "@flaticon/flaticon-uicons/css/regular/all.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --color-brand: #0060DF;
+  --color-brand-hover: #0250BB;
+  --color-brand-active: #073072;
+  --color-accent: #0060DF;
+  --color-accent-hover: #0250BB;
+  --color-accent-active: #073072;
+
+  --color-danger: #E22850;
+  --color-danger-hover: #C41E3A;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+
+  --color-app: #F5F5F7;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F0F0F4;
+  --color-surface-row: #EBEBEF;
+  --color-surface-overlay: rgba(0, 0, 0, 0.4);
+
+  --color-content: #1A1A2E;
+  --color-muted: #6B7280;
+  --color-dim: #9CA3AF;
+  --color-very-dim: #D1D5DB;
+
+  --color-border: #E5E7EB;
+  --color-border-hover: #D1D5DB;
+
+  --color-white: #FFFFFF;
+  --color-black: #1A1A2E;
+  --color-skeleton: #E5E7EB;
+  --color-brand-disabled: rgba(0, 96, 223, 0.35);
+
+  --color-accent-subtle: color-mix(in srgb, var(--color-accent) 12%, transparent);
+
+  --radius-card: 16px;
+  --radius-button: 12px;
+  --radius-input: 10px;
+  --radius-modal: 20px;
+  --radius-badge: 8px;
+  --radius-full: 9999px;
+  --radius-hero: 2rem;
+  --width-panel-page: 44rem;
+  --width-secondary-nav: 13.5rem;
+  --width-dashboard-max: 68rem;
+  --grid-template-columns-auth: minmax(0, 0.9fr) minmax(24rem, 1.1fr);
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.16);
+  --animate-fadeIn: fadeIn 200ms ease-out;
+  --animate-authSlideIn: authSlideIn 300ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideDown {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(16px); }
+}
+
+@keyframes authSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes widgetSlide {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility bg-auth-gradient {
+  background: linear-gradient(145deg, var(--color-brand-active), var(--color-accent));
+}
+
+@utility panel-page {
+  width: 100%;
+  max-width: var(--width-panel-page, 44rem);
+  margin: 0 auto;
+}
+
+@utility panel-page__header {
+  margin-bottom: 1.5rem;
+  & h1 {
+    margin: 0;
+    font-size: 1.375rem;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    color: var(--color-content);
+  }
+  & p {
+    margin: 0.35rem 0 0;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+  }
+}
+
+@utility panel-page__header--row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+@utility spinner {
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 600ms linear infinite;
+}
+
+@utility loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+@utility loading__spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--color-accent);
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 600ms linear infinite;
+}
+
+.dark {
+  --color-app: #111118;
+  --color-surface: #1C1C27;
+  --color-surface-hover: #262635;
+  --color-surface-row: #30304A;
+  --color-surface-overlay: rgba(0, 0, 0, 0.7);
+  --color-content: #EEEEF4;
+  --color-muted: #9898B4;
+  --color-dim: #6E6E8C;
+  --color-very-dim: #44445E;
+  --color-border: #30304A;
+  --color-border-hover: #44445E;
+  --color-skeleton: #30304A;
+  --color-accent: #5B8DEF;
+  --color-accent-hover: #4A7DE8;
+  --color-accent-active: #3A6DD8;
+  --color-brand: #5B8DEF;
+  --color-brand-hover: #4A7DE8;
+  --color-brand-active: #3A6DD8;
+  --color-brand-disabled: rgba(91, 141, 239, 0.25);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-app);
+    color: var(--color-content);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-white);
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hover) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-dim) 45%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-muted) 70%, transparent);
+  background-clip: padding-box;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  scrollbar-gutter: stable;
+}
+
+/* Hide scrollbar on auth pages — applied via .auth-shell class on wrapper */
+.auth-shell,
+.auth-shell *,
+.auth-shell + * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.auth-shell::-webkit-scrollbar,
+.auth-shell *::-webkit-scrollbar,
+.auth-shell + *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html:has(.auth-shell) {
+  scrollbar-width: none;
+  scrollbar-gutter: auto;
+}
+
+html:has(.auth-shell)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html:has(.auth-shell) body {
+  scrollbar-width: none;
+}
+
+html:has(.auth-shell) body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.scroll-top {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 5.5rem;
+  z-index: 40;
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-content);
+  box-shadow: var(--shadow-dropdown);
+  cursor: pointer;
+  animation: fadeIn 160ms ease-out;
+  transition: background 150ms, border-color 150ms, transform 150ms;
+}
+
+.scroll-top:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-hover);
+  transform: translateY(-2px);
+}
+
+@media (min-width: 768px) {
+  .scroll-top {
+    bottom: 1.5rem;
+    right: 1.5rem;
+  }
+}

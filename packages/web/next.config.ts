@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  // Proxy API requests to the backend
+  turbopack: {
+    root: path.resolve(__dirname, "../.."),
+  },
   async rewrites() {
     return [
       {
