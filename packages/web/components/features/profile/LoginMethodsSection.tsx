@@ -67,7 +67,7 @@ export function LoginMethodRows({ identities, onChanged }: LoginMethodRowsProps)
             key={provider.id}
             leading={
               <span className={`provider-icon provider-icon--${provider.id}`}>
-                <ProviderIcon size={16} />
+                <ProviderIcon size={18} />
               </span>
             }
             label={provider.name}
