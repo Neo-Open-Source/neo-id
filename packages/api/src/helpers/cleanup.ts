@@ -34,7 +34,12 @@ export async function runCleanup() {
   ]);
 }
 
+let started = false;
+
 export function startCleanup() {
+  if (started) return;
+  started = true;
+
   runCleanup().catch((err) => console.error("[cleanup] error:", err));
 
   setInterval(() => {

@@ -97,9 +97,17 @@ import { requestPasswordReset, resetPassword } from "./routes/auth/forgot-passwo
 
 const app = new Hono();
 
-startCleanup();
-
 // ─── Global Middleware ────────────────────────────────────────────────────────
+
+// Lazy-start cleanup on first incoming request (avoids DB access during build)
+let cleanupStarted = false;
+app.use("*", async (_, next) => {
+  if (!cleanupStarted) {
+    cleanupStarted = true;
+    startCleanup();
+  }
+  await next();
+});
 
 app.use("*", corsMiddleware);
 app.use("*", requestIdMiddleware);
