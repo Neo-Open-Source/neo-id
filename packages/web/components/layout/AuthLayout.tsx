@@ -1,56 +1,69 @@
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { cn } from "@/lib/cn";
+import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
+import { Icon } from "@/components/ui/Icon";
+import { useI18n } from "@/lib/i18n/context";
 
 interface AuthLayoutProps {
   title: string;
   subtitle?: string;
   children: ReactNode;
-  footer?: { text: string; link: string; label: string };
+  onBack?: () => void;
+  backLabel?: string;
 }
 
-export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProps) {
+export function AuthLayout({ title, subtitle, children, onBack, backLabel }: AuthLayoutProps) {
+  const { t } = useI18n();
+
   return (
-    <div className="flex h-svh w-screen overflow-hidden bg-surface">
-      {/* Left: Form */}
-      <div className="flex flex-col justify-center w-full md:w-[35%] lg:w-[38%] xl:w-[40%] px-6 sm:px-10 md:px-12 py-8 bg-surface animate-[fadeIn_300ms_ease-out] overflow-y-auto">
-        <div className="w-full max-w-sm mx-auto flex flex-col gap-6">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-              <span className="text-white font-bold text-sm">N</span>
+    <div className="auth-shell grid grid-cols-1 md:grid-cols-auth min-h-svh bg-surface">
+      <div className="flex min-w-0 p-6 md:p-8 overflow-y-auto">
+        <div
+          className={cn(
+            "flex flex-1 w-full max-w-md m-auto flex-col",
+            "min-h-svh md:min-h-[calc(100svh-4rem)]",
+          )}
+        >
+          <div className="flex items-center justify-between pt-6 md:pt-8 pb-8">
+            <div className="inline-flex items-center gap-2 text-content text-base font-bold tracking-tight">
+              <img src="/splash-icon.png" alt="Neo ID" className="w-7 h-7" />
+              <span>Neo ID</span>
             </div>
-            <span className="text-sm font-semibold text-content">Neo ID</span>
+            <LanguagePicker />
+          </div>
+          <div className="flex flex-1 flex-col justify-center gap-8">
+            {onBack && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-muted text-sm hover:text-content"
+                onClick={onBack}
+              >
+                <Icon name="arrow-left" size={16} />
+                <span>{backLabel || "Back"}</span>
+              </button>
+            )}
+            <div className="flex flex-col gap-2">
+              <h1 className="text-2xl font-bold text-content">{title}</h1>
+              {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
+            </div>
+            {children}
           </div>
 
-          {/* Title */}
-          <div className="flex flex-col gap-1.5">
-            <h1 className="text-2xl font-bold text-content">{title}</h1>
-            {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
-          </div>
-
-          {/* Form Content */}
-          {children}
-        </div>
-
-        {/* Footer */}
-        {footer && (
-          <p className="text-sm text-muted text-center mt-6 max-w-sm mx-auto w-full">
-            {footer.text}{" "}
-            <Link
-              href={footer.link}
-              className="text-accent hover:text-accent-hover font-medium transition-colors"
-            >
-              {footer.label}
-            </Link>
+          <p className="py-6 md:py-8 text-xs leading-snug text-dim text-center">
+            {t.auth.legal.agreePrefix}{" "}
+            <Link href="/terms" className="text-accent underline">{t.auth.legal.terms}</Link>{" "}
+            {t.auth.legal.agreeSuffix}{" "}
+            <Link href="/privacy" className="text-accent underline">{t.auth.legal.privacy}</Link>.
           </p>
-        )}
+        </div>
       </div>
-
-      {/* Right: Gradient Decoration */}
-      <div className="hidden md:flex md:w-[65%] lg:w-[62%] xl:w-[60%] bg-gradient-to-br from-accent via-accent-hover to-brand-active rounded-l-[32px] relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10 rounded-l-[32px]" />
-        {/* Optional: Add decorative elements here */}
-      </div>
+      <aside
+        className="relative hidden md:block overflow-hidden rounded-l-hero bg-auth-gradient"
+        aria-hidden="true"
+      />
     </div>
   );
 }

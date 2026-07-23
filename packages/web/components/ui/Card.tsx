@@ -12,9 +12,9 @@ export function Card({ children, className, padding = true, hover }: CardProps) 
   return (
     <div
       className={cn(
-        "bg-surface border border-border/50 rounded-card shadow-card",
-        padding && "p-5",
-        hover && "hover:shadow-card-hover transition-shadow cursor-pointer",
+        "card",
+        hover && "card--hover",
+        padding && "card__section",
         className,
       )}
     >

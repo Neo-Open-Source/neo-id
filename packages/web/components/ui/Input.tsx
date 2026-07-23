@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/cn";
 import type { InputHTMLAttributes } from "react";
+import { Icon } from "./Icon";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -15,18 +16,15 @@ export function Input({ label, error, type, className, ...props }: InputProps) {
   const inputType = isPassword && visible ? "text" : type;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {label && (
-        <label className="text-sm text-content">{label}</label>
-      )}
+    <div className="input-wrapper">
+      {label && <label className="input-label">{label}</label>}
       <div className="relative">
         <input
           type={inputType}
           className={cn(
-            "w-full px-4 py-2.5 text-sm bg-surface border text-content rounded-input outline-none transition-all",
-            "placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/20",
-            error ? "border-danger" : "border-border",
-            isPassword && "pr-10",
+            "input",
+            error && "input--error",
+            isPassword && "input--password",
             className,
           )}
           {...props}
@@ -38,11 +36,11 @@ export function Input({ label, error, type, className, ...props }: InputProps) {
             onClick={() => setVisible(!visible)}
             className="absolute right-3 inset-y-0 flex items-center text-dim hover:text-content transition-colors cursor-pointer"
           >
-            {visible ? "Hide" : "Show"}
+            <Icon name={visible ? "eye-crossed" : "eye"} size={16} />
           </button>
         )}
       </div>
-      {error && <span className="text-xs text-danger">{error}</span>}
+      {error && <span className="input-error">{error}</span>}
     </div>
   );
 }
