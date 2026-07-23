@@ -2,18 +2,18 @@
 
 ## Project
 
-Auth/OIDC provider — TypeScript monorepo rewrite. Replaces neo-id-rs (Rust).
-Production domain: `https://id.neome.uk`. MongoDB database.
+Auth/OIDC provider — TypeScript monorepo.
+Production domain: `https://id.neome.uk`.
 
 ## Stack
 
 | Layer | Choice |
 |-------|--------|
 | Language | TypeScript |
-| API Framework | Hono |
-| Database | MongoDB via Prisma |
+| API Framework | Hono (Bun) |
+| Database | PostgreSQL via Prisma |
 | Auth | JWT RS256 (access/refresh/ID tokens), OAuth2 (Google/GitHub), WebAuthn, TOTP |
-| Frontend | Next.js 15 (App Router, SSR) |
+| Frontend | Next.js 16 (App Router, SSR) |
 | State Management | Zustand (client-side) |
 | Validation | Zod |
 | Build | tsup + Turborepo |
@@ -53,6 +53,8 @@ packages/
 - Extract repeated logic into custom hooks (`useUser`, `useAuth`)
 - Shared utilities → `packages/shared/src/`
 - Auth-core functions → `packages/auth-core/src/`
+- API validation → `validate(schema, body)` from `packages/api/src/helpers/request.ts`
+- Pagination → `parsePagination(query, defaultLimit)` from `packages/api/src/helpers/request.ts`
 
 ### 5. DICTIONARIES FOR UI STRINGS
 - All user-facing text → i18n JSON files (`dictionaries/en.json`, etc.)
@@ -105,11 +107,59 @@ POST   /api/v1/auth/register
 POST   /api/v1/auth/login
 POST   /api/v1/auth/refresh
 POST   /api/v1/auth/logout
+POST   /api/v1/auth/forgot-password
+POST   /api/v1/auth/reset-password
+POST   /api/v1/auth/verify-email
 GET    /api/v1/user/profile
 PUT    /api/v1/user/profile
 PUT    /api/v1/user/password
+PUT    /api/v1/user/email
+GET    /api/v1/sessions
+DELETE /api/v1/sessions/:id
+DELETE /api/v1/sessions
+GET    /api/v1/passkeys
+POST   /api/v1/passkeys/register/start
+POST   /api/v1/passkeys/register/finish
+DELETE /api/v1/passkeys/:id
+POST   /api/v1/mfa/totp/setup
+POST   /api/v1/mfa/totp/enable
+POST   /api/v1/mfa/totp/disable
+POST   /api/v1/mfa/email/setup
+POST   /api/v1/mfa/email/enable
+POST   /api/v1/mfa/email/disable
+POST   /api/v1/mfa/verify
+GET    /api/v1/services
+POST   /api/v1/services
+GET    /api/v1/services/:id
+PUT    /api/v1/services/:id
+DELETE /api/v1/services/:id
+POST   /api/v1/services/:id/rotate-secret
+POST   /api/v1/services/:id/logo
+GET    /api/v1/support/tickets
+POST   /api/v1/support/tickets
+GET    /api/v1/support/tickets/:id
+POST   /api/v1/support/tickets/:id/messages
+POST   /api/v1/support/tickets/:id/close
+POST   /api/v1/support/tickets/:id/reopen
+GET    /api/v1/admin/users
+GET    /api/v1/admin/users/:id
+POST   /api/v1/admin/users/:id/ban
+POST   /api/v1/admin/users/:id/role
+POST   /api/v1/admin/users/:id/reset-password
+DELETE /api/v1/admin/users/:id
+GET    /api/v1/admin/stats
+GET    /api/v1/admin/services
+GET    /api/v1/admin/audit-logs
+GET    /api/v1/admin/support/tickets
+GET    /api/v1/admin/support/tickets/:id
+POST   /api/v1/admin/support/tickets/:id/messages
+POST   /api/v1/admin/support/tickets/:id/status
+POST   /api/v1/oauth2/authorize
+POST   /api/v1/oauth2/token
+POST   /api/v1/oauth2/token/introspect
 GET    /.well-known/openid-configuration
 GET    /.well-known/jwks.json
+POST   /api/v1/device/token
 ```
 
 ## Dev
@@ -117,7 +167,7 @@ GET    /.well-known/jwks.json
 ```sh
 pnpm install
 cp .env.example .env
-# Edit .env with MongoDB URI and JWT keys
+# Edit .env with DATABASE_URL (PostgreSQL)
 pnpm db:generate
 pnpm db:migrate
 pnpm db:seed
