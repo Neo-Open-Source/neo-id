@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
-import { Icon } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 import { useI18n } from "@/lib/i18n/context";
 
 interface AuthLayoutProps {
@@ -36,14 +36,7 @@ export function AuthLayout({ title, subtitle, children, onBack, backLabel }: Aut
           </div>
           <div className="flex flex-1 flex-col justify-center gap-8">
             {onBack && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-muted text-sm hover:text-content"
-                onClick={onBack}
-              >
-                <Icon name="arrow-left" size={16} />
-                <span>{backLabel || "Back"}</span>
-              </button>
+              <BackButton onClick={onBack} label={backLabel || t.common.back} className="mb-0" />
             )}
             <div className="flex flex-col gap-2">
               <h1 className="text-2xl font-bold text-content">{title}</h1>

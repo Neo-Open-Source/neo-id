@@ -21,7 +21,7 @@ export function BottomNav({ user, onLogout, openTicketCount }: BottomNavProps) {
   const isDev = user?.role === "developer" || isAdmin;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border flex items-center justify-around py-1.5 px-2 z-40 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border flex items-center justify-around py-1.5 px-2 pb-[max(0.375rem,env(safe-area-inset-bottom))] z-40 md:hidden">
       <Link
         href="/profile"
         className={cn(
