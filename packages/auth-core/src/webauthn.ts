@@ -3,6 +3,7 @@ import {
   verifyRegistrationResponse,
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
+  type AuthenticatorTransportFuture,
 } from "@simplewebauthn/server";
 import { WEBAUTHN } from "@neo-id/shared";
 
@@ -39,10 +40,21 @@ export async function generateRegistrationOpts(
     userName: email,
     userDisplayName: email,
     attestationType: "none",
-    excludeCredentials: existingCredentials.map((c) => ({
-      id: c.credentialId,
-      transports: c.transports ? [c.transports as any] : undefined,
-    })),
+    excludeCredentials: existingCredentials.map((c) => {
+      let transports: AuthenticatorTransportFuture[] | undefined;
+      if (c.transports) {
+        try {
+          const parsed = JSON.parse(c.transports);
+          transports = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          transports = undefined;
+        }
+      }
+      return {
+        id: c.credentialId,
+        transports,
+      };
+    }),
     authenticatorSelection: {
       residentKey: "preferred",
       userVerification: "preferred",
@@ -86,10 +98,21 @@ export async function generateAuthenticationOpts(
 ) {
   return generateAuthenticationOptions({
     rpID: RP_ID,
-    allowCredentials: credentials.map((c) => ({
-      id: c.credentialId,
-      transports: c.transports ? [c.transports as any] : undefined,
-    })),
+    allowCredentials: credentials.map((c) => {
+      let transports: AuthenticatorTransportFuture[] | undefined;
+      if (c.transports) {
+        try {
+          const parsed = JSON.parse(c.transports);
+          transports = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          transports = undefined;
+        }
+      }
+      return {
+        id: c.credentialId,
+        transports,
+      };
+    }),
     userVerification: "preferred",
   });
 }

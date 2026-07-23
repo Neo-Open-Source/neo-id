@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
 import { toast } from "sonner";
@@ -68,17 +68,22 @@ export default function PasskeysPage() {
       const startData = await api("/passkeys/register/start", { method: "POST" });
 
       // Convert base64url strings to ArrayBuffers for navigator.credentials.create
-      const publicKeyOptions = {
-        ...startData,
+      const publicKeyOptions: PublicKeyCredentialCreationOptions = {
+        rp: startData.rp,
         challenge: base64urlToBuffer(startData.challenge),
         user: {
           ...startData.user,
           id: base64urlToBuffer(startData.user.id),
         },
+        pubKeyCredParams: startData.pubKeyCredParams,
+        timeout: startData.timeout,
         excludeCredentials: (startData.excludeCredentials || []).map((cred: any) => ({
-          ...cred,
           id: base64urlToBuffer(cred.id),
+          type: "public-key" as const,
+          transports: cred.transports as AuthenticatorTransport[] | undefined,
         })),
+        attestation: "none" as const,
+        authenticatorSelection: startData.authenticatorSelection,
       };
 
       const credential = await navigator.credentials.create({ publicKey: publicKeyOptions });
@@ -123,16 +128,13 @@ export default function PasskeysPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <Link href="/profile" className="page-back">
-          <Icon name="arrow-left" size={16} />
-          {t.profile.backToProfile}
-        </Link>
+        <BackButton href="/profile" label={t.profile.backToProfile} />
         <h1 className="page-title">{t.profile.passkeys}</h1>
         <p className="page-subtitle">{t.profile.passkeysSubtitle}</p>
       </div>
 
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-3 mb-4 max-sm:flex-col max-sm:items-stretch">
           <p className="text-sm text-muted">
             {t.profile.passkeysRegistered.replace("{{count}}", String(passkeys.length))}
           </p>
