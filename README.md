@@ -220,3 +220,7 @@ packages/
 ├── sdk/           # JS/TS client SDK + React hooks
 └── web/           # Next.js frontend (SSR)
 ```
+
+## License
+
+[MIT](LICENSE)
