@@ -1,4 +1,5 @@
-import { SignJWT, jwtVerify, importPKCS8, importSPKI, type JWK } from "jose";
+import { randomUUID } from "node:crypto";
+import { SignJWT, jwtVerify, importPKCS8, importSPKI, type JWK, type CryptoKey } from "jose";
 import { TOKEN } from "@neo-id/shared";
 
 export interface JwtPayload {
@@ -14,30 +15,37 @@ export interface TokenPair {
   idToken: string;
 }
 
-let privateKey: CryptoKey | null = null;
-let publicKey: CryptoKey | null = null;
+let keyCache: { privateKey: CryptoKey; publicKey: CryptoKey } | null = null;
 
 async function getKeys() {
-  if (privateKey && publicKey) return { privateKey, publicKey };
+  if (keyCache) return keyCache;
 
-  const privPem = process.env.JWT_PRIVATE_KEY;
-  const pubPem = process.env.JWT_PUBLIC_KEY;
+  const privPem = process.env.JWT_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const pubPem = process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n");
 
   if (!privPem || !pubPem) {
     throw new Error("JWT_PRIVATE_KEY and JWT_PUBLIC_KEY must be set");
   }
 
-  privateKey = await importPKCS8(privPem, "RS256");
-  publicKey = await importSPKI(pubPem, "RS256");
+  keyCache = {
+    privateKey: await importPKCS8(privPem, "RS256"),
+    publicKey: await importSPKI(pubPem, "RS256"),
+  };
 
-  return { privateKey, publicKey };
+  return keyCache;
 }
+
+export function clearKeyCache() {
+  keyCache = null;
+}
+
+const ISSUER = () => process.env.JWT_ISSUER || "https://id.neome.uk";
 
 export async function signAccessToken(
   payload: JwtPayload,
   sessionId?: string
 ): Promise<string> {
-  const { privateKey: key } = await getKeys();
+  const { privateKey } = await getKeys();
 
   return new SignJWT({
     sub: payload.sub,
@@ -47,14 +55,14 @@ export async function signAccessToken(
   })
     .setProtectedHeader({ alg: "RS256" })
     .setIssuedAt()
-    .setIssuer(process.env.JWT_ISSUER || "https://id.neome.uk")
+    .setIssuer(ISSUER())
     .setExpirationTime(`${TOKEN.ACCESS_TOKEN_EXPIRY}s`)
-    .setJti(crypto.randomUUID())
-    .sign(key);
+    .setJti(randomUUID())
+    .sign(privateKey);
 }
 
 export async function signIdToken(payload: JwtPayload): Promise<string> {
-  const { privateKey: key } = await getKeys();
+  const { privateKey } = await getKeys();
 
   return new SignJWT({
     sub: payload.sub,
@@ -63,17 +71,17 @@ export async function signIdToken(payload: JwtPayload): Promise<string> {
   })
     .setProtectedHeader({ alg: "RS256" })
     .setIssuedAt()
-    .setIssuer(process.env.JWT_ISSUER || "https://id.neome.uk")
+    .setIssuer(ISSUER())
     .setExpirationTime(`${TOKEN.ID_TOKEN_EXPIRY}s`)
-    .setJti(crypto.randomUUID())
-    .sign(key);
+    .setJti(randomUUID())
+    .sign(privateKey);
 }
 
 export async function verifyAccessToken(token: string): Promise<JwtPayload> {
-  const { publicKey: key } = await getKeys();
+  const { publicKey } = await getKeys();
 
-  const { payload } = await jwtVerify(token, key, {
-    issuer: process.env.JWT_ISSUER || "https://id.neome.uk",
+  const { payload } = await jwtVerify(token, publicKey, {
+    issuer: ISSUER(),
   });
 
   return {
@@ -85,7 +93,7 @@ export async function verifyAccessToken(token: string): Promise<JwtPayload> {
 }
 
 export async function getJwks(): Promise<{ keys: JWK[] }> {
-  const { publicKey: key } = await getKeys();
-  const jwk = await crypto.subtle.exportKey("jwk", key);
+  const { publicKey } = await getKeys();
+  const jwk = await crypto.subtle.exportKey("jwk", publicKey);
   return { keys: [jwk] };
 }

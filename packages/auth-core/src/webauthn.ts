@@ -1,20 +1,38 @@
-// @ts-nocheck — simplewebauthn types are complex; verify at runtime
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
+import { WEBAUTHN } from "@neo-id/shared";
 
-const RP_NAME = "Neo ID";
+const RP_NAME = WEBAUTHN.RP_NAME;
 const RP_ID = process.env.RP_ID || "id.neome.uk";
 const ORIGIN = process.env.ORIGIN || "https://id.neome.uk";
+
+export interface CredentialDescriptor {
+  credentialId: string;
+  transports?: string;
+}
+
+export interface RegistrationResult {
+  verified: boolean;
+  credentialId?: string;
+  credentialPublicKey?: string;
+  counter?: number;
+  transports?: string[];
+}
+
+export interface AuthenticationResult {
+  verified: boolean;
+  newCounter?: number;
+}
 
 export async function generateRegistrationOpts(
   _userId: string,
   email: string,
-  existingCredentials: Array<{ credentialId: string; transports?: string }>
-): Promise<any> {
+  existingCredentials: CredentialDescriptor[],
+) {
   return generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
@@ -23,7 +41,7 @@ export async function generateRegistrationOpts(
     attestationType: "none",
     excludeCredentials: existingCredentials.map((c) => ({
       id: c.credentialId,
-      transports: c.transports as any,
+      transports: c.transports ? [c.transports as any] : undefined,
     })),
     authenticatorSelection: {
       residentKey: "preferred",
@@ -33,15 +51,16 @@ export async function generateRegistrationOpts(
 }
 
 export async function verifyRegistration(
-  response: any,
+  response: Record<string, unknown>,
   expectedChallenge: string,
-  _userId: string
-): Promise<{ verified: boolean; credentialId?: string; credentialPublicKey?: string; counter?: number; transports?: any }> {
+  _userId: string,
+): Promise<RegistrationResult> {
   const verification = await verifyRegistrationResponse({
-    response,
+    response: response as any,
     expectedChallenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
+    requireUserVerification: false,
   });
 
   if (!verification.verified || !verification.registrationInfo) {
@@ -49,48 +68,54 @@ export async function verifyRegistration(
   }
 
   const { credential } = verification.registrationInfo;
+  if (!credential) {
+    return { verified: false };
+  }
 
   return {
     verified: true,
     credentialId: credential.id,
     credentialPublicKey: Buffer.from(credential.publicKey).toString("base64url"),
     counter: credential.counter,
-    transports: response.response.transports,
+    transports: (response.response as Record<string, unknown>)?.transports as string[] | undefined,
   };
 }
 
 export async function generateAuthenticationOpts(
-  credentials: Array<{ credentialId: string; transports?: string }>
-): Promise<any> {
+  credentials: CredentialDescriptor[],
+) {
   return generateAuthenticationOptions({
     rpID: RP_ID,
     allowCredentials: credentials.map((c) => ({
       id: c.credentialId,
-      transports: c.transports as any,
+      transports: c.transports ? [c.transports as any] : undefined,
     })),
     userVerification: "preferred",
   });
 }
 
 export async function verifyAuthentication(
-  response: any,
+  response: Record<string, unknown>,
   expectedChallenge: string,
-  credential: { credentialId: string; publicKey: string; counter: number }
-): Promise<{ verified: boolean; newCounter?: number }> {
+  credential: { credentialId: string; publicKey: string; counter: number },
+): Promise<AuthenticationResult> {
+  const pubKeyBuffer = Buffer.from(credential.publicKey, "base64url");
+
   const verification = await verifyAuthenticationResponse({
-    response,
+    response: response as any,
     expectedChallenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
+    requireUserVerification: false,
     credential: {
       id: credential.credentialId,
-      publicKey: Buffer.from(credential.publicKey, "base64url"),
+      publicKey: new Uint8Array(pubKeyBuffer),
       counter: credential.counter,
-    } as any,
+    },
   });
 
   return {
     verified: verification.verified,
-    newCounter: verification.authenticationInfo.newCounter,
+    newCounter: verification.authenticationInfo?.newCounter,
   };
 }

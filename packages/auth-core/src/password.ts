@@ -1,9 +1,8 @@
 import bcrypt from "bcrypt";
-
-const SALT_ROUNDS = 12;
+import { PASSWORD } from "@neo-id/shared";
 
 export async function hash(password: string): Promise<string> {
-  return bcrypt.hash(password, SALT_ROUNDS);
+  return bcrypt.hash(password, PASSWORD.SALT_ROUNDS);
 }
 
 export async function verify(password: string, hash: string): Promise<boolean> {

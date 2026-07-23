@@ -80,11 +80,25 @@ export async function exchangeCode(
   return accessToken.token;
 }
 
+interface GoogleUser {
+  sub: string;
+  email: string;
+  name: string;
+  picture: string;
+}
+
+interface GitHubUser {
+  id: number;
+  email: string | null;
+  name: string | null;
+  avatar_url: string;
+}
+
 export async function getGoogleUserInfo(accessToken: string): Promise<OAuthUserInfo> {
   const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const data = await res.json();
+  const data = (await res.json()) as GoogleUser;
 
   return {
     id: data.sub,
@@ -99,12 +113,12 @@ export async function getGithubUserInfo(accessToken: string): Promise<OAuthUserI
   const res = await fetch("https://api.github.com/user", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const data = await res.json();
+  const data = (await res.json()) as GitHubUser;
 
   return {
     id: String(data.id),
-    email: data.email,
-    name: data.name,
+    email: data.email ?? "",
+    name: data.name ?? undefined,
     picture: data.avatar_url,
     provider: "github",
   };
