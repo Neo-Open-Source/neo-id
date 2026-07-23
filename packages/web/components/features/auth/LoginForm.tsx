@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { GoogleIcon, GithubIcon } from "@/components/ui/ProviderIcons";
 import { Icon } from "@/components/ui/Icon";
+import { Turnstile } from "@/components/ui/Turnstile";
 import { setAccessToken } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -23,6 +24,8 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "password">(initialLoginStep);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +42,7 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, cfTurnstileToken: turnstileToken }),
       });
 
       const json = await res.json();
@@ -98,7 +101,16 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
         )}
       </div>
 
-      <Button type="submit" loading={loading} disabled={!email || (step === "password" && !password)} className="w-full">
+      {step === "password" && turnstileSiteKey && (
+        <Turnstile siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
+      )}
+
+      <Button
+        type="submit"
+        loading={loading}
+        disabled={!email || (step === "password" && (!password || (!!turnstileSiteKey && !turnstileToken)))}
+        className="w-full"
+      >
         {step === "email" ? t.auth.login.continue : t.auth.login.button}
       </Button>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { BackButton } from "@/components/ui/BackButton";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
 import { toast } from "sonner";
@@ -20,10 +20,7 @@ export default function LanguagePage() {
 
   return (
     <div className="page profile-page">
-      <Link href="/profile" className="page-back">
-        <Icon name="arrow-left" size={16} />
-        {t.profile.backToProfile}
-      </Link>
+      <BackButton href="/profile" label={t.profile.backToProfile} />
 
       <div className="page-intro">
         <h1 className="page-intro__title">{t.language?.title ?? t.profile.language}</h1>

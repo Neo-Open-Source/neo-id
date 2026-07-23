@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { GoogleIcon, GithubIcon } from "@/components/ui/ProviderIcons";
+import { Turnstile } from "@/components/ui/Turnstile";
 import { setAccessToken } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -22,6 +23,8 @@ export function RegisterForm({ initialEmail = "", onToggleMode }: RegisterFormPr
   const [password, setPassword] = useState("");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   const canSubmit = email.length > 0 && username.length > 0 && password.length > 0 && ageConfirmed;
 
@@ -34,7 +37,7 @@ export function RegisterForm({ initialEmail = "", onToggleMode }: RegisterFormPr
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, username, password, ageConfirmed }),
+        body: JSON.stringify({ email, username, password, ageConfirmed, cfTurnstileToken: turnstileToken }),
       });
 
       const json = await res.json();
@@ -109,7 +112,11 @@ export function RegisterForm({ initialEmail = "", onToggleMode }: RegisterFormPr
         <span className="text-sm text-muted leading-snug">{t.auth.register.ageConfirm}</span>
       </label>
 
-      <Button type="submit" loading={loading} disabled={!canSubmit} className="w-full">
+      {turnstileSiteKey && (
+        <Turnstile siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
+      )}
+
+      <Button type="submit" loading={loading} disabled={!canSubmit || (!!turnstileSiteKey && !turnstileToken)} className="w-full">
         {t.auth.register.button}
       </Button>
 

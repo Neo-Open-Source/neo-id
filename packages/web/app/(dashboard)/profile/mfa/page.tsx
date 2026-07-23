@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { CodeInput } from "@/components/ui/CodeInput";
 import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -114,10 +114,7 @@ export default function MfaSettingsPage() {
 
   return (
     <div className="page profile-page">
-      <Link href="/profile" className="page-back">
-        <Icon name="arrow-left" size={16} />
-        {t.profile.backToProfile}
-      </Link>
+      <BackButton href="/profile" label={t.profile.backToProfile} />
 
       <div className="page-intro">
         <h1 className="page-intro__title">{t.profile.twoFactor}</h1>

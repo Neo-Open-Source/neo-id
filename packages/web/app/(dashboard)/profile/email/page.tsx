@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Input } from "@/components/ui/Input";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
@@ -39,7 +39,7 @@ export default function EmailPage() {
 
   return (
     <div className="email-change-page">
-      <Link href="/profile" className="page-back"><Icon name="arrow-left" size={16} />{t.profile.backToProfile}</Link>
+      <BackButton href="/profile" label={t.profile.backToProfile} />
       <section className="email-change-card">
         <div className="email-change-icon"><Icon name="envelope" size={22} /></div>
         <h1>{t.profile.changeEmail}</h1>

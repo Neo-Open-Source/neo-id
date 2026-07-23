@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Icon } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 import { PasswordChangeForm } from "@/components/features/profile/PasswordChangeForm";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
@@ -12,10 +11,7 @@ export default function PasswordPage() {
 
   return (
     <div className="profile-page password-page">
-      <Link href="/profile" className="page-back">
-        <Icon name="arrow-left" size={16} />
-        {t.profile.backToProfile}
-      </Link>
+      <BackButton href="/profile" label={t.profile.backToProfile} />
 
       <section className="profile-group password-page__card">
         <div className="password-page__header">
