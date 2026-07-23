@@ -54,6 +54,16 @@ export const updateProfileSchema = z.object({
   displayName: z.string().max(USER.DISPLAY_NAME_MAX).optional(),
   firstName: z.string().max(50).optional(),
   lastName: z.string().max(50).optional(),
+  username: z
+    .union([
+      z
+        .string()
+        .min(USER.USERNAME_MIN, `Username must be at least ${USER.USERNAME_MIN} characters`)
+        .max(USER.USERNAME_MAX, `Username must be at most ${USER.USERNAME_MAX} characters`)
+        .regex(USER.USERNAME_REGEX, "Only Latin letters, numbers, - and _ allowed"),
+      z.literal(""),
+    ])
+    .optional(),
 });
 
 export const changePasswordSchema = z.object({
@@ -116,3 +126,5 @@ export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type CreateServiceAppInput = z.infer<typeof createServiceAppSchema>;
 export type UpdateServiceAppInput = z.infer<typeof updateServiceAppSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

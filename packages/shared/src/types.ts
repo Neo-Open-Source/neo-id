@@ -131,9 +131,16 @@ export interface ApiResponse<T = unknown> {
   meta: ResponseMeta;
 }
 
-export interface ApiError {
-  code: ErrorCode;
-  message: string;
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number = 500,
+    public details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
 export interface ResponseMeta {
@@ -164,7 +171,10 @@ export type ErrorCode =
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "CONFLICT"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "SERVICE_UNAVAILABLE"
+  | "EMAIL_FAILED"
+  | "CODE_REQUIRED";
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
 

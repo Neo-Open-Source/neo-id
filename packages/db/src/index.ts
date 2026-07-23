@@ -1,11 +1,19 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./__generated__/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-export { PrismaClient };
-export type * from "@prisma/client";
+export { PrismaClient, PrismaPg };
+export type * from "./__generated__/prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-export const db = globalForPrisma.prisma || new PrismaClient();
+function createPrismaClient() {
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+  });
+  return new PrismaClient({ adapter });
+}
+
+export const db = globalForPrisma.prisma || createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
@@ -20,7 +28,7 @@ export async function findUserById(id: string) {
 }
 
 export async function findUserByUsername(username: string) {
-  return db.user.findUnique({ where: { username } });
+  return db.user.findFirst({ where: { username } });
 }
 
 export async function createUser(data: {
@@ -182,8 +190,8 @@ export async function findValidMfaCode(
     where: {
       userId,
       purpose,
+      expiresAt: { gte: new Date() },
       usedAt: null,
-      expiresAt: { gt: new Date() },
     },
     orderBy: { createdAt: "desc" },
   });

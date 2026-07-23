@@ -27,6 +27,8 @@ export const RATE_LIMITS = {
   REFRESH: { limit: 30, window: 60 },
   GENERAL: { limit: 100, window: 60 },
   PASSWORD_RESET: { limit: 3, window: 600 },
+  FORGOT_PASSWORD: { limit: 3, window: 600 },
+  RESET_PASSWORD: { limit: 3, window: 600 },
   EMAIL_VERIFY: { limit: 3, window: 600 },
 } as const;
 
@@ -35,6 +37,7 @@ export const RATE_LIMITS = {
 export const PASSWORD = {
   MIN_LENGTH: 8,
   MAX_LENGTH: 128,
+  SALT_ROUNDS: 12,
 } as const;
 
 // ─── User Rules ──────────────────────────────────────────────────────────────
@@ -44,8 +47,6 @@ export const USER = {
   USERNAME_MAX: 30,
   USERNAME_REGEX: /^[a-zA-Z0-9_-]+$/,
   DISPLAY_NAME_MAX: 100,
-  AVATAR_MAX_SIZE: 5 * 1024 * 1024, // 5MB
-  AVATAR_ALLOWED_TYPES: ["image/png", "image/jpeg", "image/webp"],
 } as const;
 
 // ─── Email ───────────────────────────────────────────────────────────────────
@@ -63,6 +64,27 @@ export const SESSION = {
   INACTIVITY_TIMEOUT: 30 * 24 * 60 * 60, // 30 days
 } as const;
 
+// ─── WebAuthn ───────────────────────────────────────────────────────────────
+
+export const WEBAUTHN = {
+  RP_NAME: "Neo ID",
+} as const;
+
+// ─── Device Code (RFC 8628) ─────────────────────────────────────────────────
+
+export const DEVICE_CODE = {
+  CODE_LENGTH: 8,
+  POLL_INTERVAL: 5, // seconds
+  EXPIRY: 30 * 60, // 30 minutes in seconds
+} as const;
+
+// ─── Avatar ─────────────────────────────────────────────────────────────────
+
+export const AVATAR = {
+  MAX_SIZE: 5 * 1024 * 1024, // 5MB
+  ALLOWED_TYPES: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+} as const;
+
 // ─── OAuth Providers ─────────────────────────────────────────────────────────
 
 export const OAUTH_PROVIDERS = ["google", "github"] as const;
@@ -73,6 +95,14 @@ export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
 
 export const ROLES = ["user", "developer", "admin"] as const;
 export const STATUSES = ["active", "banned", "invited"] as const;
+
+// ─── Pagination ──────────────────────────────────────────────────────────────
+
+export const PAGINATION = {
+  DEFAULT_LIMIT: 20,
+  MAX_LIMIT: 100,
+  AUDIT_LIMIT: 50,
+} as const;
 
 // ─── Audit Actions ───────────────────────────────────────────────────────────
 

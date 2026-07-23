@@ -1,34 +1,29 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/__generated__/prisma"
 }
 
 datasource db {
-  provider = "mongodb"
-  url      = env("MONGODB_URI")
+  provider = "postgresql"
 }
 
 // ─── User ────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @id @default(cuid())
   email         String    @unique
   emailVerified Boolean   @default(false)
-  username      String?   @unique
+  username      String?
   passwordHash  String?
   displayName   String?
   firstName     String?
   lastName      String?
   avatar        String?
 
-  // Roles — validated via Zod in shared/validation.ts
-  // Allowed values: "user" | "developer" | "admin"
   role          String    @default("user")
 
-  // Status — validated via Zod in shared/validation.ts
-  // Allowed values: "active" | "banned" | "invited"
   status        String    @default("active")
 
-  // Metadata (Auth0 pattern) — JsonValue, type-guard in shared/types.ts
   userMetadata  Json?     @default("{}")
   appMetadata   Json?     @default("{}")
 
@@ -50,6 +45,7 @@ model User {
   identities    Identity[]
   passkeys      Passkey[]
   mfaCodes      MfaCode[]
+  authorizedConnections AuthorizedConnection[]
 
   @@map("users")
 }
@@ -57,8 +53,8 @@ model User {
 // ─── Session ─────────────────────────────────────────────────────────────────
 
 model Session {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String   @db.ObjectId
+  id           String   @id @default(cuid())
+  userId       String 
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Device info
@@ -79,14 +75,14 @@ model Session {
 // ─── Refresh Token ───────────────────────────────────────────────────────────
 
 model RefreshToken {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String    @db.ObjectId
+  id            String    @id @default(cuid())
+  userId        String  
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessionId     String?   @db.ObjectId
+  sessionId     String? 
 
   // Token
   tokenHash     String    @unique
-  parentId      String?   @db.ObjectId // For reuse detection chain
+  parentId      String?  // For reuse detection chain
 
   // Device
   deviceInfo    String?
@@ -109,8 +105,8 @@ model RefreshToken {
 // ─── Service App ─────────────────────────────────────────────────────────────
 
 model ServiceApp {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  ownerId         String   @db.ObjectId
+  id              String   @id @default(cuid())
+  ownerId         String 
   owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   // Identity
@@ -132,6 +128,8 @@ model ServiceApp {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  authorizedConnections AuthorizedConnection[]
+
   @@index([ownerId])
   @@map("service_apps")
 }
@@ -139,18 +137,18 @@ model ServiceApp {
 // ─── Identity ────────────────────────────────────────────────────────────────
 
 model Identity {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String   @db.ObjectId
+  id              String   @id @default(cuid())
+  userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  provider        String   // "google", "github"
+  provider        String
   providerUserId  String
   accessToken     String?
   refreshToken    String?
 
   createdAt       DateTime @default(now())
 
-  @@unique([provider, providerUserId], map: "provider_providerUserId_unique")
+  @@unique([provider, providerUserId])
   @@index([userId])
   @@map("identities")
 }
@@ -158,8 +156,8 @@ model Identity {
 // ─── Passkey ─────────────────────────────────────────────────────────────────
 
 model Passkey {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String   @db.ObjectId
+  id              String   @id @default(cuid())
+  userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   credentialId    String   @unique
@@ -178,38 +176,57 @@ model Passkey {
 // ─── OAuth State ─────────────────────────────────────────────────────────────
 
 model OAuthState {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(cuid())
   state           String   @unique
+  code            String?  @unique
   codeVerifier    String?
   codeChallenge   String?
   redirectUri     String?
-  serviceAppId    String?  @db.ObjectId
-  userId          String?  @db.ObjectId
+  serviceAppId    String?
+  userId          String?
+  provider        String?
+  mode            String?
 
   createdAt       DateTime @default(now())
   expiresAt       DateTime
 
-  // Index for TTL cleanup — expired states are deleted periodically
   @@index([expiresAt])
   @@map("oauth_states")
+}
+
+// ─── Authorized Connection (Neo ID apps user granted access to) ──────────────
+
+model AuthorizedConnection {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceAppId String
+  serviceApp   ServiceApp @relation(fields: [serviceAppId], references: [id], onDelete: Cascade)
+
+  scopes       String[] @default([])
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+
+  @@unique([userId, serviceAppId])
+  @@index([userId])
+  @@map("authorized_connections")
 }
 
 // ─── MFA Code ────────────────────────────────────────────────────────────────
 
 model MfaCode {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String   @db.ObjectId
+  id              String   @id @default(cuid())
+  userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   code            String
-  purpose         String   // "login", "mfa_login", "mfa_setup", "mfa_disable", "email_change", "delete_account", "verify_email"
+  purpose         String
+  targetEmail     String?
 
   createdAt       DateTime @default(now())
   expiresAt       DateTime
   usedAt          DateTime?
 
-  // Compound index for lookup: find unused, non-expired code for user+purpose
   @@index([userId, purpose])
-  // Index for code verification: find specific code for user
   @@index([userId, code])
   @@map("mfa_codes")
 }
@@ -217,7 +234,7 @@ model MfaCode {
 // ─── Audit Log ───────────────────────────────────────────────────────────────
 
 model AuditLog {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(cuid())
   actorId         String
   actorEmail      String
   action          String
@@ -233,17 +250,51 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// ─── Support Ticket ───────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  subject   String
+  status    String   @default("open")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages  TicketMessage[]
+
+  @@index([userId])
+  @@index([email])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String?
+  authorRole String   @default("user")
+  body       String
+
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_messages")
+}
+
 // ─── Device Code (RFC 8628) ──────────────────────────────────────────────────
 
 model DeviceCode {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  deviceCode      String   @unique  // opaque token for polling — index from @unique
-  userCode        String   @unique  // "ABC-123" — index from @unique
+  id              String   @id @default(cuid())
+  deviceCode      String   @unique
+  userCode        String   @unique
   clientId        String
-  userId          String?  @db.ObjectId
-  status          String   @default("pending") // pending | approved | denied | expired
+  userId          String?
+  status          String   @default("pending")
   scopes          String[]
-  location        String?  // Device name (e.g. "Living Room TV")
+  location        String?
 
   createdAt       DateTime @default(now())
   expiresAt       DateTime
