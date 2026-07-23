@@ -1,0 +1,146 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { GoogleIcon, GithubIcon } from "@/components/ui/ProviderIcons";
+import { Icon } from "@/components/ui/Icon";
+import { setAccessToken } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
+
+interface LoginFormProps {
+  initialEmail?: string;
+  initialLoginStep?: "email" | "password";
+  onToggleMode: () => void;
+}
+
+export function LoginForm({ initialEmail = "", initialLoginStep = "email", onToggleMode }: LoginFormProps) {
+  const router = useRouter();
+  const { t } = useI18n();
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"email" | "password">(initialLoginStep);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (step === "email") {
+      setStep("password");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        toast.error(json.error?.message || t.auth.errors.loginFailed);
+        setLoading(false);
+        return;
+      }
+
+      if (json.data?.mfaRequired) {
+        const methods = json.data.mfaMethods?.join(",") || "";
+        const emailHint = json.data.emailHint || "";
+        router.push(`/auth/2fa?email=${encodeURIComponent(email)}&methods=${methods}&emailHint=${encodeURIComponent(emailHint)}`);
+        return;
+      }
+
+      if (json.data?.accessToken) {
+        setAccessToken(json.data.accessToken);
+      }
+
+      router.push("/profile");
+    } catch {
+      toast.error(t.auth.errors.network);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <div key={step} className="flex flex-col gap-5 animate-authSlideIn">
+        <Input
+          label={t.auth.email}
+          type="email"
+          name="email"
+          autoComplete="email"
+          placeholder={t.auth.emailPlaceholder}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        {step === "password" && (
+          <div className="animate-fadeIn">
+            <Input
+              label={t.auth.password}
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              placeholder={t.auth.passwordPlaceholder}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+        )}
+      </div>
+
+      <Button type="submit" loading={loading} disabled={!email || (step === "password" && !password)} className="w-full">
+        {step === "email" ? t.auth.login.continue : t.auth.login.button}
+      </Button>
+
+      {step === "password" && (
+        <>
+          <button type="button" onClick={() => router.push(`/auth/2fa/passkey?email=${encodeURIComponent(email)}&fallback=password`)} className="inline-flex items-center justify-center gap-2 text-muted text-sm cursor-pointer hover:text-content">
+            <Icon name="key" size={15} />
+            {t.auth.login.usePasskey}
+          </button>
+          <button type="button" onClick={() => router.push(`/auth/forgot-password?email=${encodeURIComponent(email)}`)} className="text-sm text-accent hover:text-accent-hover cursor-pointer transition-colors">
+            {t.auth.login.forgotPassword}
+          </button>
+        </>
+      )}
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-dim">{t.auth.or}</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+
+      <div className="flex items-center justify-center gap-3">
+        <button type="button" onClick={() => window.location.href = "/api/v1/auth/oauth/google"} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-surface-hover hover:border-border-hover transition-all">
+          <GoogleIcon size={18} />
+        </button>
+        <button type="button" onClick={() => window.location.href = "/api/v1/auth/oauth/github"} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-surface-hover hover:border-border-hover transition-all">
+          <GithubIcon size={18} />
+        </button>
+      </div>
+
+      <p className="text-sm text-muted text-center mt-2">
+        {t.auth.login.noAccount}{" "}
+        <button type="button" onClick={onToggleMode} className="text-accent hover:text-accent-hover font-medium transition-colors">
+          {t.auth.login.createOne}
+        </button>
+      </p>
+
+      <div className="flex items-center justify-center gap-4 mt-2">
+        <button type="button" onClick={() => router.push("/support")} className="text-xs text-dim hover:text-muted transition-colors">
+          {t.auth.help}
+        </button>
+      </div>
+    </form>
+  );
+}
