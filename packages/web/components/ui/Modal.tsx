@@ -35,6 +35,8 @@ export function Modal({
   const [closing, setClosing] = useState(false);
   // mounted: false on first frame → true on second frame, triggers entrance transition
   const [mounted, setMounted] = useState(false);
+  // isDragging ref exposed to render — used to suppress React style during drag
+  const isDragging = useRef(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,10 @@ export function Modal({
   const applyDragTransform = (dy: number) => {
     const el = contentRef.current;
     const bg = backdropRef.current;
-    if (el) el.style.transform = `translateY(${dy}px)`;
+    if (el) {
+      el.style.transition = "none";
+      el.style.transform = `translateY(${dy}px)`;
+    }
     if (bg) bg.style.opacity = String(Math.max(0.2, 1 - dy / 320));
   };
 
@@ -77,11 +82,13 @@ export function Modal({
     if (el) {
       el.style.transform = "";
       el.style.transition = "";
+      el.classList.remove("modal-content--dragging");
     }
     if (bg) {
       bg.style.opacity = "";
       bg.style.transition = "";
     }
+    isDragging.current = false;
   };
 
   const requestClose = useCallback((fromDrag = false) => {
@@ -97,6 +104,7 @@ export function Modal({
     const el = contentRef.current;
     const bg = backdropRef.current;
     if (el) {
+      el.classList.remove("modal-content--dragging");
       el.style.transition = "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)";
       el.style.transform = `translateY(${targetY}px)`;
     }
@@ -179,10 +187,14 @@ export function Modal({
     dragLastTs.current = performance.now();
     dragVelocity.current = 0;
     dragging.current = true;
+    isDragging.current = true;
 
     const el = contentRef.current;
     const bg = backdropRef.current;
-    if (el) el.style.transition = "none";
+    if (el) {
+      el.style.transition = "none";
+      el.classList.add("modal-content--dragging");
+    }
     if (bg) bg.style.transition = "none";
 
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -223,12 +235,14 @@ export function Modal({
     if (el) {
       el.style.transition = "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)";
       el.style.transform = "";
+      el.classList.remove("modal-content--dragging");
     }
     if (bg) {
       bg.style.transition = "opacity 150ms ease-out";
       bg.style.opacity = "";
     }
     dragY.current = 0;
+    isDragging.current = false;
   };
 
   if (!visible) return null;
@@ -244,25 +258,27 @@ export function Modal({
     >
       <div
         ref={backdropRef}
-        className="modal-backdrop"
-        style={{
-          opacity: mounted && !closing ? 1 : 0,
-          transition: "opacity 200ms ease-out",
-        }}
+        className={[
+          "modal-backdrop",
+          mounted && !closing ? "modal-backdrop--visible" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={() => requestClose(false)}
         aria-hidden
       />
       <div
         ref={contentRef}
-        className={`modal-content modal-content--${size}`}
+        className={[
+          "modal-content",
+          `modal-content--${size}`,
+          mounted && !closing ? "modal-content--visible" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          opacity: mounted && !closing ? 1 : 0,
-          transform: mounted && !closing ? "none" : "translateY(16px)",
-          transition: "opacity 200ms ease-out, transform 220ms cubic-bezier(0.16, 1, 0.3, 1)",
-        }}
       >
         <div
           className="modal-handle"

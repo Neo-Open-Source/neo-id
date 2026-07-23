@@ -1548,6 +1548,11 @@
     box-shadow: none;
   }
 
+  .modal-content--dragging {
+    touch-action: none;
+    user-select: none;
+  }
+
   .modal-handle {
     display: block;
   }
