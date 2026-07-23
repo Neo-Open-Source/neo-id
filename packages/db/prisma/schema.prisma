@@ -1,0 +1,305 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/__generated__/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  username      String?
+  passwordHash  String?
+  displayName   String?
+  firstName     String?
+  lastName      String?
+  avatar        String?
+
+  role          String    @default("user")
+
+  status        String    @default("active")
+
+  userMetadata  Json?     @default("{}")
+  appMetadata   Json?     @default("{}")
+
+  // MFA
+  totpSecret     String?
+  totpEnabled    Boolean   @default(false)
+  emailMfaEnabled Boolean  @default(false)
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+
+  // Relations
+  sessions      Session[]
+  refreshTokens RefreshToken[]
+  serviceApps   ServiceApp[]
+  identities    Identity[]
+  passkeys      Passkey[]
+  mfaCodes      MfaCode[]
+  authorizedConnections AuthorizedConnection[]
+
+  @@map("users")
+}
+
+// ─── Session ─────────────────────────────────────────────────────────────────
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String 
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Device info
+  deviceInfo   String?
+  ipAddress    String?
+  location     String?  // GeoIP city/country
+
+  // Status
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime?
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─── Refresh Token ───────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id            String    @id @default(cuid())
+  userId        String  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId     String? 
+
+  // Token
+  tokenHash     String    @unique
+  parentId      String?  // For reuse detection chain
+
+  // Device
+  deviceInfo    String?
+  ipAddress     String?
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime?
+
+  // Revocation
+  revokedAt     DateTime?
+  revokeReason  String?
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ─── Service App ─────────────────────────────────────────────────────────────
+
+model ServiceApp {
+  id              String   @id @default(cuid())
+  ownerId         String 
+  owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Identity
+  clientId        String   @unique
+  clientSecretHash String?
+  name            String
+  displayName     String?
+  description     String?
+  logoUrl         String?
+  website         String?
+
+  // OAuth config
+  redirectUris    String[]
+  allowedScopes   String[] @default(["openid", "profile", "email"])
+  grantTypes      String[] @default(["authorization_code", "refresh_token"])
+
+  // Status
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  authorizedConnections AuthorizedConnection[]
+
+  @@index([ownerId])
+  @@map("service_apps")
+}
+
+// ─── Identity ────────────────────────────────────────────────────────────────
+
+model Identity {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider        String
+  providerUserId  String
+  accessToken     String?
+  refreshToken    String?
+
+  createdAt       DateTime @default(now())
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("identities")
+}
+
+// ─── Passkey ─────────────────────────────────────────────────────────────────
+
+model Passkey {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  credentialId    String   @unique
+  publicKey       String
+  counter         Int      @default(0)
+  transports      String?
+  deviceName      String?
+
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime?
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+// ─── OAuth State ─────────────────────────────────────────────────────────────
+
+model OAuthState {
+  id              String   @id @default(cuid())
+  state           String   @unique
+  code            String?  @unique
+  codeVerifier    String?
+  codeChallenge   String?
+  redirectUri     String?
+  serviceAppId    String?
+  userId          String?
+  provider        String?
+  mode            String?
+
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+
+  @@index([expiresAt])
+  @@map("oauth_states")
+}
+
+// ─── Authorized Connection (Neo ID apps user granted access to) ──────────────
+
+model AuthorizedConnection {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceAppId String
+  serviceApp   ServiceApp @relation(fields: [serviceAppId], references: [id], onDelete: Cascade)
+
+  scopes       String[] @default([])
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+
+  @@unique([userId, serviceAppId])
+  @@index([userId])
+  @@map("authorized_connections")
+}
+
+// ─── MFA Code ────────────────────────────────────────────────────────────────
+
+model MfaCode {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code            String
+  purpose         String
+  targetEmail     String?
+
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  usedAt          DateTime?
+
+  @@index([userId, purpose])
+  @@index([userId, code])
+  @@map("mfa_codes")
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  actorId         String
+  actorEmail      String
+  action          String
+  targetId        String?
+  targetEmail     String?
+  details         Json?
+  ipAddress       String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+// ─── Support Ticket ───────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  subject   String
+  status    String   @default("open")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages  TicketMessage[]
+
+  @@index([userId])
+  @@index([email])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String?
+  authorRole String   @default("user")
+  body       String
+
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_messages")
+}
+
+// ─── Device Code (RFC 8628) ──────────────────────────────────────────────────
+
+model DeviceCode {
+  id              String   @id @default(cuid())
+  deviceCode      String   @unique
+  userCode        String   @unique
+  clientId        String
+  userId          String?
+  status          String   @default("pending")
+  scopes          String[]
+  location        String?
+
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  approvedAt      DateTime?
+
+  @@index([expiresAt])
+  @@map("device_codes")
+}

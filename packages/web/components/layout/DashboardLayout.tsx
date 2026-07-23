@@ -1,0 +1,128 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { Sidebar } from "./Sidebar";
+import { BottomNav } from "./BottomNav";
+import { ScrollToTop } from "@/components/ui/ScrollToTop";
+import { useCachedQuery } from "@/hooks/useCachedQuery";
+import { readCache } from "@/lib/cache";
+import { logoutSession, api, hasSession } from "@/lib/api";
+
+interface UserData {
+  id: string;
+  email: string;
+  displayName?: string;
+  avatar?: string;
+  role: string;
+}
+
+interface Ticket {
+  id: string;
+  status: string;
+}
+
+export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [openTicketCount, setOpenTicketCount] = useState(0);
+  const [supportMode, setSupportMode] = useState<"pending" | "anon" | "authed">("pending");
+
+  const isSupportPage = pathname.startsWith("/support");
+  const isSupportChat = /^\/support\/[^/]+$/.test(pathname);
+
+  useEffect(() => {
+    if (!isSupportPage) {
+      setSupportMode("pending");
+      return;
+    }
+
+    // Already loaded profile elsewhere in this session — treat as authenticated.
+    if (readCache<UserData>("/user/profile")) {
+      setSupportMode("authed");
+      return;
+    }
+
+    let cancelled = false;
+    setSupportMode("pending");
+    hasSession().then((authed) => {
+      if (!cancelled) setSupportMode(authed ? "authed" : "anon");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSupportPage, pathname]);
+
+  const loadProfile = !isSupportPage || supportMode === "authed";
+
+  const { data: user, error } = useCachedQuery<UserData>("/user/profile", {
+    enabled: loadProfile,
+  });
+
+  useEffect(() => {
+    if (isSupportPage) return;
+    if (error && !user) {
+      router.replace("/auth");
+    }
+  }, [error, user, router, isSupportPage]);
+
+  const fetchOpenTickets = useCallback(async () => {
+    if (!user || user.role !== "admin") return;
+    try {
+      const tickets = await api<Ticket[]>("/admin/support/tickets");
+      const openCount = tickets.filter((t) => t.status === "open").length;
+      setOpenTicketCount(openCount);
+    } catch {
+      // silently fail - badge is non-critical
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void fetchOpenTickets();
+    const interval = setInterval(fetchOpenTickets, 60000);
+    return () => clearInterval(interval);
+  }, [fetchOpenTickets]);
+
+  const handleLogout = async () => {
+    await logoutSession();
+    router.replace("/auth");
+  };
+
+  // Anonymous support — no profile fetch, no redirect to auth
+  if (isSupportPage && supportMode === "anon") {
+    return <>{children}</>;
+  }
+
+  if (isSupportPage && supportMode === "pending") {
+    return (
+      <div className="min-h-screen bg-app">
+        <div className="loading">
+          <div className="loading__spinner" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-app">
+        <div className="loading">
+          <div className="loading__spinner" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-app">
+      <Sidebar user={user} onLogout={handleLogout} openTicketCount={openTicketCount} />
+      <main className={`dashboard-main ml-20 min-h-svh max-md:ml-0${isSupportChat ? " dashboard-main--chat" : ""}`}>
+        <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-24">{children}</div>
+      </main>
+      {!isSupportChat && (
+        <BottomNav user={user} onLogout={handleLogout} openTicketCount={openTicketCount} />
+      )}
+      <ScrollToTop />
+    </div>
+  );
+}

@@ -1,0 +1,21 @@
+{
+  "name": "neo-id",
+  "version": "4.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
+    "lint": "turbo lint",
+    "db:migrate": "pnpm --filter @neo-id/db migrate",
+    "db:generate": "pnpm --filter @neo-id/db generate"
+  },
+  "devDependencies": {
+    "mongodb": "^7.5.0",
+    "tsx": "^4.19.0",
+    "turbo": "^2.10.6",
+    "typescript": "^5.9.3"
+  }
+}

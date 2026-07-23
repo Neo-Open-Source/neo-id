@@ -1,0 +1,13 @@
+node_modules/
+.turbo/
+.next/
+dist/
+*.md
+.env
+.env.*
+!.env.example
+.git/
+tests/
+scripts/
+packages/sdk/
+netlify/

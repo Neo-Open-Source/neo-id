@@ -1,81 +1,17 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-/unified-id
-/unified-id.exe
-
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool
-*.out
-coverage.out
-coverage.html
-
-# Go workspace file
-go.work
-
-# Environment files
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
 .env
 .env.local
-.env.production
+.env.*.local
 .env.test
-
-# Node modules and build artifacts
-web/node_modules/
-web/dist/
-web/build/
-web/.vite/
-web/pnpm-lock.yaml
-node_modules/
-
-# Static build output
-static/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.windsurf/
-
-# Logs
+.turbo/
+coverage/
 *.log
-logs/
+.DS_Store
 
-# Temporary files
-tmp/
-temp/
-
-# Test data
-tests/testdata/
-controllers/testdata/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Certificates and keys
+# JWT keys (sensitive)
 *.pem
-*.key
-*.crt
-
-# Backup files
-*.bak
-*.backup
 .vercel
-.env*.local
+.env*

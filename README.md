@@ -5,366 +5,222 @@
 <h1 align="center">Neo ID</h1>
 
 <p align="center">
-  Modern unified authentication service with OAuth 2.0, OIDC, and SaaS integration
+  Auth/OIDC provider — TypeScript monorepo. Email, OAuth (Google/GitHub), Passkeys, MFA (TOTP/email), sessions with refresh rotation, developer portal, and admin panel
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#documentation">Documentation</a> •
-  <a href="#development">Development</a> •
-  <a href="#api">API</a>
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNeo-Open-Source%2Fneo-id&project-name=neo-id">
+    <img src="https://vercel.com/button" alt="Deploy with Vercel" />
+  </a>
+  <a href="https://app.netlify.com/start/deploy?repository=https://github.com/Neo-Open-Source/neo-id">
+    <img src="https://www.netlify.com/img/deploy/button.svg" alt="Deploy to Netlify" />
+  </a>
 </p>
-
----
 
 ## Features
 
-- OAuth 2.0 / OpenID Connect (OIDC) provider
-- Social login: Google, GitHub, Yandex, VK
-- Email/password auth with email verification
-- MFA: TOTP (authenticator app) + email codes
-- SaaS site integration via API key
-- Session management with geo-tracking
-- Admin panel: users, services, sites
-- React + MUI dashboard (served from `/`)
+- Email/password authentication with bcrypt hashing
+- OAuth login (Google, GitHub)
+- Passkey/WebAuthn (register + authenticate)
+- Multi-factor authentication (TOTP, email codes)
+- Password reset via email
+- Session management with refresh token rotation
+- Developer portal for OAuth service registration
+- Admin panel for user/service management, audit logs
+- Anonymous support tickets with auto-responses
+- i18n (English, Ukrainian, Russian, Romanian)
+- Device Code flow (RFC 8628) for TV/IoT
+- GeoIP-based session tracking
 
 ## Stack
 
-### Backend
-- **Go** - Fast, reliable, and efficient
-- **Beego** - MVC web framework
-- **MongoDB** - Flexible document database
-- **JWT** - HS256 (access/refresh) + RS256 (OIDC id_token)
+| Package | Technology |
+|---------|-----------|
+| `@neo-id/shared` | Zod schemas, TypeScript types, constants |
+| `@neo-id/db` | Prisma 7 + PostgreSQL |
+| `@neo-id/auth-core` | JWT (RS256), bcrypt, OAuth2, WebAuthn, TOTP |
+| `@neo-id/api` | Hono HTTP server (serverless) |
+| `@neo-id/web` | Next.js 16 (SSR, App Router) |
+| `@neo-id/sdk` | JS/TS client SDK + React hooks |
 
-### Frontend
-- **React 18** - Modern UI library
-- **TypeScript** - Type safety
-- **Vite** - Lightning-fast build tool
-- **React Router** - Client-side routing
+## Environment
 
-## Quick Start
-
-### Prerequisites
-
-- Go 1.21+
-- Node.js 18+
-- MongoDB
-- pnpm (recommended) or npm
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/your-org/neo-id.git
-cd neo-id
-```
-
-2. **Install dependencies**
-```bash
-make deps
-```
-
-3. **Configure environment**
-
-Copy `.env.example` to `.env` and fill in the values:
+Copy `.env.example` and fill in the values:
 
 ```env
-# Database
-MONGODB_URI=mongodb+srv://...
+# Database (PostgreSQL via Prisma)
+DATABASE_URL=postgresql://user:password@localhost:5432/neo-id
 
-# JWT Secrets
-JWT_SECRET=your-secret-key-here
-SESSION_SECRET=your-session-secret-here
+# JWT (RS256)
+JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
+JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----
+JWT_ISSUER=https://id.neome.uk
 
-# Server
-BASE_URL=http://localhost:8080
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+# WebAuthn
+RP_ID=id.neome.uk
+ORIGIN=https://id.neome.uk
 
-# OAuth Providers (optional)
+# OAuth
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
 
 # Email (Resend)
-RESEND_API_KEY=...
-RESEND_FROM=Neo ID <no-reply@yourdomain.com>
+RESEND_API_KEY=re_...
+EMAIL_FROM="Neo ID <no-reply@neome.uk>"
 
-# Legal documents change notifications (optional, recommended)
-# Bump LEGAL_DOCS_VERSION when Terms/Privacy text changes.
-# Notifications are deduplicated per (version + user) and processed in bounded batches.
-LEGAL_DOCS_VERSION=2026-05-21
-LEGAL_NOTIFY_BATCH_SIZE=200
-LEGAL_NOTIFY_ACTIVE_WINDOW_DAYS=3650
-LEGAL_NOTIFY_MAX_BATCHES_PER_RUN=1
-# For Vercel cron/manual trigger endpoint:
-LEGAL_NOTIFY_CRON_TOKEN=replace-with-long-random-secret
-# Optional: force run on boot even on Vercel (default skipped on Vercel)
-LEGAL_NOTIFY_RUN_ON_BOOT=false
+# URLs
+WEB_URL=https://id.neome.uk
+NEXT_PUBLIC_API_URL=https://id.neome.uk
 
-# Image Uploads (ImageKit, optional)
-IMAGEKIT_PRIVATE_KEY=...
+# Security (Cloudflare Turnstile)
+TURNSTILE_SECRET_KEY=...
+TURNSTILE_SITE_KEY=...
 ```
-
-4. **Start development servers**
-
-Terminal 1 - Backend:
-```bash
-FRONTEND_DEV_URL=http://localhost:5173 go run .
-```
-
-Terminal 2 - Frontend:
-```bash
-cd web && pnpm dev
-```
-
-5. **Open your browser**
-
-Navigate to `http://localhost:8080`
 
 ## Development
 
-### Project Structure
-
-```
-neo-id/
-├── controllers/        # Legacy controllers (to be refactored)
-├── internal/          # Internal packages
-│   ├── handlers/      # HTTP handlers
-│   ├── middleware/    # HTTP middleware
-│   ├── services/      # Business logic
-│   └── utils/         # Utility functions
-├── models/            # Database models
-├── pkg/               # Public packages
-│   ├── config/        # Configuration
-│   └── logger/        # Logging
-├── routers/           # Route definitions
-├── tests/             # All tests
-│   ├── unit/          # Unit tests
-│   ├── integration/   # Integration tests
-│   └── e2e/           # End-to-end tests
-└── web/               # Frontend application
-    ├── src/
-    │   ├── api/       # API client
-    │   ├── components/# UI components
-    │   ├── hooks/     # Custom hooks
-    │   ├── pages/     # Page components
-    │   ├── types/     # TypeScript types
-    │   └── utils/     # Utilities
-    └── public/        # Static assets
-```
-
-### Available Commands
-
 ```bash
-make help              # Show all available commands
-make build             # Build frontend and backend
-make dev               # Start development mode
-make test              # Run all tests
-make test-unit         # Run unit tests
-make test-coverage     # Run tests with coverage
-make lint              # Lint code
-make fmt               # Format code
+pnpm install
+cp .env.example .env
+# Edit .env with your PostgreSQL URL and keys
+
+# Generate JWT keys
+openssl genrsa -out jwt-private.pem 2048
+openssl rsa -in jwt-private.pem -pubout -out jwt-public.pem
+
+# Push schema to database
+pnpm --filter @neo-id/db exec prisma db push
+
+# Generate Prisma client
+pnpm db:generate
+
+# Start dev
+pnpm dev
 ```
 
-### Running Tests
+## Deployment
 
-```bash
-# All tests
-make test
+### Vercel (Recommended)
 
-# Unit tests only
-make test-unit
+Everything runs on Vercel on one subdomain (e.g., `id.neome.uk`):
+- Frontend: Next.js app
+- API: Serverless function at `/api`
 
-# Integration tests
-make test-integration
+1. Push to GitHub
+2. Import on Vercel
+3. Set environment variables in Vercel dashboard
+4. Deploy
 
-# With coverage
-make test-coverage
+### Netlify
+
+1. Push to GitHub
+2. Connect repository on Netlify
+3. Set environment variables
+4. Deploy
+
+## API Overview
+
+### Auth
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/auth/register` | Register with email/password |
+| POST | `/api/v1/auth/login` | Login with email/password |
+| POST | `/api/v1/auth/refresh` | Refresh access token |
+| POST | `/api/v1/auth/logout` | Logout (revoke session) |
+| POST | `/api/v1/auth/forgot-password` | Request password reset |
+| POST | `/api/v1/auth/reset-password` | Reset password with code |
+| POST | `/api/v1/auth/oauth/:provider` | Start OAuth flow |
+| GET | `/api/v1/auth/oauth/:provider/callback` | OAuth callback |
+
+### User
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/user/profile` | Get profile |
+| PUT | `/api/v1/user/profile` | Update profile |
+| PUT | `/api/v1/user/password` | Change password |
+| POST | `/api/v1/user/avatar` | Upload avatar |
+| DELETE | `/api/v1/user` | Delete account |
+
+### MFA
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/mfa/totp/setup` | Setup TOTP |
+| POST | `/api/v1/mfa/totp/enable` | Enable TOTP |
+| POST | `/api/v1/mfa/totp/disable` | Disable TOTP |
+| POST | `/api/v1/mfa/email/setup` | Setup email MFA |
+| POST | `/api/v1/mfa/email/enable` | Enable email MFA |
+| POST | `/api/v1/mfa/email/disable` | Disable email MFA |
+| POST | `/api/v1/mfa/verify` | Verify MFA during login |
+
+### Passkeys
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/passkeys` | List passkeys |
+| POST | `/api/v1/passkeys/register/start` | Start WebAuthn registration |
+| POST | `/api/v1/passkeys/register/finish` | Finish WebAuthn registration |
+| DELETE | `/api/v1/passkeys/:id` | Remove passkey |
+| POST | `/api/v1/passkeys/authenticate/start` | Start WebAuthn auth |
+| POST | `/api/v1/passkeys/authenticate/finish` | Finish WebAuthn auth |
+
+### Developer Services
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/services` | List services |
+| POST | `/api/v1/services` | Create service |
+| GET | `/api/v1/services/:id` | Get service |
+| PUT | `/api/v1/services/:id` | Update service |
+| DELETE | `/api/v1/services/:id` | Delete service |
+| POST | `/api/v1/services/:id/rotate-secret` | Rotate client secret |
+| POST | `/api/v1/services/:id/logo` | Upload service logo |
+
+### OIDC
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/.well-known/openid-configuration` | OIDC discovery |
+| GET | `/.well-known/jwks.json` | JWKS public keys |
+
+### Support
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/support/tickets` | Create ticket |
+| GET | `/api/v1/support/tickets` | List tickets |
+| GET | `/api/v1/support/tickets/:id` | Get ticket detail |
+| POST | `/api/v1/support/tickets/:id/messages` | Reply to ticket |
+
+### Admin
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/admin/users` | List users |
+| GET | `/api/v1/admin/users/:id` | Get user |
+| POST | `/api/v1/admin/users/:id/ban` | Ban/unban user |
+| POST | `/api/v1/admin/users/:id/role` | Change user role |
+| POST | `/api/v1/admin/users/:id/reset-password` | Reset user password |
+| DELETE | `/api/v1/admin/users/:id` | Delete user |
+| GET | `/api/v1/admin/stats` | Dashboard stats |
+| GET | `/api/v1/admin/services` | List all services |
+
+## Project Structure
+
 ```
-
-## Build
-
-### Development Build
-```bash
-make build
+packages/
+├── shared/        # Types, constants, Zod schemas
+├── db/            # Prisma schema, client, seed
+├── auth-core/     # JWT, bcrypt, OAuth2, TOTP, WebAuthn
+├── api/           # Hono HTTP server
+├── sdk/           # JS/TS client SDK + React hooks
+└── web/           # Next.js frontend (SSR)
 ```
-
-### Production Build
-```bash
-make vercel-build
-```
-
-### Run Production Build
-```bash
-make run
-```
-
-## Integrating your app
-
-### 1. Register a site
-
-Call the admin API or use the dashboard to create a site. You'll get:
-- `site_id`
-- `api_key`
-- `api_secret`
-
-### 2. SaaS flow (simple, token-based)
-
-```js
-// Step 1 — get login URL
-const { login_url } = await fetch(`${NEO_ID_URL}/api/site/login`, {
-  method: 'POST',
-  headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ redirect_url: 'https://yourapp.com/callback', state: 'random' })
-}).then(r => r.json());
-
-window.location.href = login_url;
-
-// Step 2 — verify token on callback
-const { valid, user } = await fetch(`${NEO_ID_URL}/api/site/verify`, {
-  method: 'POST',
-  headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ token: urlParams.get('token') })
-}).then(r => r.json());
-
-// user.unified_id — use as primary key in your DB
-// user.email, user.display_name, user.avatar
-```
-
-### 3. OIDC flow (standard OAuth 2.0)
-
-Discovery document: `GET /.well-known/openid-configuration`
-
-```
-GET /oauth/authorize?client_id=<site_id>&redirect_uri=...&response_type=code&scope=openid+profile+email&state=...
-POST /oauth/token        — exchange code for access_token, id_token, refresh_token
-GET  /oauth/userinfo     — get user claims (Bearer access_token)
-POST /oauth/revoke       — revoke token
-GET  /.well-known/jwks.json — RSA public key for RS256 id_token verification
-```
-
-`client_secret` = your `api_secret`.
-
-### 4. Legacy service integration
-
-For internal services with a service app token:
-
-```
-POST /api/service/verify    — verify user JWT (requires service Bearer token + user token in body)
-GET  /api/service/userinfo  — get user info (requires X-User-Token header)
-```
-
-## Documentation
-
-### API Documentation
-- **[API.md](API.md)** - Complete API reference with examples
-- **[INTEGRATION.md](INTEGRATION.md)** - Integration guide for your apps
-- **[INTEGRATION.md#embedded-widget-qr--code-auth](INTEGRATION.md#embedded-widget-qr--code-auth)** - Embeddable QR/text-code auth widget (`/widget/auth`, `/widget/sdk.js`)
-
-### Frontend Documentation
-- **[web/README.md](web/README.md)** - Frontend development guide
-
-### Testing Documentation
-- **[tests/README.md](tests/README.md)** - Testing guide and best practices
-
-## API
-
-### API Overview
-
-| Group | Prefix | Description |
-|-------|--------|-------------|
-| Auth | `/api/auth/*` | Login, register, OAuth, MFA, token refresh |
-| User | `/api/user/*` | Profile, providers, sessions, TOTP setup |
-| Admin | `/api/admin/*` | Users, services, sites, OIDC clients |
-| Site | `/api/site/*` | SaaS integration endpoints |
-| Service | `/api/service/*` | Legacy internal service integration |
-| Widget | `/widget/*` | Embedded QR/text-code auth widget + SDK |
-| OIDC | `/oauth/*`, `/.well-known/*` | Standard OIDC endpoints |
-| A/B Testing | `/api/ab/*` | Experiment management |
-
-### Quick Examples
-
-#### Authentication
-```bash
-# Register
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"secure123"}'
-
-# Login
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"secure123"}'
-```
-
-#### User Profile
-```bash
-# Get profile
-curl http://localhost:8080/api/user/profile \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-#### A/B Testing
-```bash
-# Create experiment (admin)
-curl -X POST http://localhost:8080/api/ab/experiments \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "button_color",
-    "variants": [
-      {"name": "control", "weight": 50},
-      {"name": "blue", "weight": 50}
-    ]
-  }'
-
-# Get variant for user
-curl http://localhost:8080/api/ab/variant/button_color \
-  -H "Authorization: Bearer USER_TOKEN"
-```
-
-For complete API documentation, see **[API.md](API.md)**
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Code Style
-
-- Follow Go best practices
-- Use `gofmt` for formatting
-- Write tests for new features
-- Update documentation
-
-## Troubleshooting
-
-### Common Issues
-
-**MongoDB connection fails**
-- Check `MONGODB_URI` in `.env`
-- Ensure MongoDB is running
-- Verify network connectivity
-
-**Frontend build errors**
-- Clear node_modules: `rm -rf web/node_modules`
-- Reinstall: `cd web && pnpm install`
-- Clear Vite cache: `rm -rf web/.vite`
-
-**Tests failing**
-- Ensure MongoDB is running
-- Check test database configuration
-- Run `make test-unit` first to isolate issues
 
 ## License
 
 [MIT](LICENSE)
-
----
-
-<p align="center">Made with ❤️ by the Neo-Open-Source</p>
