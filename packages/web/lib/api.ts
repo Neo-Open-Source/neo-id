@@ -126,11 +126,8 @@ export async function apiUpload<T = any>(
 export async function hasSession(): Promise<boolean> {
   if (accessToken) return true;
 
-  // Check if a refresh cookie exists without making a request
-  const hasRefreshCookie = typeof document !== "undefined" &&
-    document.cookie.split("; ").some((c) => c.startsWith("neo_id_refresh="));
-  if (!hasRefreshCookie) return false;
-
+  // Auth cookies are httpOnly, so they are invisible to document.cookie.
+  // Probe refresh with credentials instead.
   try {
     return (await refreshSession()) !== null;
   } catch {
