@@ -1,5 +1,6 @@
 {
   "buildCommand": "pnpm build",
+  "devCommand": "pnpm --filter @neo-id/web dev",
   "outputDirectory": "packages/web/.next",
   "framework": "nextjs",
   "installCommand": "pnpm install",
