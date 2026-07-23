@@ -33,6 +33,8 @@ export function Modal({
 }: ModalProps) {
   const [visible, setVisible] = useState(open);
   const [closing, setClosing] = useState(false);
+  // mounted: false on first frame → true on second frame, triggers entrance transition
+  const [mounted, setMounted] = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -64,12 +66,8 @@ export function Modal({
   const applyDragTransform = (dy: number) => {
     const el = contentRef.current;
     const bg = backdropRef.current;
-    if (el) {
-      el.style.transform = `translateY(${dy}px)`;
-    }
-    if (bg) {
-      bg.style.opacity = String(Math.max(0.2, 1 - dy / 320));
-    }
+    if (el) el.style.transform = `translateY(${dy}px)`;
+    if (bg) bg.style.opacity = String(Math.max(0.2, 1 - dy / 320));
   };
 
   /** Reset DOM styles after drag ends */
@@ -96,7 +94,6 @@ export function Modal({
       ? typeof window !== "undefined" ? window.innerHeight : 640
       : 0;
 
-    // Animate to target via DOM
     const el = contentRef.current;
     const bg = backdropRef.current;
     if (el) {
@@ -113,6 +110,7 @@ export function Modal({
     closeTimer.current = setTimeout(() => {
       closingRef.current = false;
       setClosing(false);
+      setMounted(false);
       resetDragStyles();
       setVisible(false);
       onCloseRef.current();
@@ -126,14 +124,22 @@ export function Modal({
       closingRef.current = false;
       setVisible(true);
       setClosing(false);
+      setMounted(false);
       resetDragStyles();
       dragY.current = 0;
       dragging.current = false;
+      // Trigger entrance transition on next frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setMounted(true);
+        });
+      });
       return;
     }
 
     setVisible(false);
     setClosing(false);
+    setMounted(false);
     resetDragStyles();
     dragY.current = 0;
     dragging.current = false;
@@ -174,7 +180,6 @@ export function Modal({
     dragVelocity.current = 0;
     dragging.current = true;
 
-    // Disable CSS transition during drag
     const el = contentRef.current;
     const bg = backdropRef.current;
     if (el) el.style.transition = "none";
@@ -197,7 +202,6 @@ export function Modal({
     dragCurrentY.current = dy;
     dragY.current = dy;
 
-    // Direct DOM update — no React state
     applyDragTransform(dy);
   };
 
@@ -214,7 +218,6 @@ export function Modal({
       return;
     }
 
-    // Spring back with CSS transition
     const el = contentRef.current;
     const bg = backdropRef.current;
     if (el) {
@@ -242,6 +245,10 @@ export function Modal({
       <div
         ref={backdropRef}
         className="modal-backdrop"
+        style={{
+          opacity: mounted && !closing ? 1 : 0,
+          transition: "opacity 200ms ease-out",
+        }}
         onClick={() => requestClose(false)}
         aria-hidden
       />
@@ -251,6 +258,11 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          opacity: mounted && !closing ? 1 : 0,
+          transform: mounted && !closing ? "none" : "translateY(16px)",
+          transition: "opacity 200ms ease-out, transform 220ms cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
       >
         <div
           className="modal-handle"
