@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { cleanDb, makeRequest, createTestUser } from "../helpers";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 describe("POST /api/v1/auth/login", () => {
   let app: any;

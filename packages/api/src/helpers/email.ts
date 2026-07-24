@@ -109,7 +109,7 @@ async function sendRawEmail(input: {
 
       if (response.status === 429 && attempt < maxRetries) {
         const retryAfter = Math.min(2 ** attempt, 10);
-        console.log(`[email] Rate limited, retrying in ${retryAfter}s...`);
+        console.warn(`[email] Rate limited, retrying in ${retryAfter}s...`);
         await new Promise((r) => setTimeout(r, retryAfter * 1000));
         continue;
       }
@@ -121,12 +121,12 @@ async function sendRawEmail(input: {
       }
 
       const body = await response.json().catch(() => ({}));
-      console.log("[email] Sent:", body);
+      console.warn("[email] Sent:", body);
       return true;
     } catch (e) {
       if (attempt < maxRetries) {
         const retryAfter = Math.min(2 ** attempt, 10);
-        console.log(`[email] Network error, retrying in ${retryAfter}s...`);
+        console.warn(`[email] Network error, retrying in ${retryAfter}s...`);
         await new Promise((r) => setTimeout(r, retryAfter * 1000));
         continue;
       }

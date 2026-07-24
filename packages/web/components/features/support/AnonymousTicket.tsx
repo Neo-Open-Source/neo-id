@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
 import { Input } from "@/components/ui/Input";
@@ -146,7 +147,7 @@ export function AnonymousTicket() {
 
     const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
-  }, [ticket?.id, ticket?.email, ticket?.isLocal, ticket?.messages.length]);
+  }, [ticket]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -400,7 +401,7 @@ export function AnonymousTicket() {
       <div className="w-full max-w-md">
         <div className="bg-surface rounded-card border border-border shadow-card p-8">
           <div className="flex items-center gap-3 mb-6">
-            <img src="/splash-icon.png" alt="Neo ID" className="w-8 h-8" />
+            <Image src="/splash-icon.png" alt="Neo ID" width={32} height={32} className="w-8 h-8" />
             <span className="text-lg font-bold text-content">Neo ID</span>
           </div>
           <h1 className="text-xl font-bold text-content mb-1">{t.support.title}</h1>

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NeoIdClient } from "../client";
 
 // Mock fetch
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 

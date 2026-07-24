@@ -25,15 +25,15 @@ export function getTranslations(locale: Locale): Translations {
 export function detectLocale(): Locale {
   if (typeof window === "undefined") {
     if (typeof globalThis !== "undefined") {
-      const cookie = (globalThis as any).__localeCookie as string | undefined;
+      const cookie = (globalThis as unknown as Record<string, string | undefined>).__localeCookie;
       if (cookie && locales.includes(cookie as Locale)) return cookie as Locale;
     }
     return "en";
   }
 
   // Check global set by anti-flicker script first
-  const w = window as any;
-  if (w.__initialLocale && locales.includes(w.__initialLocale)) return w.__initialLocale;
+  const w = window as unknown as Record<string, string | undefined>;
+  if (w.__initialLocale && locales.includes(w.__initialLocale as Locale)) return w.__initialLocale as Locale;
 
   const saved = localStorage.getItem("neo_id_locale") as Locale | null;
   if (saved && locales.includes(saved)) return saved;

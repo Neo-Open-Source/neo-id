@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { DEFAULT_AVATAR } from "./AvatarImage";
 import { Icon } from "./Icon";
@@ -34,13 +35,15 @@ export function UserAvatar({ src, name, size = 32, className }: UserAvatarProps)
 
   if (resolved) {
     return (
-      <img
+      <Image
         src={resolved}
         alt=""
         referrerPolicy="no-referrer"
         className={cn("user-avatar", className)}
-        style={{ width: size, height: size }}
+        width={size}
+        height={size}
         onError={() => setFailed(true)}
+        unoptimized
       />
     );
   }

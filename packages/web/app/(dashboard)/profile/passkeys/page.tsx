@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { Passkey } from "@neo-id/shared";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
@@ -30,7 +31,8 @@ function base64urlToBuffer(base64url: string): ArrayBuffer {
   return buffer;
 }
 
-function serializeCredential(credential: PublicKeyCredential): any {
+function serializeCredential(credential: PublicKeyCredential): Record<string, unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = credential.response as any;
   return {
     id: credential.id,
@@ -50,7 +52,7 @@ function serializeCredential(credential: PublicKeyCredential): any {
 export default function PasskeysPage() {
   const { t } = useI18n();
   usePageTitle(t.pages.passkeys);
-  const [passkeys, setPasskeys] = useState<any[]>([]);
+  const [passkeys, setPasskeys] = useState<Passkey[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -77,7 +79,7 @@ export default function PasskeysPage() {
         },
         pubKeyCredParams: startData.pubKeyCredParams,
         timeout: startData.timeout,
-        excludeCredentials: (startData.excludeCredentials || []).map((cred: any) => ({
+        excludeCredentials: (startData.excludeCredentials || []).map((cred: { id: string; transports?: string[] }) => ({
           id: base64urlToBuffer(cred.id),
           type: "public-key" as const,
           transports: cred.transports as AuthenticatorTransport[] | undefined,

@@ -61,7 +61,7 @@ export function getGithubAuthorizationUrl(
 ) {
   return client.authorizeURL({
     redirect_uri: redirectUri,
-    scope: ["user:email"],
+    scope: ["read:user", "user:email"],
     state,
   });
 }
@@ -109,17 +109,37 @@ export async function getGoogleUserInfo(accessToken: string): Promise<OAuthUserI
   };
 }
 
+interface GitHubEmail {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+  visibility: string | null;
+}
+
 export async function getGithubUserInfo(accessToken: string): Promise<OAuthUserInfo> {
-  const res = await fetch("https://api.github.com/user", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const data = (await res.json()) as GitHubUser;
+  const [userRes, emailsRes] = await Promise.all([
+    fetch("https://api.github.com/user", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+    fetch("https://api.github.com/user/emails", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+  ]);
+
+  const userData = (await userRes.json()) as GitHubUser;
+  let email = userData.email ?? "";
+
+  if (!email && emailsRes.ok) {
+    const emails = (await emailsRes.json()) as GitHubEmail[];
+    const primary = emails.find((e) => e.primary);
+    if (primary) email = primary.email;
+  }
 
   return {
-    id: String(data.id),
-    email: data.email ?? "",
-    name: data.name ?? undefined,
-    picture: data.avatar_url,
+    id: String(userData.id),
+    email,
+    name: userData.name ?? undefined,
+    picture: userData.avatar_url,
     provider: "github",
   };
 }

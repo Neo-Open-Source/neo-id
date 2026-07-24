@@ -181,7 +181,7 @@ export async function socialOAuthCallback(c: Context) {
     return c.redirect(url.toString(), 302);
   }
 
-  let identity = await db.identity.findUnique({
+  const identity = await db.identity.findUnique({
     where: {
       provider_providerUserId: {
         provider,

@@ -68,6 +68,7 @@ export async function verifyRegistration(
   _userId: string,
 ): Promise<RegistrationResult> {
   const verification = await verifyRegistrationResponse({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     response: response as any,
     expectedChallenge,
     expectedOrigin: ORIGIN,
@@ -125,6 +126,7 @@ export async function verifyAuthentication(
   const pubKeyBuffer = Buffer.from(credential.publicKey, "base64url");
 
   const verification = await verifyAuthenticationResponse({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     response: response as any,
     expectedChallenge,
     expectedOrigin: ORIGIN,

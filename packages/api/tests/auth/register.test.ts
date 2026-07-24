@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { cleanDb, makeRequest } from "../helpers";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 describe("POST /api/v1/auth/register", () => {
   let app: any;
 
@@ -22,7 +24,7 @@ describe("POST /api/v1/auth/register", () => {
 
     // Debug: log response
     const json = await res.json();
-    console.log("Register response:", JSON.stringify(json, null, 2));
+    console.warn("Register response:", JSON.stringify(json, null, 2));
 
     expect(res.status).toBe(201);
     expect(json.ok).toBe(true);

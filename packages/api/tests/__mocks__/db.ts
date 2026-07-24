@@ -1,4 +1,5 @@
 // Mock database for unit tests
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 function generateId() {
   return Math.random().toString(36).substring(2, 15);

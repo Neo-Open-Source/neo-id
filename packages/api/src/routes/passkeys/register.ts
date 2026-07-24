@@ -80,7 +80,8 @@ export async function finishPasskeyRegistration(c: Context) {
       deviceName: passkey.deviceName,
       createdAt: passkey.createdAt.toISOString(),
     });
-  } catch (e: any) {
-    return error(c, "INVALID_REQUEST", e.message || "Passkey registration failed");
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Passkey registration failed";
+    return error(c, "INVALID_REQUEST", message);
   }
 }

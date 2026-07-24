@@ -35,7 +35,9 @@ export function proxy(request: NextRequest) {
   const locale = detectLocale(request);
 
   if (pathname === "/") {
-    const hasSession = !!request.cookies.get("neo_id_access")?.value;
+    const hasAccess = !!request.cookies.get("neo_id_access")?.value;
+    const hasRefresh = !!request.cookies.get("neo_id_refresh")?.value;
+    const hasSession = hasAccess || hasRefresh;
     if (hasSession) {
       return NextResponse.redirect(new URL("/profile", request.url));
     }
@@ -43,8 +45,9 @@ export function proxy(request: NextRequest) {
   }
 
   if (isAuthRoute(pathname)) {
-    const hasSession = !!request.cookies.get("neo_id_access")?.value;
-    if (!hasSession) {
+    const hasAccess = !!request.cookies.get("neo_id_access")?.value;
+    const hasRefresh = !!request.cookies.get("neo_id_refresh")?.value;
+    if (!hasAccess && !hasRefresh) {
       const loginUrl = new URL("/auth", request.url);
       loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
@@ -52,7 +55,8 @@ export function proxy(request: NextRequest) {
   }
 
   if (pathname === "/auth") {
-    const hasSession = !!request.cookies.get("neo_id_access")?.value;
+    const hasAccess = !!request.cookies.get("neo_id_access")?.value;
+    const hasSession = hasAccess || !!request.cookies.get("neo_id_refresh")?.value;
     if (hasSession) {
       return NextResponse.redirect(new URL("/profile", request.url));
     }

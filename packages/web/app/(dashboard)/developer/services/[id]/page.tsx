@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
@@ -10,6 +11,7 @@ import { usePageTitle } from "@/lib/use-page-title";
 import { Input } from "@/components/ui/Input";
 import { Icon } from "@/components/ui/Icon";
 import { toast } from "sonner";
+import type { ServiceApp } from "@neo-id/shared";
 import { api, apiUpload, ApiError } from "@/lib/api";
 
 export default function ServiceDetailPage() {
@@ -18,7 +20,7 @@ export default function ServiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [service, setService] = useState<any>(null);
+  const [service, setService] = useState<ServiceApp | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -36,7 +38,7 @@ export default function ServiceDetailPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
-    api<any>(`/services/${params.id}`)
+    api<ServiceApp>(`/services/${params.id}`)
       .then((data) => {
         setService(data);
         setForm({
@@ -53,7 +55,7 @@ export default function ServiceDetailPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const data = await api<any>(`/services/${params.id}`, {
+      const data = await api<ServiceApp>(`/services/${params.id}`, {
         method: "PUT",
         body: {
           displayName: form.displayName,
@@ -113,7 +115,7 @@ export default function ServiceDetailPage() {
       const formData = new FormData();
       formData.append("logo", file);
       const data = await apiUpload<{ url: string }>(`/services/${params.id}/logo`, formData);
-      setService({ ...service, logoUrl: data.url });
+      setService({ ...service!, logoUrl: data.url });
       toast.success("Logo uploaded");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t.common.error);
@@ -154,7 +156,7 @@ export default function ServiceDetailPage() {
             className="relative w-16 h-16 rounded-2xl bg-surface-row border border-border flex items-center justify-center shrink-0 group overflow-hidden cursor-pointer hover:border-accent transition-colors"
           >
             {service.logoUrl ? (
-              <img src={service.logoUrl} alt="" className="w-full h-full object-cover rounded-2xl" />
+              <Image src={service.logoUrl} alt="" fill className="object-cover rounded-2xl" unoptimized />
             ) : (
               <Icon name="terminal" size={28} className="text-accent" />
             )}

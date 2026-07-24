@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
@@ -65,7 +66,7 @@ export default function ServicesPage() {
             <Link key={service.id} href={`/developer/services/${service.id}`} className="admin-user-row">
               <div className="list-row__icon-wrap list-row__icon-wrap--app">
                 {service.logoUrl ? (
-                  <img src={service.logoUrl} alt="" />
+                  <Image src={service.logoUrl} alt="" width={18} height={18} unoptimized />
                 ) : (
                   <Icon name="apps" size={18} />
                 )}

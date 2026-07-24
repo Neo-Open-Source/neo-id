@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { useI18n } from "@/lib/i18n/context";
 import { localeNames, type Locale } from "@/lib/i18n";
 
@@ -34,7 +35,7 @@ export function LanguagePicker() {
         className="language-picker__trigger"
         aria-label={localeNames[locale]}
       >
-        <img src={FLAGS[locale]} alt="" className="language-flag language-flag--sm" />
+        <Image src={FLAGS[locale]} alt="" width={20} height={15} className="language-flag language-flag--sm" />
         <span>{localeNames[locale]}</span>
       </button>
 
@@ -50,7 +51,7 @@ export function LanguagePicker() {
               }}
               className={`language-picker__option${loc === locale ? " language-picker__option--active" : ""}`}
             >
-              <img src={FLAGS[loc]} alt="" className="language-flag language-flag--sm" />
+              <Image src={FLAGS[loc]} alt="" width={20} height={15} className="language-flag language-flag--sm" />
               <span>{localeNames[loc]}</span>
             </button>
           ))}

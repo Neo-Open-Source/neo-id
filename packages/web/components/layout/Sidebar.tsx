@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
@@ -72,7 +73,7 @@ export function Sidebar({ user, onLogout, openTicketCount }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-20 flex flex-col items-center py-4 gap-2 z-40 bg-app border-r border-border max-md:hidden">
       <Link href="/profile" className="w-12 h-12 flex items-center justify-center mb-4 mt-2">
-        <img src="/splash-icon.png" alt="Neo ID" className="w-10 h-10" />
+        <Image src="/splash-icon.png" alt="Neo ID" width={40} height={40} className="w-10 h-10" />
       </Link>
 
       <Link

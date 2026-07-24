@@ -57,7 +57,7 @@ export function MfaCodeForm({
       setResendCooldown((v) => (v <= 1 ? 0 : v - 1));
     }, 1000);
     return () => window.clearInterval(id);
-  }, [resendCooldown > 0]);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (!isExport) return;

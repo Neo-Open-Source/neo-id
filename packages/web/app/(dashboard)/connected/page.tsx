@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { ListPageSkeleton } from "@/components/ui/Skeleton";
@@ -81,7 +82,7 @@ export default function ConnectedPage() {
             <div key={connection.id} className="list-row">
               <div className="list-row__icon-wrap list-row__icon-wrap--app">
                 {connection.app.logoUrl ? (
-                  <img src={connection.app.logoUrl} alt="" />
+                  <Image src={connection.app.logoUrl} alt="" width={18} height={18} unoptimized />
                 ) : (
                   <Icon name="apps" size={18} />
                 )}

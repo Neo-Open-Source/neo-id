@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { Icon } from "./Icon";
 
@@ -84,9 +85,11 @@ export function AvatarImage({
 
   if (displaySrc && !failed) {
     return (
-      <img
+      <Image
         src={displaySrc}
         alt=""
+        width={80}
+        height={80}
         className={cn("avatar__image", imageClassName)}
         onError={() => {
           if (displaySrc !== DEFAULT_AVATAR) {
@@ -95,6 +98,7 @@ export function AvatarImage({
             setFailed(true);
           }
         }}
+        unoptimized
       />
     );
   }

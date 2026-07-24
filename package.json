@@ -9,13 +9,20 @@
     "test": "turbo test",
     "test:e2e": "turbo test:e2e",
     "lint": "turbo lint",
+    "lint:all": "eslint packages/",
     "db:migrate": "pnpm --filter @neo-id/db migrate",
     "db:generate": "pnpm --filter @neo-id/db generate"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.2.11",
+    "eslint": "9",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "mongodb": "^7.5.0",
     "tsx": "^4.19.0",
     "turbo": "^2.10.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0"
   }
 }

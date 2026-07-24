@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { ListPageSkeleton } from "@/components/ui/Skeleton";
@@ -96,7 +97,7 @@ export default function AdminServicesPage() {
             <div key={service.id} className="admin-user-row">
               <div className="list-row__icon-wrap list-row__icon-wrap--app">
                 {service.logoUrl ? (
-                  <img src={service.logoUrl} alt="" />
+                  <Image src={service.logoUrl} alt="" width={18} height={18} unoptimized />
                 ) : (
                   <Icon name="apps" size={18} />
                 )}

@@ -21,11 +21,9 @@ export function useTicketPolling({ ticketId, enabled = true, apiPath, onUpdate, 
     let lastId: string | null = null;
     let lastStatus: string | null = null;
     const path = apiPath || `/support/tickets/${ticketId}`;
-    let interval: ReturnType<typeof setInterval> | undefined;
-
     async function poll() {
       try {
-        const data: any = await api(path);
+        const data = await api<{ status?: string; messages?: Array<{ id: string }> }>(path);
         if (data.status && data.status !== lastStatus) {
           lastStatus = data.status;
           onStatusRef.current?.(data.status);
@@ -44,7 +42,7 @@ export function useTicketPolling({ ticketId, enabled = true, apiPath, onUpdate, 
     }
 
     void poll();
-    interval = setInterval(poll, 2000);
+    const interval = setInterval(poll, 2000);
 
     return () => clearInterval(interval);
   }, [ticketId, enabled, apiPath]);

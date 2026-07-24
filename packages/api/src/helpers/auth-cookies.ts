@@ -22,7 +22,7 @@ export function setAuthCookies(
 ) {
   setCookie(c, ACCESS_COOKIE, tokens.accessToken, {
     ...baseCookieOpts(),
-    maxAge: TOKEN.ACCESS_TOKEN_EXPIRY,
+    maxAge: TOKEN.REFRESH_TOKEN_EXPIRY,
   });
   setCookie(c, REFRESH_COOKIE, tokens.refreshToken, {
     ...baseCookieOpts(),

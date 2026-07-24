@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
@@ -205,7 +206,7 @@ export function AvatarUpload({
               aria-label={t.profile.uploadPhoto}
             >
               <div className="avatar avatar--md">
-                <img src={displayPreview} alt="" className="avatar__image" />
+                <Image src={displayPreview} alt="" width={96} height={96} className="avatar__image" unoptimized />
               </div>
             </button>
             <p className="avatar-picker__hint">{t.profile.uploadPhotoHint}</p>
@@ -226,7 +227,7 @@ export function AvatarUpload({
                     setUploadFile(null);
                   }}
                 >
-                  <img src={url} alt="" />
+                  <Image src={url} alt="" width={48} height={48} unoptimized />
                 </button>
               ))}
             </div>

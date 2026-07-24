@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
@@ -139,7 +140,7 @@ export default function MfaSettingsPage() {
           {totpSetup ? (
             <div className="mfa-setup">
               <div className="mfa-setup__qr">
-                <img src={totpSetup.qr_code_url} alt="QR Code" />
+                <Image src={totpSetup.qr_code_url!} alt="QR Code" width={180} height={180} unoptimized />
               </div>
               <div className="mfa-setup__secret">
                 <p>{t.profile.enterManualKey}</p>

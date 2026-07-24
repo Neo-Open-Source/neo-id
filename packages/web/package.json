@@ -7,7 +7,7 @@
     "dev": "next dev --port ${PORT:-3001}",
     "build": "pnpm --filter @neo-id/shared build && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint --config ../../eslint.config.mjs app/ components/ hooks/ lib/"
   },
   "dependencies": {
     "@flaticon/flaticon-uicons": "^3.3.1",
@@ -32,7 +32,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9",
-    "eslint-config-next": "15.5.21",
     "tailwindcss": "^4",
     "typescript": "^5.7.0"
   }

@@ -1,6 +1,7 @@
 import { db } from "./__mocks__/db";
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export { db };
 

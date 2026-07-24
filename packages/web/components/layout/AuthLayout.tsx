@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
 import { BackButton } from "@/components/ui/BackButton";
@@ -29,7 +30,7 @@ export function AuthLayout({ title, subtitle, children, onBack, backLabel }: Aut
         >
           <div className="flex items-center justify-between pt-6 md:pt-8 pb-8">
             <div className="inline-flex items-center gap-2 text-content text-base font-bold tracking-tight">
-              <img src="/splash-icon.png" alt="Neo ID" className="w-7 h-7" />
+              <Image src="/splash-icon.png" alt="Neo ID" width={28} height={28} className="w-7 h-7" />
               <span>Neo ID</span>
             </div>
             <LanguagePicker />

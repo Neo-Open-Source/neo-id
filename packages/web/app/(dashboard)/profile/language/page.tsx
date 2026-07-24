@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { BackButton } from "@/components/ui/BackButton";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
@@ -42,7 +43,7 @@ export default function LanguagePage() {
                 toast.success(next.language?.updated ?? next.common.success);
               }}
             >
-              <img src={lang.flag} alt="" className="language-flag" />
+              <Image src={lang.flag} alt="" width={24} height={18} className="language-flag" />
               <span className="settings-row__label">{localeNames[lang.code]}</span>
               {active && <Icon name="check" size={16} className="text-accent" />}
             </button>

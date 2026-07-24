@@ -223,10 +223,10 @@ export class NeoIdClient {
   }
 
   async startPasskeyRegistration() {
-    return this.request<any>("POST", "/api/v1/passkeys/register/start");
+    return this.request<Record<string, unknown>>("POST", "/api/v1/passkeys/register/start");
   }
 
-  async finishPasskeyRegistration(response: any, expectedChallenge: string, deviceName?: string) {
+  async finishPasskeyRegistration(response: Record<string, unknown>, expectedChallenge: string, deviceName?: string) {
     return this.request<{ id: string; credentialId: string }>(
       "POST",
       "/api/v1/passkeys/register/finish",
@@ -264,7 +264,7 @@ export class NeoIdClient {
   }
 
   async verifyMfa(email: string, method: string, code: string, purpose?: string) {
-    return this.request<{ accessToken?: string; user?: any }>(
+    return this.request<{ accessToken?: string; user?: Record<string, unknown> }>(
       "POST",
       "/api/v1/mfa/verify",
       { email, method, code, purpose },

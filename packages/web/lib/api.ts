@@ -130,6 +130,7 @@ async function fetchWithRetry<T>(path: string, init: RequestInit, token: boolean
   return json.data;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function api<T = any>(
   path: string,
   options: ApiOptions = {},
@@ -144,6 +145,7 @@ export async function api<T = any>(
   return fetchWithRetry<T>(path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined }, token);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function apiUpload<T = any>(
   path: string,
   formData: FormData,

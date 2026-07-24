@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
@@ -73,7 +74,7 @@ function ConsentContent() {
       <div className="flex flex-col gap-5 animate-fadeIn">
         {clientLogo && (
           <div className="flex justify-center">
-            <img src={clientLogo} alt={clientName} className="w-16 h-16 rounded-2xl object-cover" />
+            <Image src={clientLogo} alt={clientName} width={64} height={64} className="rounded-2xl object-cover" unoptimized />
           </div>
         )}
 

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: "Auth/OIDC Provider",
 };
 
-// eslint-disable-next-line react/no-danger
+ 
 const themeScript = `
 (function() {
   try {
@@ -25,7 +25,7 @@ const themeScript = `
 })();
 `;
 
-// eslint-disable-next-line react/no-danger
+ 
 const localeScript = `
 (function() {
   try {

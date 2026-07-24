@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
@@ -91,7 +92,7 @@ export default function NewServicePage() {
               className="relative w-16 h-16 rounded-2xl bg-surface-hover border border-dashed border-border flex items-center justify-center shrink-0 group overflow-hidden cursor-pointer hover:border-accent transition-colors"
             >
               {logoPreview ? (
-                <img src={logoPreview} alt="" className="w-full h-full object-cover rounded-2xl" />
+                <Image src={logoPreview} alt="" fill className="object-cover rounded-2xl" unoptimized />
               ) : (
                 <Icon name="camera" size={24} className="text-dim group-hover:text-accent transition-colors" />
               )}
