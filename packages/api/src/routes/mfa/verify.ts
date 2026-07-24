@@ -55,7 +55,12 @@ export async function verifyMfa(c: Context) {
 
     setAuthCookies(c, tokens);
 
-    return success(c, { verified: true });
+    return success(c, {
+      verified: true,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      idToken: tokens.idToken,
+    });
   }
 
   // ─── MFA during login (totp / email) ────────────────────────────────────

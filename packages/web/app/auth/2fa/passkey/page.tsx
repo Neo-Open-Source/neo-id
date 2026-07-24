@@ -3,7 +3,7 @@
 import { useCallback, useEffect, Suspense, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
-import { setAccessToken } from "@/lib/api";
+import { setSessionTokens } from "@/lib/api";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n/context";
@@ -89,7 +89,12 @@ function PasskeyContent() {
       });
       const result = await finish.json();
       if (!finish.ok || !result.ok) throw new Error("passkey verification failed");
-      if (result.data?.accessToken) setAccessToken(result.data.accessToken);
+      if (result.data?.accessToken || result.data?.refreshToken) {
+        setSessionTokens({
+          accessToken: result.data.accessToken,
+          refreshToken: result.data.refreshToken,
+        });
+      }
       router.replace("/profile");
     } catch {
       setStatus("failed");

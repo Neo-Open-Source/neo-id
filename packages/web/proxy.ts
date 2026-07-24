@@ -3,21 +3,6 @@ import type { NextRequest } from "next/server";
 
 const locales = ["en", "uk", "ro", "ru"];
 
-const AUTH_ROUTES = new Set([
-  "/profile", "/sessions", "/connected", "/setup",
-  "/admin", "/developer",
-]);
-
-function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.has(pathname) ||
-    pathname.startsWith("/profile/") ||
-    pathname.startsWith("/sessions/") ||
-    pathname.startsWith("/connected/") ||
-    pathname.startsWith("/setup/") ||
-    pathname.startsWith("/admin/") ||
-    pathname.startsWith("/developer/");
-}
-
 function detectLocale(request: NextRequest): string {
   const cookie = request.cookies.get("neo_id_locale")?.value;
   if (cookie && locales.includes(cookie)) return cookie;
@@ -30,36 +15,29 @@ function detectLocale(request: NextRequest): string {
   return "en";
 }
 
+function hasAuthCookies(request: NextRequest): boolean {
+  return (
+    !!request.cookies.get("neo_id_access")?.value ||
+    !!request.cookies.get("neo_id_refresh")?.value
+  );
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const locale = detectLocale(request);
+  const authed = hasAuthCookies(request);
 
+  // Soft routing only. Do NOT hard-block /profile without cookies:
+  // refresh may live in localStorage when Set-Cookie was dropped, and the
+  // client rehydrates via POST /auth/refresh before loading the profile.
   if (pathname === "/") {
-    const hasAccess = !!request.cookies.get("neo_id_access")?.value;
-    const hasRefresh = !!request.cookies.get("neo_id_refresh")?.value;
-    const hasSession = hasAccess || hasRefresh;
-    if (hasSession) {
-      return NextResponse.redirect(new URL("/profile", request.url));
-    }
-    return NextResponse.redirect(new URL("/auth", request.url));
+    return NextResponse.redirect(new URL(authed ? "/profile" : "/auth", request.url));
   }
 
-  if (isAuthRoute(pathname)) {
-    const hasAccess = !!request.cookies.get("neo_id_access")?.value;
-    const hasRefresh = !!request.cookies.get("neo_id_refresh")?.value;
-    if (!hasAccess && !hasRefresh) {
-      const loginUrl = new URL("/auth", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-  }
-
-  if (pathname === "/auth") {
-    const hasAccess = !!request.cookies.get("neo_id_access")?.value;
-    const hasSession = hasAccess || !!request.cookies.get("neo_id_refresh")?.value;
-    if (hasSession) {
-      return NextResponse.redirect(new URL("/profile", request.url));
-    }
+  // Only bounce away from /auth when cookies prove a session. Client-side
+  // ensureSession handles the localStorage-only case.
+  if (pathname === "/auth" && authed) {
+    return NextResponse.redirect(new URL("/profile", request.url));
   }
 
   const response = NextResponse.next();

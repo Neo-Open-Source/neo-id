@@ -113,7 +113,8 @@ export function MfaCodeForm({
       if (purpose) body.purpose = purpose;
 
       try {
-        await api("/mfa/verify", { method: "POST", body });
+        // Login MFA has no access token yet — don't force auth bootstrap
+        await api("/mfa/verify", { method: "POST", body, token: false });
       } catch (err) {
         const msg = err instanceof ApiError ? err.message : t.auth.mfa.verificationFailed;
         toast.error(msg);

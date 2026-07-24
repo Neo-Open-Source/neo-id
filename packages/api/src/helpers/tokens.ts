@@ -86,8 +86,42 @@ export async function verifyAndRotateRefreshToken(
     include: { user: true },
   });
 
-  if (!storedToken || storedToken.revokedAt) {
+  if (!storedToken) {
     return { ok: false, error: "TOKEN_INVALID", message: "Invalid refresh token" };
+  }
+
+  // Grace period: concurrent tabs / retry after Set-Cookie lag often re-present
+  // a token that was just rotated. Re-issue for the same session instead of logout.
+  if (storedToken.revokedAt) {
+    const rotatedRecently =
+      storedToken.revokeReason === "rotated" &&
+      Date.now() - storedToken.revokedAt.getTime() < TOKEN.REUSE_DETECTION_WINDOW * 1000;
+
+    if (!rotatedRecently || !storedToken.sessionId) {
+      return { ok: false, error: "TOKEN_INVALID", message: "Invalid refresh token" };
+    }
+
+    const user = storedToken.user;
+    if (user.status === "banned") {
+      return { ok: false, error: "USER_BANNED", message: "Your account has been banned" };
+    }
+
+    const session = await db.session.findUnique({ where: { id: storedToken.sessionId } });
+    if (!session || !session.isActive) {
+      return { ok: false, error: "TOKEN_INVALID", message: "Session is no longer active" };
+    }
+
+    const tokens = await rotateSessionTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      sessionId: storedToken.sessionId,
+      oldRefreshTokenId: storedToken.id,
+      deviceInfo: deviceInfo ?? storedToken.deviceInfo ?? undefined,
+      ipAddress,
+    });
+
+    return { ok: true, tokens, user };
   }
 
   if (storedToken.expiresAt < new Date()) {
@@ -101,6 +135,11 @@ export async function verifyAndRotateRefreshToken(
 
   if (!storedToken.sessionId) {
     return { ok: false, error: "INVALID_REQUEST", message: "Invalid session" };
+  }
+
+  const session = await db.session.findUnique({ where: { id: storedToken.sessionId } });
+  if (!session || !session.isActive) {
+    return { ok: false, error: "TOKEN_INVALID", message: "Session is no longer active" };
   }
 
   await db.refreshToken.update({

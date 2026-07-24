@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { GoogleIcon, GithubIcon } from "@/components/ui/ProviderIcons";
 import { Icon } from "@/components/ui/Icon";
 import { Turnstile } from "@/components/ui/Turnstile";
-import { setAccessToken } from "@/lib/api";
+import { setSessionTokens } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 
 interface LoginFormProps {
@@ -60,8 +60,11 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
         return;
       }
 
-      if (json.data?.accessToken) {
-        setAccessToken(json.data.accessToken);
+      if (json.data?.accessToken || json.data?.refreshToken) {
+        setSessionTokens({
+          accessToken: json.data.accessToken,
+          refreshToken: json.data.refreshToken,
+        });
       }
 
       router.push("/profile");

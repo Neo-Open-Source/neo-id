@@ -15,7 +15,10 @@ export const TOKEN = {
   REFRESH_TOKEN_EXPIRY: 30 * 24 * 60 * 60, // 30 days in seconds
   ID_TOKEN_EXPIRY: 60 * 60, // 1 hour in seconds
   REFRESH_TOKEN_LENGTH: 64, // bytes
-  REUSE_DETECTION_WINDOW: 10, // seconds
+  // Grace window for concurrent/retry refresh after rotation.
+  // If a just-rotated token is presented again within this window, re-issue
+  // tokens for the same session instead of killing the login.
+  REUSE_DETECTION_WINDOW: 60, // seconds
 } as const;
 
 // ─── Rate Limits ─────────────────────────────────────────────────────────────

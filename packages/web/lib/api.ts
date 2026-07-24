@@ -4,6 +4,7 @@ import { ApiError } from "@neo-id/shared";
 export { ApiError } from "@neo-id/shared";
 
 const API_BASE = "/api/v1";
+const REFRESH_STORAGE_KEY = "neo_id_refresh_token";
 
 interface ApiOptions {
   method?: string;
@@ -14,9 +15,50 @@ interface ApiOptions {
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 let pendingRefreshToken: string | null = null;
+let bootstrapped = false;
+
+function readStoredRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    // localStorage: survives tab/browser close (httpOnly cookie is primary;
+    // this is the fallback when Set-Cookie is dropped by the edge/proxy).
+    return localStorage.getItem(REFRESH_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredRefreshToken(token: string | null) {
+  pendingRefreshToken = token;
+  if (typeof window === "undefined") return;
+  try {
+    if (token) localStorage.setItem(REFRESH_STORAGE_KEY, token);
+    else localStorage.removeItem(REFRESH_STORAGE_KEY);
+  } catch {
+    // private mode / blocked storage — memory fallback only
+  }
+}
+
+function rememberTokens(data: { accessToken?: string; refreshToken?: string }) {
+  if (data.accessToken) accessToken = data.accessToken;
+  if (data.refreshToken) writeStoredRefreshToken(data.refreshToken);
+}
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+}
+
+/** Call after login/MFA/OAuth so refresh survives tab close within the session. */
+export function setRefreshToken(token: string | null) {
+  writeStoredRefreshToken(token);
+}
+
+export function setSessionTokens(tokens: {
+  accessToken?: string | null;
+  refreshToken?: string | null;
+}) {
+  if (tokens.accessToken !== undefined) accessToken = tokens.accessToken;
+  if (tokens.refreshToken !== undefined) writeStoredRefreshToken(tokens.refreshToken);
 }
 
 async function refreshSession(): Promise<string | null> {
@@ -26,6 +68,11 @@ async function refreshSession(): Promise<string | null> {
     // where the API is momentarily unavailable when the browser first reconnects.
     const MAX_ATTEMPTS = 3;
     const BACKOFF_MS = [0, 800, 1500];
+
+    // Prefer in-memory, then sessionStorage (survives reload), then httpOnly cookie.
+    if (!pendingRefreshToken) {
+      pendingRefreshToken = readStoredRefreshToken();
+    }
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       if (attempt > 0) {
@@ -44,15 +91,12 @@ async function refreshSession(): Promise<string | null> {
         });
         const json = await res.json();
         if (json.ok && json.data?.accessToken) {
-          accessToken = json.data.accessToken;
-          if (json.data.refreshToken) {
-            pendingRefreshToken = json.data.refreshToken;
-          }
-          return json.data.accessToken;
+          rememberTokens(json.data);
+          return json.data.accessToken as string;
         }
         // Token genuinely invalid (not a network/server error) — stop retrying
         if (res.status === 400 || res.status === 401) {
-          pendingRefreshToken = null;
+          writeStoredRefreshToken(null);
           return null;
         }
         // Server error (5xx) or network issue — retry
@@ -61,7 +105,6 @@ async function refreshSession(): Promise<string | null> {
       }
     }
 
-    pendingRefreshToken = null;
     return null;
   })();
   try {
@@ -71,8 +114,27 @@ async function refreshSession(): Promise<string | null> {
   }
 }
 
+/**
+ * Ensure we have a live access token before the first authenticated call.
+ * Critical after tab reopen: access JWT is ~15m, refresh cookie is 30d.
+ */
+export async function ensureSession(): Promise<boolean> {
+  if (accessToken) {
+    bootstrapped = true;
+    return true;
+  }
+  if (bootstrapped && !accessToken && !pendingRefreshToken && !readStoredRefreshToken()) {
+    // Already tried and have nothing to work with
+  }
+  const token = await refreshSession();
+  bootstrapped = true;
+  return token !== null;
+}
+
 export async function logoutSession(): Promise<void> {
   accessToken = null;
+  writeStoredRefreshToken(null);
+  bootstrapped = false;
   try {
     await fetch(`${API_BASE}/auth/logout`, {
       method: "POST",
@@ -85,6 +147,13 @@ export async function logoutSession(): Promise<void> {
 }
 
 async function fetchWithRetry<T>(path: string, init: RequestInit, token: boolean): Promise<T> {
+  // Rehydrate access token from refresh before the first protected request.
+  // Without this, a cold open after 15m hits /profile with an expired JWT
+  // (or only the locale cookie) and races into logout.
+  if (token && !accessToken) {
+    await ensureSession();
+  }
+
   const headers = new Headers(init.headers);
   if (token && accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
@@ -123,8 +192,8 @@ async function fetchWithRetry<T>(path: string, init: RequestInit, token: boolean
     );
   }
 
-  if (json.data?.accessToken) {
-    accessToken = json.data.accessToken;
+  if (json.data?.accessToken || json.data?.refreshToken) {
+    rememberTokens(json.data);
   }
 
   return json.data;
@@ -157,7 +226,7 @@ export async function hasSession(): Promise<boolean> {
   if (accessToken) return true;
 
   // Auth cookies are httpOnly, so they are invisible to document.cookie.
-  // Probe refresh with credentials instead.
+  // Probe refresh with credentials + sessionStorage fallback.
   try {
     return (await refreshSession()) !== null;
   } catch {

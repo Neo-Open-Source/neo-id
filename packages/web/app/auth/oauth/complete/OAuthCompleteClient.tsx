@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { setAccessToken } from "@/lib/api";
+import { setSessionTokens } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
 
@@ -29,7 +29,12 @@ export default function OAuthCompletePage() {
       .then((res) => res.json())
       .then((json) => {
         if (!json.ok) throw new Error(json.error?.message || "oauth_failed");
-        if (json.data?.accessToken) setAccessToken(json.data.accessToken);
+        if (json.data?.accessToken || json.data?.refreshToken) {
+          setSessionTokens({
+            accessToken: json.data.accessToken,
+            refreshToken: json.data.refreshToken,
+          });
+        }
         router.replace("/profile");
       })
       .catch(() => setError("oauth_failed"));

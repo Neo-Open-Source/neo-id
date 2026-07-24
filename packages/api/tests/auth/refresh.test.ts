@@ -45,4 +45,29 @@ describe("POST /api/v1/auth/refresh", () => {
     expect(json.ok).toBe(false);
     expect(json.error.code).toBe("TOKEN_INVALID");
   });
+
+  it("should allow reuse of a just-rotated refresh token within grace window", async () => {
+    const loginRes = await makeRequest(app, "POST", "/api/v1/auth/login", {
+      body: { email: "test@example.com", password: "password123" },
+    });
+    const loginJson = await loginRes.json();
+    const refreshToken = loginJson.data.refreshToken as string;
+
+    const first = await makeRequest(app, "POST", "/api/v1/auth/refresh", {
+      body: { refresh_token: refreshToken },
+    });
+    expect(first.status).toBe(200);
+    const firstJson = await first.json();
+    expect(firstJson.ok).toBe(true);
+
+    // Concurrent tab / laggy Set-Cookie re-sends the previous token
+    const second = await makeRequest(app, "POST", "/api/v1/auth/refresh", {
+      body: { refresh_token: refreshToken },
+    });
+    expect(second.status).toBe(200);
+    const secondJson = await second.json();
+    expect(secondJson.ok).toBe(true);
+    expect(secondJson.data.accessToken).toBeDefined();
+    expect(secondJson.data.refreshToken).toBeDefined();
+  });
 });
