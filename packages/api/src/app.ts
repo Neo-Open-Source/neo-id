@@ -242,7 +242,7 @@ app.post("/api/v1/device/deny", requireAuth, denyDeviceCode);
 
 // ─── OIDC ────────────────────────────────────────────────────────────────────
 
-app.get("/.well-known/openid-configuration", (c) => {
+function oidcConfig(c: any) {
   const issuer = process.env.JWT_ISSUER || "https://id.neome.uk";
   return c.json({
     issuer,
@@ -258,12 +258,17 @@ app.get("/.well-known/openid-configuration", (c) => {
     token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
     code_challenge_methods_supported: ["S256"],
   });
-});
+}
 
-app.get("/.well-known/jwks.json", async (c) => {
+async function jwksHandler(c: any) {
   const { getJwks } = await import("@neo-id/auth-core");
   const jwks = await getJwks();
   return c.json(jwks);
-});
+}
+
+app.get("/.well-known/openid-configuration", oidcConfig);
+app.get("/.well-known/jwks.json", jwksHandler);
+app.get("/api/.well-known/openid-configuration", oidcConfig);
+app.get("/api/.well-known/jwks.json", jwksHandler);
 
 export default app;

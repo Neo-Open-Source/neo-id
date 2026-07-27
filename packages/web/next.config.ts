@@ -17,7 +17,12 @@ const nextConfig: NextConfig = {
         },
       ];
     }
-    return [];
+    return [
+      {
+        source: "/.well-known/:path*",
+        destination: "/api/.well-known/:path*",
+      },
+    ];
   },
 };
 
