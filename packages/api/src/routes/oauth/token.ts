@@ -43,7 +43,7 @@ export async function token(c: Context) {
       },
     });
 
-    if (!oauthState || !oauthState.userId) {
+    if (!oauthState || !oauthState.userId || !oauthState.code) {
       return error(c, "INVALID_REQUEST", "Invalid or expired authorization code");
     }
 

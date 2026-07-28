@@ -44,6 +44,7 @@ import { listPasskeys, deletePasskey } from "./routes/passkeys/list";
 import { authorize } from "./routes/oauth/authorize";
 import { token } from "./routes/oauth/token";
 import { userinfo } from "./routes/oauth/userinfo";
+import { consent, consentInfo } from "./routes/oauth/consent";
 
 // Session Routes
 import { listSessions, deleteSession, deleteAllSessions } from "./routes/sessions/list";
@@ -177,6 +178,8 @@ app.delete("/api/v1/passkeys/:id", requireAuth, deletePasskey);
 
 app.get("/api/v1/oauth/authorize", authorize);
 app.post("/api/v1/oauth/token", token);
+app.get("/api/v1/oauth/consent/:session", consentInfo);
+app.post("/api/v1/oauth/consent", consent);
 app.get("/api/v1/oauth/userinfo", requireAuth, userinfo);
 
 // ─── Session Routes ──────────────────────────────────────────────────────────

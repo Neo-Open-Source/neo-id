@@ -353,6 +353,18 @@ const en = {
     description: "Description",
     secretWarning: "Copy this now. It won't be shown again.",
   },
+  oauth: {
+    authorizeTitle: "Authorize",
+    authorizeSubtitle: "This application wants to access your account",
+    requestedPermissions: "Requested permissions:",
+    authorize: "Authorize",
+    scopeOpenid: "View your identity information",
+    scopeProfile: "View your profile information",
+    scopeEmail: "View your email address",
+    byAuthorizing: "By authorizing, you allow this app to access the requested information.",
+    loading: "Loading...",
+    invalidSession: "Invalid or expired authorization session",
+  },
   support: {
     title: "Support",
     subtitle: "Contact us for help",

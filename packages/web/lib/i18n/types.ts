@@ -382,6 +382,18 @@ export interface Translations {
     description: string;
     secretWarning: string;
   };
+  oauth: {
+    authorizeTitle: string;
+    authorizeSubtitle: string;
+    requestedPermissions: string;
+    authorize: string;
+    scopeOpenid: string;
+    scopeProfile: string;
+    scopeEmail: string;
+    byAuthorizing: string;
+    loading: string;
+    invalidSession: string;
+  };
   setup: {
     title: string;
     subtitle: string;

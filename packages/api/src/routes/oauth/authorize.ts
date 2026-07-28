@@ -59,27 +59,24 @@ export async function authorize(c: Context) {
     return c.redirect(loginUrl.toString(), 302);
   }
 
-  const code = generateToken(32);
-
-  await db.oAuthState.create({
+  // Create a pending oauth state (code=null until user approves)
+  const pendingState = await db.oAuthState.create({
     data: {
       state: state || generateToken(16),
-      code,
+      code: null,
       codeVerifier: code_challenge || null,
       codeChallenge: code_challenge_method === "S256" ? code_challenge : null,
       redirectUri: redirect_uri,
       serviceAppId: serviceApp.id,
       userId,
-      mode: "authorize",
+      mode: "pending",
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     },
   });
 
-  const redirectUrl = new URL(redirect_uri);
-  redirectUrl.searchParams.set("code", code);
-  if (state) {
-    redirectUrl.searchParams.set("state", state);
-  }
+  // Redirect to consent UI — только session ID, никаких данных приложения в URL
+  const consentUrl = new URL("/auth/oauth/consent", c.req.url);
+  consentUrl.searchParams.set("session", pendingState.id);
 
-  return c.redirect(redirectUrl.toString(), 302);
+  return c.redirect(consentUrl.toString(), 302);
 }

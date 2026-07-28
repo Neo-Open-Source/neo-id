@@ -380,6 +380,18 @@ const ro = {
     description: "Descriere",
     secretWarning: "Copiază acum. Nu va mai fi afișat.",
   },
+  oauth: {
+    authorizeTitle: "Autorizare",
+    authorizeSubtitle: "Această aplicație dorește să acceseze contul tău",
+    requestedPermissions: "Permisiuni solicitate:",
+    authorize: "Autorizează",
+    scopeOpenid: "Vizualizează informațiile tale de identitate",
+    scopeProfile: "Vizualizează informațiile profilului tău",
+    scopeEmail: "Vizualizează adresa ta de email",
+    byAuthorizing: "Prin autorizare, permiți acestei aplicații să acceseze informațiile solicitate.",
+    loading: "Se încarcă...",
+    invalidSession: "Sesiune de autorizare invalidă sau expirată",
+  },
   support: {
     title: "Asistență",
     subtitle: "Contactează-ne pentru ajutor",
