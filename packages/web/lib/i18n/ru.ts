@@ -136,6 +136,18 @@ const ru: Translations = {
     settings: "Настройки",
     logout: "Выйти",
   },
+  footer: {
+    ecosystem: "Экосистема",
+    community: "Сообщество",
+    blog: "Блог",
+    api: "API",
+    neoid: "Neo ID",
+    telegram: "Telegram",
+    github: "GitHub",
+    tos: "Пользовательское соглашение",
+    privacy: "Политика конфиденциальности",
+    copyright: "© 2024–{{year}} Neo-Open-Source",
+  },
   profile: {
     title: "Профиль",
     subtitle: "Управление личной информацией",

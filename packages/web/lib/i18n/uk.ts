@@ -136,6 +136,18 @@ const uk: Translations = {
     settings: "Налаштування",
     logout: "Вийти",
   },
+  footer: {
+    ecosystem: "Екосистема",
+    community: "Спільнота",
+    blog: "Блог",
+    api: "API",
+    neoid: "Neo ID",
+    telegram: "Telegram",
+    github: "GitHub",
+    tos: "Угода користувача",
+    privacy: "Політика конфіденційності",
+    copyright: "© 2024–{{year}} Neo-Open-Source",
+  },
   profile: {
     title: "Профіль",
     subtitle: "Керування особистою інформацією",

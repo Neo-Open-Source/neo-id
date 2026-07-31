@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { cn } from "@/lib/cn";
 import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
 import { BackButton } from "@/components/ui/BackButton";
 import { useI18n } from "@/lib/i18n/context";
@@ -20,44 +19,82 @@ export function AuthLayout({ title, subtitle, children, onBack, backLabel }: Aut
   const { t } = useI18n();
 
   return (
-    <div className="auth-shell grid grid-cols-1 md:grid-cols-auth min-h-svh bg-surface">
-      <div className="flex min-w-0 p-6 md:p-8 overflow-y-auto">
-        <div
-          className={cn(
-            "flex flex-1 w-full max-w-md m-auto flex-col",
-            "min-h-svh md:min-h-[calc(100svh-4rem)]",
-          )}
-        >
-          <div className="flex items-center justify-between pt-6 md:pt-8 pb-8">
-            <div className="inline-flex items-center gap-2 text-content text-base font-bold tracking-tight">
-              <Image src="/splash-icon.png" alt="Neo ID" width={28} height={28} className="w-7 h-7" />
-              <span>Neo ID</span>
+    <div className="auth-shell" style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      minHeight: "100svh",
+      backgroundColor: "var(--color-app)",
+      padding: "0 16px",
+    }}>
+
+      {/* Everything in one centred 340px column */}
+      <div style={{
+        width: "100%",
+        maxWidth: "340px",
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+      }}>
+
+        {/* Form centred vertically */}
+        <div style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: "20px",
+          paddingBottom: "60px",
+        }}>
+          {/* Logo + language right above the form */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "8px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Image src="/splash-icon.png" alt="Neo ID" width={26} height={26} style={{ width: 26, height: 26 }} />
+              <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--color-content)", letterSpacing: "-0.02em" }}>
+                Neo ID
+              </span>
             </div>
             <LanguagePicker />
           </div>
-          <div className="flex flex-1 flex-col justify-center gap-8">
-            {onBack && (
-              <BackButton onClick={onBack} label={backLabel || t.common.back} className="mb-0" />
+
+          {onBack && (
+            <BackButton onClick={onBack} label={backLabel || t.common.back} className="mb-0" />
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <h1 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "var(--color-content)", letterSpacing: "-0.02em" }}>
+              {title}
+            </h1>
+            {subtitle && (
+              <p style={{ margin: 0, fontSize: "14px", color: "var(--color-muted)" }}>
+                {subtitle}
+              </p>
             )}
-            <div className="flex flex-col gap-2">
-              <h1 className="text-2xl font-bold text-content">{title}</h1>
-              {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
-            </div>
-            {children}
           </div>
 
-          <p className="py-6 md:py-8 text-xs leading-snug text-dim text-center">
+          {children}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          flexShrink: 0,
+          padding: "20px 0",
+          textAlign: "center",
+        }}>
+          <p style={{ margin: 0, fontSize: "12px", color: "var(--color-dim)", lineHeight: 1.5 }}>
             {t.auth.legal.agreePrefix}{" "}
-            <Link href="/terms" className="text-accent underline">{t.auth.legal.terms}</Link>{" "}
+            <Link href="/terms" style={{ color: "var(--color-accent)" }}>{t.auth.legal.terms}</Link>{" "}
             {t.auth.legal.agreeSuffix}{" "}
-            <Link href="/privacy" className="text-accent underline">{t.auth.legal.privacy}</Link>.
+            <Link href="/privacy" style={{ color: "var(--color-accent)" }}>{t.auth.legal.privacy}</Link>.
           </p>
         </div>
+
       </div>
-      <aside
-        className="relative hidden md:block overflow-hidden rounded-l-hero bg-auth-gradient"
-        aria-hidden="true"
-      />
     </div>
   );
 }

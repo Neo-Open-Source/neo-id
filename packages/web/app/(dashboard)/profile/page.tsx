@@ -118,7 +118,7 @@ export default function ProfilePage() {
       </div>
 
       <div className="profile-group">
-        <SettingsRow icon="globe" label={t.profile.language} value={localeNames[locale]} href="/profile/language" />
+        <SettingsRow icon="globe" label={t.profile.language} value={localeNames[locale]} href="/profile/language" className="md:hidden" />
       </div>
 
       <div className="profile-group">

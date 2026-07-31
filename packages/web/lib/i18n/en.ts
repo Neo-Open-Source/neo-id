@@ -136,6 +136,18 @@ const en = {
     settings: "Settings",
     logout: "Log out",
   },
+  footer: {
+    ecosystem: "Ecosystem",
+    community: "Community",
+    blog: "Blog",
+    api: "API",
+    neoid: "Neo ID",
+    telegram: "Telegram",
+    github: "GitHub",
+    tos: "Terms of Service",
+    privacy: "Privacy Policy",
+    copyright: "© 2024–{{year}} Neo-Open-Source",
+  },
   profile: {
     title: "Profile",
     subtitle: "Manage your personal information",

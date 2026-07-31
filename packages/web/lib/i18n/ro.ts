@@ -136,6 +136,18 @@ const ro = {
     settings: "Setări",
     logout: "Deconectare",
   },
+  footer: {
+    ecosystem: "Ecosistem",
+    community: "Comunitate",
+    blog: "Blog",
+    api: "API",
+    neoid: "Neo ID",
+    telegram: "Telegram",
+    github: "GitHub",
+    tos: "Termeni de utilizare",
+    privacy: "Politica de confidențialitate",
+    copyright: "© 2024–{{year}} Neo-Open-Source",
+  },
   profile: {
     title: "Profil",
     subtitle: "Gestionează-ți informațiile personale",

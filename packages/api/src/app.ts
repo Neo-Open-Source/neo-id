@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { corsMiddleware } from "./middleware/cors";
 import { requestIdMiddleware } from "./middleware/request-id";
 import { requireAuth } from "./middleware/auth";
@@ -245,7 +245,7 @@ app.post("/api/v1/device/deny", requireAuth, denyDeviceCode);
 
 // ─── OIDC ────────────────────────────────────────────────────────────────────
 
-function oidcConfig(c: any) {
+function oidcConfig(c: Context) {
   const issuer = process.env.JWT_ISSUER || "https://id.neome.uk";
   return c.json({
     issuer,
@@ -263,7 +263,7 @@ function oidcConfig(c: any) {
   });
 }
 
-async function jwksHandler(c: any) {
+async function jwksHandler(c: Context) {
   const { getJwks } = await import("@neo-id/auth-core");
   const jwks = await getJwks();
   return c.json(jwks);

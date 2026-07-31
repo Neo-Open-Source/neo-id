@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { BackButton } from "@/components/ui/BackButton";
+import { Footer } from "@/components/layout/Footer";
 import { usePageTitle } from "@/lib/use-page-title";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -37,6 +38,7 @@ export default function TermsPage() {
       </main>
 
       <ScrollToTop />
+      <Footer />
     </div>
   );
 }

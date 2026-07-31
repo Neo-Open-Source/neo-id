@@ -142,6 +142,18 @@ export interface Translations {
     settings: string;
     logout: string;
   };
+  footer: {
+    ecosystem: string;
+    community: string;
+    blog: string;
+    api: string;
+    neoid: string;
+    telegram: string;
+    github: string;
+    tos: string;
+    privacy: string;
+    copyright: string;
+  };
   profile: {
     title: string;
     subtitle: string;

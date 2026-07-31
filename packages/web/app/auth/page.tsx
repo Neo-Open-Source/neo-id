@@ -37,11 +37,8 @@ function AuthPageContent() {
 
   if (checking) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-auth min-h-svh bg-surface">
-        <div className="flex min-w-0 items-center justify-center p-6 md:p-8">
-          <div className="loading__spinner" />
-        </div>
-        <aside className="relative hidden md:block overflow-hidden rounded-l-hero bg-auth-gradient" />
+      <div className="flex min-h-svh items-center justify-center bg-app">
+        <div className="loading__spinner" />
       </div>
     );
   }
@@ -59,9 +56,8 @@ function AuthPageContent() {
 export default function AuthPage() {
   return (
     <Suspense fallback={
-      <div className="grid grid-cols-1 md:grid-cols-auth min-h-svh bg-surface">
-        <div className="flex min-w-0 p-6 md:p-8"><div className="flex flex-1 w-full max-w-md" /></div>
-        <aside className="relative hidden md:block overflow-hidden rounded-l-hero bg-auth-gradient" />
+      <div className="flex min-h-svh items-center justify-center bg-app">
+        <div className="loading__spinner" />
       </div>
     }>
       <AuthPageContent />

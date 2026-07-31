@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Sidebar } from "./Sidebar";
+import { Header } from "./Header";
+import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { useCachedQuery } from "@/hooks/useCachedQuery";
@@ -126,13 +127,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-app">
-      <Sidebar user={user} onLogout={handleLogout} openTicketCount={openTicketCount} />
-      <main className={`dashboard-main ml-20 min-h-svh max-md:ml-0${isSupportChat ? " dashboard-main--chat" : ""}`}>
+    <div className="min-h-screen bg-app flex flex-col">
+      <Header user={user} openTicketCount={openTicketCount} />
+      <main className={`dashboard-main${isSupportChat ? " dashboard-main--chat" : " flex-1"}`}>
         <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-24">{children}</div>
       </main>
       {!isSupportChat && (
-        <BottomNav user={user} onLogout={handleLogout} openTicketCount={openTicketCount} />
+        <>
+          <BottomNav user={user} onLogout={handleLogout} openTicketCount={openTicketCount} />
+          <Footer />
+        </>
       )}
       <ScrollToTop />
     </div>
