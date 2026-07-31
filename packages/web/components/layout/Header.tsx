@@ -43,7 +43,6 @@ export function Header({ user, openTicketCount }: HeaderProps) {
   const isDev = user?.role === "developer" || isAdmin;
 
   const navItems: NavItem[] = [
-    { href: "/profile", label: t.nav.profile },
     { href: "/sessions", label: t.nav.sessions },
     ...(isDev ? [{ href: "/developer/services", label: t.nav.developer }] : []),
     ...(isAdmin ? [{ href: "/admin/users", label: t.nav.admin, badge: openTicketCount }] : []),
