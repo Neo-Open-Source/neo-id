@@ -131,7 +131,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="hidden md:block">
         <Header user={user} openTicketCount={openTicketCount} />
       </div>
-      <main className={`dashboard-main${isSupportChat ? " dashboard-main--chat" : " flex-1"}`}>
+      <main className={`dashboard-main${isSupportChat ? " dashboard-main--chat" : " flex-1"} md:pt-[52px]`}>
         <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-24">{children}</div>
       </main>
       {!isSupportChat && (
