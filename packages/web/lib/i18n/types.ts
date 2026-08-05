@@ -73,11 +73,10 @@ export interface Translations {
     or: string;
     errors: {
       network: string;
-      loginFailed: string;
-      registerFailed: string;
-    };
-    help: string;
-    legal: {
+    loginFailed: string;
+    registerFailed: string;
+  },
+  legal: {
       agreePrefix: string;
       terms: string;
       privacy: string;
@@ -138,7 +137,6 @@ export interface Translations {
     overview: string;
     users: string;
     audit: string;
-    support: string;
     settings: string;
     logout: string;
   };
@@ -331,40 +329,6 @@ export interface Translations {
     newPassword: string;
     copyPassword: string;
     passwordCopied: string;
-    supportTitle: string;
-    supportCount: string;
-    noTickets: string;
-    noTicketsDesc: string;
-    reply: string;
-    close: string;
-    reopen: string;
-    delete: string;
-    deleteConfirm: string;
-    ticketStatus: string;
-    subject: string;
-  };
-  support: {
-    title: string;
-    subtitle: string;
-    newTicket: string;
-    subject: string;
-    subjectPlaceholder: string;
-    message: string;
-    messagePlaceholder: string;
-    send: string;
-    closed: string;
-    open: string;
-    close: string;
-    reopen: string;
-    noTickets: string;
-    noTicketsDesc: string;
-    widgetTitle: string;
-    widgetSubtitle: string;
-    widgetPlaceholder: string;
-    sendMessage: string;
-    sent: string;
-    replyAt: string;
-    widgetExisting: string;
   };
   developer: {
     docsSubtitle: string;

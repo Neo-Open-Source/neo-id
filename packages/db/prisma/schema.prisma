@@ -250,40 +250,6 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// ─── Support Ticket ───────────────────────────────────────────────────────────
-
-model SupportTicket {
-  id        String   @id @default(cuid())
-  userId    String?
-  email     String
-  subject   String
-  status    String   @default("open")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  messages  TicketMessage[]
-
-  @@index([userId])
-  @@index([email])
-  @@index([status])
-  @@map("support_tickets")
-}
-
-model TicketMessage {
-  id         String   @id @default(cuid())
-  ticketId   String
-  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId   String?
-  authorRole String   @default("user")
-  body       String
-
-  createdAt  DateTime @default(now())
-
-  @@index([ticketId])
-  @@map("ticket_messages")
-}
-
 // ─── Device Code (RFC 8628) ──────────────────────────────────────────────────
 
 model DeviceCode {

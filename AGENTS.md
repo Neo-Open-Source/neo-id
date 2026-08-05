@@ -135,12 +135,6 @@ PUT    /api/v1/services/:id
 DELETE /api/v1/services/:id
 POST   /api/v1/services/:id/rotate-secret
 POST   /api/v1/services/:id/logo
-GET    /api/v1/support/tickets
-POST   /api/v1/support/tickets
-GET    /api/v1/support/tickets/:id
-POST   /api/v1/support/tickets/:id/messages
-POST   /api/v1/support/tickets/:id/close
-POST   /api/v1/support/tickets/:id/reopen
 GET    /api/v1/admin/users
 GET    /api/v1/admin/users/:id
 POST   /api/v1/admin/users/:id/ban
@@ -150,10 +144,6 @@ DELETE /api/v1/admin/users/:id
 GET    /api/v1/admin/stats
 GET    /api/v1/admin/services
 GET    /api/v1/admin/audit-logs
-GET    /api/v1/admin/support/tickets
-GET    /api/v1/admin/support/tickets/:id
-POST   /api/v1/admin/support/tickets/:id/messages
-POST   /api/v1/admin/support/tickets/:id/status
 POST   /api/v1/oauth2/authorize
 POST   /api/v1/oauth2/token
 POST   /api/v1/oauth2/token/introspect

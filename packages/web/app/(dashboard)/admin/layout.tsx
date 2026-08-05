@@ -11,7 +11,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       items={[
         { href: "/admin/users", label: t.nav.users, icon: "users" },
         { href: "/admin/services", label: t.nav.services, icon: "apps" },
-        { href: "/admin/support", label: t.nav.support, icon: "comments" },
       ]}
     >
       {children}

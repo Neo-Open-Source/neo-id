@@ -150,12 +150,6 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
           {t.auth.login.createOne}
         </button>
       </p>
-
-      <div className="flex items-center justify-center gap-4 mt-2">
-        <button type="button" onClick={() => router.push("/support")} className="text-xs text-dim hover:text-muted transition-colors">
-          {t.auth.help}
-        </button>
-      </div>
     </form>
   );
 }

@@ -79,11 +79,6 @@ import {
 } from "./routes/admin/services";
 import { requireAdmin } from "./middleware/auth";
 
-// Support Routes
-import { createTicket, listMyTickets, getTicket, addMessage, closeMyTicket, reopenMyTicket, createAnonymousTicket, getAnonymousTicket, addAnonymousMessage } from "./routes/support/tickets";
-import { ticketEvents } from "./routes/support/events";
-import { listAllTickets, getTicketDetail, replyTicket, closeTicket, reopenTicket, deleteTicket } from "./routes/admin/support";
-
 // Device Code Routes (RFC 8628)
 import { requestDeviceCode } from "./routes/device/code";
 import { pollDeviceToken } from "./routes/device/token";
@@ -212,28 +207,6 @@ app.get("/api/v1/admin/services", requireAuth, requireAdmin, listAllServices);
 app.post("/api/v1/admin/services/:id/active", requireAuth, requireAdmin, setServiceActive);
 app.delete("/api/v1/admin/services/:id", requireAuth, requireAdmin, deleteAnyService);
 app.post("/api/v1/admin/broadcast", requireAuth, requireAdmin, sendBroadcast);
-app.get("/api/v1/admin/support/tickets", requireAuth, requireAdmin, listAllTickets);
-app.get("/api/v1/admin/support/tickets/:id", requireAuth, requireAdmin, getTicketDetail);
-app.post("/api/v1/admin/support/tickets/:id/reply", requireAuth, requireAdmin, replyTicket);
-app.post("/api/v1/admin/support/tickets/:id/close", requireAuth, requireAdmin, closeTicket);
-app.post("/api/v1/admin/support/tickets/:id/reopen", requireAuth, requireAdmin, reopenTicket);
-app.delete("/api/v1/admin/support/tickets/:id", requireAuth, requireAdmin, deleteTicket);
-
-// ─── Support Routes ───────────────────────────────────────────────────────────
-
-app.post("/api/v1/support/tickets", requireAuth, createTicket);
-app.get("/api/v1/support/tickets", requireAuth, listMyTickets);
-app.get("/api/v1/support/tickets/:id", requireAuth, getTicket);
-app.post("/api/v1/support/tickets/:id/messages", requireAuth, addMessage);
-app.post("/api/v1/support/tickets/:id/close", requireAuth, closeMyTicket);
-app.post("/api/v1/support/tickets/:id/reopen", requireAuth, reopenMyTicket);
-app.get("/api/v1/support/tickets/:id/events", requireAuth, ticketEvents);
-
-// ─── Anonymous Support Routes ────────────────────────────────────────────────
-
-app.post("/api/v1/support/anonymous", createAnonymousTicket);
-app.get("/api/v1/support/anonymous/:id", getAnonymousTicket);
-app.post("/api/v1/support/anonymous/:id/messages", addAnonymousMessage);
 
 // ─── Device Code Routes (RFC 8628 — TV/IoT/Console) ─────────────────────────
 

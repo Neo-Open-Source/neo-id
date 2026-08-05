@@ -27,7 +27,6 @@
 - Session management with refresh token rotation
 - Developer portal for OAuth service registration
 - Admin panel for user/service management, audit logs
-- Anonymous support tickets with auto-responses
 - i18n (English, Ukrainian, Russian, Romanian)
 - Device Code flow (RFC 8628) for TV/IoT
 - GeoIP-based session tracking
@@ -186,15 +185,6 @@ Everything runs on Vercel on one subdomain (e.g., `id.neome.uk`):
 |--------|------|-------------|
 | GET | `/.well-known/openid-configuration` | OIDC discovery |
 | GET | `/.well-known/jwks.json` | JWKS public keys |
-
-### Support
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/support/tickets` | Create ticket |
-| GET | `/api/v1/support/tickets` | List tickets |
-| GET | `/api/v1/support/tickets/:id` | Get ticket detail |
-| POST | `/api/v1/support/tickets/:id/messages` | Reply to ticket |
 
 ### Admin
 

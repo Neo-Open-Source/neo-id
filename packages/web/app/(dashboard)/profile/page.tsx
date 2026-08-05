@@ -122,7 +122,6 @@ export default function ProfilePage() {
       </div>
 
       <div className="profile-group">
-        <SettingsRow icon="comments" label={t.support.title} href="/support" />
         <SettingsRow icon="document-signed" label={t.profile.terms} href="/terms" />
         <SettingsRow icon="lock" label={t.profile.privacy} href="/privacy" />
       </div>

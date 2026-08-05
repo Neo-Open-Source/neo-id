@@ -317,48 +317,6 @@ export class NeoIdClient {
     return this.upload<{ url: string }>(`/api/v1/services/${id}/logo`, formData);
   }
 
-  // ─── Support ───────────────────────────────────────────────────────────────
-
-  async createSupportTicket(subject: string, message: string) {
-    return this.request<{ id: string }>(
-      "POST",
-      "/api/v1/support/tickets",
-      { subject, message }
-    );
-  }
-
-  async getSupportTickets() {
-    return this.request<Array<{
-      id: string;
-      subject: string;
-      status: string;
-      updatedAt: string;
-      messageCount: number;
-    }>>("GET", "/api/v1/support/tickets");
-  }
-
-  async getSupportTicket(id: string) {
-    return this.request<{
-      id: string;
-      subject: string;
-      status: string;
-      messages: Array<{
-        id: string;
-        authorRole: string;
-        body: string;
-        createdAt: string;
-      }>;
-    }>(`GET`, `/api/v1/support/tickets/${id}`);
-  }
-
-  async sendSupportMessage(ticketId: string, message: string) {
-    return this.request<{ id: string }>(
-      "POST",
-      `/api/v1/support/tickets/${ticketId}/messages`,
-      { message }
-    );
-  }
-
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
   async adminListUsers(params?: { page?: number; limit?: number; search?: string }) {

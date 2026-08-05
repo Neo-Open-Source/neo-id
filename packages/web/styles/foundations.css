@@ -103,11 +103,6 @@
   50% { opacity: 1; }
 }
 
-@keyframes widgetSlide {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 @utility bg-auth-gradient {
   background: linear-gradient(145deg, var(--color-brand-active), var(--color-accent));
 }

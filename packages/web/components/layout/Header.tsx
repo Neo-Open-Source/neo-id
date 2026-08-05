@@ -12,10 +12,9 @@ import { useI18n } from "@/lib/i18n/context";
 interface NavItem {
   href: string;
   label: string;
-  badge?: number;
 }
 
-function HeaderLink({ href, label, badge }: NavItem) {
+function HeaderLink({ href, label }: NavItem) {
   const pathname = usePathname();
   const isActive = pathname === href || pathname.startsWith(href + "/");
 
@@ -25,19 +24,15 @@ function HeaderLink({ href, label, badge }: NavItem) {
       className={cn("site-header__nav-link", isActive && "site-header__nav-link--active")}
     >
       {label}
-      {badge != null && badge > 0 && (
-        <span className="site-header__nav-badge">{badge > 99 ? "99+" : badge}</span>
-      )}
     </Link>
   );
 }
 
 interface HeaderProps {
   user?: { avatar?: string; email?: string; displayName?: string; role?: string } | null;
-  openTicketCount?: number;
 }
 
-export function Header({ user, openTicketCount }: HeaderProps) {
+export function Header({ user }: HeaderProps) {
   const { t } = useI18n();
   const isAdmin = user?.role === "admin";
   const isDev = user?.role === "developer" || isAdmin;
@@ -45,7 +40,7 @@ export function Header({ user, openTicketCount }: HeaderProps) {
   const navItems: NavItem[] = [
     { href: "/sessions", label: t.nav.sessions },
     ...(isDev ? [{ href: "/developer/services", label: t.nav.developer }] : []),
-    ...(isAdmin ? [{ href: "/admin/users", label: t.nav.admin, badge: openTicketCount }] : []),
+    ...(isAdmin ? [{ href: "/admin/users", label: t.nav.admin }] : []),
   ];
 
   return (

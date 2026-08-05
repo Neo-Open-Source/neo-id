@@ -11,10 +11,9 @@ import { cn } from "@/lib/cn";
 interface BottomNavProps {
   user?: { avatar?: string; email?: string; displayName?: string; role?: string } | null;
   onLogout?: () => void | Promise<void>;
-  openTicketCount?: number;
 }
 
-export function BottomNav({ user, onLogout, openTicketCount }: BottomNavProps) {
+export function BottomNav({ user, onLogout }: BottomNavProps) {
   const pathname = usePathname();
   const { t } = useI18n();
   const isAdmin = user?.role === "admin";
@@ -76,11 +75,6 @@ export function BottomNav({ user, onLogout, openTicketCount }: BottomNavProps) {
           aria-label={t.nav.admin}
         >
           <Icon name="shield" size={20} />
-          {openTicketCount != null && openTicketCount > 0 && (
-            <span className="absolute top-0 right-1 min-w-4 h-4 flex items-center justify-center rounded-full bg-accent text-white text-[9px] font-bold px-1 leading-none">
-              {openTicketCount > 99 ? "99+" : openTicketCount}
-            </span>
-          )}
         </Link>
       )}
       <div className="flex items-center gap-0.5">
