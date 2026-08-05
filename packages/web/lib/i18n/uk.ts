@@ -274,6 +274,7 @@ const uk: Translations = {
     lastUsed: "Використовувалось {{date}}",
     revokeAccess: "Відкликати",
     openApp: "Відкрити",
+    backToProfile: "Назад до профілю",
   },
   admin: {
     usersTitle: "Користувачі",

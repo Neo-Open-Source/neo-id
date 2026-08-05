@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Icon } from "@/components/ui/Icon";
 import { ListPageSkeleton } from "@/components/ui/Skeleton";
 import { useCachedQuery } from "@/hooks/useCachedQuery";
@@ -61,6 +62,7 @@ export default function ConnectedPage() {
 
   return (
     <div className="page profile-page">
+      <BackButton href="/profile" label={t.connected.backToProfile} />
       <div className="page-intro">
         <h1 className="page-intro__title">{t.connected.title}</h1>
         <p className="page-intro__desc">{t.connected.subtitle}</p>

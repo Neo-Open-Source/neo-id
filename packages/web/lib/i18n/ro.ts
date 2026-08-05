@@ -295,6 +295,7 @@ const ro = {
     lastUsed: "Folosit ultima dată {{date}}",
     revokeAccess: "Revocă",
     openApp: "Deschide",
+    backToProfile: "Înapoi la profil",
   },
   admin: {
     usersTitle: "Utilizatori",

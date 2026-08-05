@@ -281,6 +281,7 @@ export interface Translations {
     lastUsed: string;
     revokeAccess: string;
     openApp: string;
+    backToProfile: string;
   };
   admin: {
     usersTitle: string;

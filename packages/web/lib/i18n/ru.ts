@@ -274,6 +274,7 @@ const ru: Translations = {
     lastUsed: "Использовалось {{date}}",
     revokeAccess: "Отозвать",
     openApp: "Открыть",
+    backToProfile: "Назад к профилю",
   },
   admin: {
     usersTitle: "Пользователи",

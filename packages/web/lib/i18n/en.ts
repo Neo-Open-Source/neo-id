@@ -274,6 +274,7 @@ const en = {
     lastUsed: "Last used {{date}}",
     revokeAccess: "Revoke",
     openApp: "Open",
+    backToProfile: "Back to Profile",
   },
   admin: {
     usersTitle: "Users",
