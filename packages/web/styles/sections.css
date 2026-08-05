@@ -1040,6 +1040,33 @@
   width: 100%;
 }
 
+.admin-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 550;
+  background: var(--color-surface-hover);
+  color: var(--color-muted);
+  text-transform: capitalize;
+}
+
+.admin-pill--admin {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+}
+
+.admin-pill--status-active {
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+}
+
+.admin-pill--status-banned {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+}
+
 .admin-pagination {
   display: flex;
   align-items: center;

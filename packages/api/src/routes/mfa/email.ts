@@ -76,7 +76,7 @@ export async function enableEmailMfa(c: Context) {
 
   await db.user.update({
     where: { id: user.sub },
-    data: { emailMfaEnabled: true },
+    data: { emailMfaEnabled: true, emailVerified: true },
   });
 
   return success(c, { ok: true });
