@@ -30,7 +30,7 @@ async function populateSessionGeo(sessionId: string, ipAddress?: string) {
 }
 
 export async function issueTokens(info: SessionInfo, reuseSessionId?: string): Promise<TokenResult> {
-  let session: { id: string };
+  let session: { id: string } | undefined;
 
   // OAuth code exchanges reuse the session the user already has in the browser
   // (carried through OAuthState) instead of minting a fresh Session per app.
