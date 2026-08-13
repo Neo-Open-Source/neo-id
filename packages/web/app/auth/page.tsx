@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthForm } from "@/components/features/auth/AuthForm";
 import { ensureSession } from "@/lib/api";
+import { resolveAuthRedirect } from "@/lib/auth-redirect";
 
 function AuthPageContent() {
   const router = useRouter();
@@ -21,8 +22,15 @@ function AuthPageContent() {
       .then((ok) => {
         if (cancelled) return;
         if (ok) {
-          const redirect = searchParams.get("redirect") || "/profile";
-          router.replace(redirect.startsWith("/") ? redirect : "/profile");
+          const redirect = resolveAuthRedirect(
+            searchParams.get("redirect"),
+            searchParams.get("return_to"),
+          );
+          if (redirect.startsWith("/api/")) {
+            window.location.replace(redirect);
+            return;
+          }
+          router.replace(redirect);
           return;
         }
         setChecking(false);

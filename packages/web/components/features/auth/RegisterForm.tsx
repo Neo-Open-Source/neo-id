@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { GoogleIcon, GithubIcon } from "@/components/ui/ProviderIcons";
 import { Turnstile } from "@/components/ui/Turnstile";
 import { setSessionTokens } from "@/lib/api";
+import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { useI18n } from "@/lib/i18n/context";
 
 interface RegisterFormProps {
@@ -17,7 +18,11 @@ interface RegisterFormProps {
 
 export function RegisterForm({ initialEmail = "", onToggleMode }: RegisterFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
+  const afterLogin = resolveAuthRedirect(searchParams.get("redirect"));
+  const afterLoginParam =
+    afterLogin && afterLogin !== "/profile" ? `&redirect=${encodeURIComponent(afterLogin)}` : "";
   const [email, setEmail] = useState(initialEmail);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -25,6 +30,15 @@ export function RegisterForm({ initialEmail = "", onToggleMode }: RegisterFormPr
   const [loading, setLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  /** Social login must keep the OAuth authorize path so consent shows after sign-in. */
+  const startSocial = (provider: "google" | "github") => {
+    const url = new URL(`/api/v1/auth/oauth/${provider}`, window.location.origin);
+    if (afterLogin && afterLogin !== "/profile") {
+      url.searchParams.set("return_to", afterLogin);
+    }
+    window.location.href = url.toString();
+  };
 
   const canSubmit = email.length > 0 && username.length > 0 && password.length > 0 && ageConfirmed;
 
@@ -56,9 +70,12 @@ export function RegisterForm({ initialEmail = "", onToggleMode }: RegisterFormPr
       }
 
       if (json.data?.emailVerified === false) {
-        router.push(`/auth/2fa/mfa?email=${encodeURIComponent(email)}&purpose=verify_email`);
+        router.push(`/auth/2fa/mfa?email=${encodeURIComponent(email)}&purpose=verify_email${afterLoginParam}`);
+      } else if (afterLogin.startsWith("/api/")) {
+        // OAuth authorize must be a full document navigation so 302 → consent works
+        window.location.assign(afterLogin);
       } else {
-        router.push("/profile");
+        router.push(afterLogin);
       }
     } catch {
       toast.error(t.auth.errors.network);
@@ -130,10 +147,10 @@ export function RegisterForm({ initialEmail = "", onToggleMode }: RegisterFormPr
       </div>
 
       <div className="flex items-center justify-center gap-3">
-        <button type="button" onClick={() => window.location.href = "/api/v1/auth/oauth/google"} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-surface-hover hover:border-border-hover transition-all">
+        <button type="button" onClick={() => startSocial("google")} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-surface-hover hover:border-border-hover transition-all">
           <GoogleIcon size={18} />
         </button>
-        <button type="button" onClick={() => window.location.href = "/api/v1/auth/oauth/github"} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-surface-hover hover:border-border-hover transition-all">
+        <button type="button" onClick={() => startSocial("github")} className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-surface-hover hover:border-border-hover transition-all">
           <GithubIcon size={18} />
         </button>
       </div>

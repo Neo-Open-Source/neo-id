@@ -183,6 +183,7 @@ model OAuthState {
   codeChallenge   String?
   redirectUri     String?
   serviceAppId    String?
+  sessionId       String?
   userId          String?
   provider        String?
   mode            String?

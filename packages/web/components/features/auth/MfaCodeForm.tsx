@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +9,7 @@ import { CodeInput } from "@/components/ui/CodeInput";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
 import { api, ApiError } from "@/lib/api";
+import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { writeCache, readCache } from "@/lib/cache";
 
 interface MfaCodeFormProps {
@@ -30,7 +31,9 @@ export function MfaCodeForm({
   onBack,
 }: MfaCodeFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
+  const afterLogin = resolveAuthRedirect(searchParams.get("redirect"));
 
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -122,10 +125,13 @@ export function MfaCodeForm({
         return;
       }
 
-      if (isVerifyEmail) {
+      if (isVerifyEmail && afterLogin === "/profile") {
         router.push("/setup");
+      } else if (afterLogin.startsWith("/api/")) {
+        // OAuth authorize must be a full document navigation so 302 → consent works
+        window.location.assign(afterLogin);
       } else {
-        router.push("/profile");
+        router.push(afterLogin);
       }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t.auth.errors.network);

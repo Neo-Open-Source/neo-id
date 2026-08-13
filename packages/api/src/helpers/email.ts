@@ -120,8 +120,6 @@ async function sendRawEmail(input: {
         return false;
       }
 
-      const body = await response.json().catch(() => ({}));
-      console.warn("[email] Sent:", body);
       return true;
     } catch (e) {
       if (attempt < maxRetries) {

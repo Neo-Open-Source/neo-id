@@ -22,9 +22,7 @@ describe("POST /api/v1/auth/register", () => {
       },
     });
 
-    // Debug: log response
     const json = await res.json();
-    console.warn("Register response:", JSON.stringify(json, null, 2));
 
     expect(res.status).toBe(201);
     expect(json.ok).toBe(true);

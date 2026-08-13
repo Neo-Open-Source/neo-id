@@ -19,77 +19,80 @@ export function BottomNav({ user, onLogout }: BottomNavProps) {
   const isAdmin = user?.role === "admin";
   const isDev = user?.role === "developer" || isAdmin;
 
+  const itemClass = (active: boolean) =>
+    cn("mobile-nav__item", active && "mobile-nav__item--active");
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border flex items-center justify-around py-1.5 px-2 pb-[max(0.375rem,env(safe-area-inset-bottom))] z-40 md:hidden">
-      <Link
-        href="/profile"
-        className={cn(
-          "flex flex-col items-center gap-0.5 px-3 py-1 rounded-button transition-colors",
-          pathname === "/profile" ? "text-accent" : "text-muted"
+    <nav className="mobile-nav" aria-label="Mobile navigation">
+      <div className="mobile-nav__inner">
+        <Link
+          href="/profile"
+          className={itemClass(pathname === "/profile")}
+          aria-current={pathname === "/profile" ? "page" : undefined}
+          aria-label={t.nav.profile}
+        >
+          <span className="mobile-nav__avatar">
+            <AvatarImage src={user?.avatar} name={user?.displayName || user?.email} size="sm" proxy />
+          </span>
+        </Link>
+
+        <Link
+          href="/sessions"
+          className={itemClass(isActive("/sessions"))}
+          aria-current={isActive("/sessions") ? "page" : undefined}
+          aria-label={t.nav.sessions}
+        >
+          <Icon name="laptop" size={20} />
+        </Link>
+
+        <Link
+          href="/connected"
+          className={itemClass(isActive("/connected"))}
+          aria-current={isActive("/connected") ? "page" : undefined}
+          aria-label={t.nav.connected}
+        >
+          <Icon name="link" size={20} />
+        </Link>
+
+        {isDev && (
+          <Link
+            href="/developer/services"
+            className={itemClass(isActive("/developer"))}
+            aria-current={isActive("/developer") ? "page" : undefined}
+            aria-label={t.nav.developer}
+          >
+            <Icon name="terminal" size={20} />
+          </Link>
         )}
-        aria-label={t.nav.profile}
-      >
-        <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
-          <AvatarImage src={user?.avatar} name={user?.displayName || user?.email} size="sm" proxy />
+
+        {isAdmin && (
+          <Link
+            href="/admin/users"
+            className={itemClass(isActive("/admin"))}
+            aria-current={isActive("/admin") ? "page" : undefined}
+            aria-label={t.nav.admin}
+          >
+            <Icon name="shield" size={20} />
+          </Link>
+        )}
+
+        <div className="mobile-nav__item">
+          <ThemeToggle className="w-9 h-9" iconSize={18} showTooltip={false} />
         </div>
-      </Link>
-      <Link
-        href="/sessions"
-        className={cn(
-          "flex flex-col items-center gap-0.5 px-3 py-1 rounded-button transition-colors",
-          pathname.startsWith("/sessions") ? "text-accent" : "text-muted"
+
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="mobile-nav__item mobile-nav__item--danger"
+            aria-label={t.nav.logout}
+          >
+            <Icon name="sign-out-alt" size={20} />
+          </button>
         )}
-        aria-label={t.nav.sessions}
-      >
-        <Icon name="laptop" size={20} />
-      </Link>
-      <Link
-        href="/connected"
-        className={cn(
-          "flex flex-col items-center gap-0.5 px-3 py-1 rounded-button transition-colors",
-          pathname.startsWith("/connected") ? "text-accent" : "text-muted"
-        )}
-        aria-label={t.nav.connected}
-      >
-        <Icon name="link" size={20} />
-      </Link>
-      {isDev && (
-        <Link
-          href="/developer/services"
-          className={cn(
-            "flex flex-col items-center gap-0.5 px-3 py-1 rounded-button transition-colors",
-            pathname.startsWith("/developer") ? "text-accent" : "text-muted"
-          )}
-          aria-label={t.nav.developer}
-        >
-          <Icon name="terminal" size={20} />
-        </Link>
-      )}
-      {isAdmin && (
-        <Link
-          href="/admin/users"
-          className={cn(
-            "relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-button transition-colors",
-            pathname.startsWith("/admin") ? "text-accent" : "text-muted"
-          )}
-          aria-label={t.nav.admin}
-        >
-          <Icon name="shield" size={20} />
-        </Link>
-      )}
-      <div className="flex items-center gap-0.5">
-        <ThemeToggle />
       </div>
-      {onLogout && (
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-button transition-colors text-danger"
-          aria-label={t.nav.logout}
-        >
-          <Icon name="sign-out-alt" size={20} />
-        </button>
-      )}
     </nav>
   );
 }

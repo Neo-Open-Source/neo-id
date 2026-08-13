@@ -68,6 +68,8 @@ export async function createService(c: Context) {
     return error(c, "INVALID_REQUEST", "name and redirectUris are required");
   }
 
+  const normalizedRedirects = (redirectUris as string[]).map((u) => u.trim()).filter(Boolean);
+
   // Generate client credentials
   const clientId = generateToken(20);
   const clientSecret = generateToken(40);
@@ -83,7 +85,7 @@ export async function createService(c: Context) {
       description,
       logoUrl,
       website,
-      redirectUris,
+      redirectUris: normalizedRedirects,
     },
     select: {
       id: true,
@@ -120,7 +122,9 @@ export async function updateService(c: Context) {
       ...(description !== undefined && { description }),
       ...(logoUrl !== undefined && { logoUrl }),
       ...(website !== undefined && { website }),
-      ...(redirectUris !== undefined && { redirectUris }),
+      ...(redirectUris !== undefined && {
+        redirectUris: (redirectUris as string[]).map((u) => u.trim()).filter(Boolean),
+      }),
     },
     select: {
       id: true,

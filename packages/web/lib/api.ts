@@ -15,7 +15,6 @@ interface ApiOptions {
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 let pendingRefreshToken: string | null = null;
-let bootstrapped = false;
 
 function readStoredRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -119,22 +118,14 @@ async function refreshSession(): Promise<string | null> {
  * Critical after tab reopen: access JWT is ~15m, refresh cookie is 30d.
  */
 export async function ensureSession(): Promise<boolean> {
-  if (accessToken) {
-    bootstrapped = true;
-    return true;
-  }
-  if (bootstrapped && !accessToken && !pendingRefreshToken && !readStoredRefreshToken()) {
-    // Already tried and have nothing to work with
-  }
+  if (accessToken) return true;
   const token = await refreshSession();
-  bootstrapped = true;
   return token !== null;
 }
 
 export async function logoutSession(): Promise<void> {
   accessToken = null;
   writeStoredRefreshToken(null);
-  bootstrapped = false;
   try {
     await fetch(`${API_BASE}/auth/logout`, {
       method: "POST",

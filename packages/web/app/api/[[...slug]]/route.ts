@@ -32,4 +32,15 @@ const handler = async (request: Request) => {
   return nextRes;
 };
 
-export { handler as GET, handler as POST, handler as PUT, handler as DELETE, handler as PATCH };
+// OPTIONS must be forwarded to Hono too: without this export, Next.js answers
+// the CORS preflight itself with a bare 204 (no Access-Control-Allow-* headers),
+// so the browser blocks the PKCE token exchange even though the Hono cors
+// middleware is configured. Forwarding lets the middleware emit the headers.
+export {
+  handler as GET,
+  handler as POST,
+  handler as PUT,
+  handler as DELETE,
+  handler as PATCH,
+  handler as OPTIONS,
+};

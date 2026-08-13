@@ -196,11 +196,6 @@
 }
 
 .email-change-page { width: 100%; max-width: 28rem; margin: 2rem auto; }
-.back-btn.mb-0,
-.page-back.mb-0,
-.legal-back.mb-0 {
-  margin-bottom: 0;
-}
 
 .email-change-page .page-back,
 .email-change-page .back-btn { margin-bottom: 1rem; }
@@ -1258,6 +1253,7 @@
   .modal-content {
     max-width: none;
     max-height: min(92vh, 100%);
+    max-height: min(92dvh, 100%);
     border-radius: 1.25rem 1.25rem 0 0;
     border-left: none;
     border-right: none;
@@ -1344,7 +1340,7 @@
   }
 
   .panel-shell__content {
-    padding: 1rem 1rem 5.5rem;
+    padding: 1rem 1rem 2.5rem;
     align-items: flex-start;
   }
 
@@ -1488,13 +1484,7 @@
   height: 34px;
 }
 
-@media (max-width: 640px) {
-  .site-header__nav,
-  .site-header__actions .language-picker__trigger,
-  .site-header__actions .group {
-    display: none;
-  }
-}
+/* Mobile header/nav handling lives in styles/mobile.css */
 
 /* ═══════════════════════════════════════════════════════════
    Футер

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { getScrollY, onScrollRoot, scrollRootTo } from "@/lib/scroll-root";
 
 const SHOW_AFTER = 360;
 
@@ -9,15 +10,21 @@ export function ScrollToTop() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const update = () => setVisible(window.scrollY > SHOW_AFTER);
+    const update = () => setVisible(getScrollY() > SHOW_AFTER);
+
+    // Re-bind when crossing the mobile/desktop breakpoint (scroll root switches)
+    let unsubscribe = onScrollRoot(update);
+    const onResize = () => {
+      unsubscribe();
+      unsubscribe = onScrollRoot(update);
+      update();
+    };
+    window.addEventListener("resize", onResize);
 
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update, { passive: true });
-
     return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
+      unsubscribe();
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
@@ -28,7 +35,7 @@ export function ScrollToTop() {
       type="button"
       className="scroll-top"
       aria-label="Scroll to top"
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      onClick={() => scrollRootTo(0, "smooth")}
     >
       <Icon name="arrow-up" size={18} />
     </button>

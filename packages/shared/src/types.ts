@@ -141,6 +141,16 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+
+  toJSON() {
+    return {
+      code: this.code,
+      message: this.message,
+      status: this.status,
+      name: this.name,
+      ...(this.details ? { details: this.details } : {}),
+    };
+  }
 }
 
 export interface ResponseMeta {

@@ -55,17 +55,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-app flex flex-col">
+    <div className="dashboard-shell min-h-dvh bg-app flex flex-col">
       <div className="hidden md:block">
         <Header user={user} />
       </div>
       <main className="dashboard-main flex-1 md:pt-[52px]">
-        <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-24">{children}</div>
+        <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-10">{children}</div>
       </main>
-      <BottomNav user={user} onLogout={handleLogout} />
       <div className="hidden md:block">
         <Footer />
       </div>
+      <BottomNav user={user} onLogout={handleLogout} />
       <ScrollToTop />
     </div>
   );

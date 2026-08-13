@@ -29,15 +29,37 @@ async function populateSessionGeo(sessionId: string, ipAddress?: string) {
   }).catch(() => {});
 }
 
-export async function issueTokens(info: SessionInfo): Promise<TokenResult> {
-  const session = await db.session.create({
-    data: {
-      userId: info.userId,
-      deviceInfo: info.deviceInfo,
-      ipAddress: info.ipAddress,
-      expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
-    },
-  });
+export async function issueTokens(info: SessionInfo, reuseSessionId?: string): Promise<TokenResult> {
+  let session: { id: string };
+
+  // OAuth code exchanges reuse the session the user already has in the browser
+  // (carried through OAuthState) instead of minting a fresh Session per app.
+  // Fall back to a new session if the stored one was revoked/expired meanwhile.
+  if (reuseSessionId) {
+    const existing = await db.session.findUnique({ where: { id: reuseSessionId } });
+    if (existing?.isActive && existing.userId === info.userId) {
+      session = await db.session.update({
+        where: { id: existing.id },
+        data: {
+          lastActiveAt: new Date(),
+          ipAddress: info.ipAddress,
+          deviceInfo: info.deviceInfo,
+          expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
+        },
+      });
+    }
+  }
+
+  if (!session) {
+    session = await db.session.create({
+      data: {
+        userId: info.userId,
+        deviceInfo: info.deviceInfo,
+        ipAddress: info.ipAddress,
+        expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
+      },
+    });
+  }
 
   void populateSessionGeo(session.id, info.ipAddress);
 

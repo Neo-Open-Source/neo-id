@@ -17,6 +17,8 @@ function PickerContent() {
   const methods = searchParams.get("methods")?.split(",").filter(Boolean) || [];
   const emailHint = searchParams.get("emailHint") || "";
   const requiresPassword = searchParams.get("prePassword") === "true";
+  const redirect = searchParams.get("redirect") || "";
+  const redirectParam = redirect ? `&redirect=${encodeURIComponent(redirect)}` : "";
 
   const availableMethods =
     requiresPassword &&
@@ -55,7 +57,7 @@ function PickerContent() {
     <AuthLayout
       title={t.auth.mfa.title}
       subtitle={t.auth.mfa.subtitle}
-      onBack={() => router.push(`/auth?email=${encodeURIComponent(email)}`)}
+      onBack={() => router.push(`/auth?email=${encodeURIComponent(email)}${redirectParam}`)}
       backLabel={t.common.back}
     >
       <div className="flex flex-col gap-3 animate-[slideUp_250ms_ease-out]">
@@ -68,7 +70,7 @@ function PickerContent() {
               type="button"
               onClick={() => {
                 if (method === "password" || (requiresPassword && method !== "passkey")) {
-                  router.push(`/auth?email=${encodeURIComponent(email)}&password=true`);
+                  router.push(`/auth?email=${encodeURIComponent(email)}&password=true${redirectParam}`);
                   return;
                 }
                 router.push(`${info.href}?${searchParams.toString()}`);

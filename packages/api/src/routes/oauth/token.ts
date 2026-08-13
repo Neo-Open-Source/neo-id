@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { verify } from "@neo-id/auth-core";
@@ -6,9 +7,21 @@ import { success, error } from "../../helpers/response";
 import { issueTokens, verifyAndRotateRefreshToken } from "../../helpers/tokens";
 import { getRequestInfo } from "../../helpers/request";
 
+/** RFC 7636 S256 challenge: base64url(SHA-256(verifier)) without padding. */
+function pkceChallenge(verifier: string): string {
+  return createHash("sha256").update(verifier).digest("base64url");
+}
+
+/** Constant-time comparison for the fixed-length SHA-256 challenge digests. */
+function safeEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
 export async function token(c: Context) {
   const body = await c.req.json();
-  const { grant_type, code, redirect_uri, client_id, client_secret, refresh_token } = body;
+  const { grant_type, code, redirect_uri, client_id, client_secret, refresh_token, code_verifier } = body;
   const { deviceInfo, ipAddress } = getRequestInfo(c);
 
   // ─── Authorization Code Grant ─────────────────────────────────────────────
@@ -47,6 +60,27 @@ export async function token(c: Context) {
       return error(c, "INVALID_REQUEST", "Invalid or expired authorization code");
     }
 
+    // PKCE (RFC 7636): when authorize() stored a code_challenge, the client
+    // must prove knowledge of the matching verifier. Public (SPA) clients
+    // exchange codes in the browser, so this is what actually authenticates
+    // the code instead of a client_secret.
+    const storedChallenge = oauthState.codeChallenge || oauthState.codeVerifier;
+    const isPublicClient = !serviceApp.clientSecretHash || !client_secret;
+    // A public client (no client_secret presented) MUST prove knowledge of the
+    // code_verifier — otherwise the authorization code itself is the only
+    // credential and whoever steals it can redeem it (OAuth 2.1 / RFC 7636).
+    if (isPublicClient && !storedChallenge) {
+      return error(c, "INVALID_REQUEST", "code_verifier is required for this client (PKCE)");
+    }
+    if (storedChallenge) {
+      if (!code_verifier) {
+        return error(c, "INVALID_REQUEST", "code_verifier is required");
+      }
+      if (!safeEqual(pkceChallenge(code_verifier), storedChallenge)) {
+        return error(c, "INVALID_REQUEST", "Invalid code_verifier");
+      }
+    }
+
     await db.oAuthState.delete({ where: { id: oauthState.id } });
 
     await db.authorizedConnection.upsert({
@@ -75,7 +109,10 @@ export async function token(c: Context) {
       return error(c, "INVALID_REQUEST", "User not found or banned");
     }
 
-    const tokens = await issueTokens({ userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress });
+    const tokens = await issueTokens(
+      { userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress },
+      oauthState.sessionId || undefined,
+    );
 
     return success(c, {
       access_token: tokens.accessToken,

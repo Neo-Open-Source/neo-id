@@ -250,12 +250,6 @@
   border-radius: var(--radius-full);
 }
 
-.bottom-nav-avatar {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: var(--radius-full);
-}
-
 .avatar__initials {
   width: 100%;
   height: 100%;

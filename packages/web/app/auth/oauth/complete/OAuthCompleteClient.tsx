@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setSessionTokens } from "@/lib/api";
+import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
 
@@ -12,6 +13,7 @@ export default function OAuthCompletePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const returnTo = resolveAuthRedirect(searchParams.get("return_to"));
 
   useEffect(() => {
     const ticket = searchParams.get("ticket");
@@ -35,10 +37,15 @@ export default function OAuthCompletePage() {
             refreshToken: json.data.refreshToken,
           });
         }
-        router.replace("/profile");
+        // Keep the OAuth authorize path so the consent screen shows after sign-in
+        if (returnTo.startsWith("/api/")) {
+          window.location.assign(returnTo);
+        } else {
+          router.replace(returnTo);
+        }
       })
       .catch(() => setError("oauth_failed"));
-  }, [router, searchParams]);
+  }, [router, searchParams, returnTo]);
 
   useEffect(() => {
     if (!error) return;

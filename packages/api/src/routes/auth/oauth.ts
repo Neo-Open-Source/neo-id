@@ -237,6 +237,8 @@ export async function socialOAuthCallback(c: Context) {
   const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
   const hasMfa = user.totpEnabled || user.emailMfaEnabled;
 
+  const returnTo = oauthState.redirectUri || `${WEB_URL}/profile`;
+
   if (hasMfa) {
     const mfaMethods = [
       ...(passkeyCount > 0 ? ["passkey"] : []),
@@ -247,6 +249,7 @@ export async function socialOAuthCallback(c: Context) {
     mfaUrl.searchParams.set("email", user.email);
     mfaUrl.searchParams.set("methods", mfaMethods.join(","));
     mfaUrl.searchParams.set("oauth_ticket", generateToken(32));
+    mfaUrl.searchParams.set("redirect", returnTo);
     if (user.emailMfaEnabled) mfaUrl.searchParams.set("emailHint", user.email);
     return c.redirect(mfaUrl.toString(), 302);
   }
@@ -275,6 +278,7 @@ export async function socialOAuthCallback(c: Context) {
 
   const completeUrl = new URL("/auth/oauth/complete", WEB_URL);
   completeUrl.searchParams.set("ticket", ticket);
+  completeUrl.searchParams.set("return_to", returnTo);
   return c.redirect(completeUrl.toString(), 302);
 }
 

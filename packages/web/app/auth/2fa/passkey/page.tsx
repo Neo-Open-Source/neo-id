@@ -4,6 +4,7 @@ import { useCallback, useEffect, Suspense, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { setSessionTokens } from "@/lib/api";
+import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n/context";
@@ -30,6 +31,8 @@ function PasskeyContent() {
   usePageTitle(t.pages.passkey);
   const email = searchParams.get("email") || "";
   const fallback = searchParams.get("fallback") === "password";
+  const redirect = resolveAuthRedirect(searchParams.get("redirect"));
+  const redirectParam = redirect !== "/profile" ? `&redirect=${encodeURIComponent(redirect)}` : "";
   const [status, setStatus] = useState<"pending" | "failed">("pending");
   const authenticatingRef = useRef(false);
 
@@ -95,19 +98,24 @@ function PasskeyContent() {
           refreshToken: result.data.refreshToken,
         });
       }
-      router.replace("/profile");
+      // Keep the OAuth authorize path so the consent screen shows after sign-in
+      if (redirect.startsWith("/api/")) {
+        window.location.assign(redirect);
+      } else {
+        router.replace(redirect);
+      }
     } catch {
       setStatus("failed");
     } finally {
       authenticatingRef.current = false;
     }
-  }, [email, router]);
+  }, [email, router, redirect]);
 
   useEffect(() => { authenticate(); }, [authenticate]);
 
   const useFallback = () => {
     if (fallback) {
-      router.replace(`/auth?email=${encodeURIComponent(email)}&password=true`);
+      router.replace(`/auth?email=${encodeURIComponent(email)}&password=true${redirectParam}`);
       return;
     }
     router.replace(`/auth/2fa?${searchParams.toString()}`);

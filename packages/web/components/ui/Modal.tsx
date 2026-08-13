@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -247,7 +248,7 @@ export function Modal({
 
   if (!visible) return null;
 
-  return (
+  const overlay = (
     <div
       className={[
         "modal-overlay",
@@ -321,4 +322,10 @@ export function Modal({
       </div>
     </div>
   );
+
+  // Portal to <body> so the fixed overlay escapes the locked app shell and its
+  // scroll container — otherwise the mobile bottom sheet gets clipped by the
+  // shell's overflow (notably on iOS with -webkit-overflow-scrolling: touch).
+  if (typeof document === "undefined") return null;
+  return createPortal(overlay, document.body);
 }

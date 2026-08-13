@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
 import { api, ApiError } from "@/lib/api";
+import { resolveAuthRedirect } from "@/lib/auth-redirect";
 
 export default function ForgotPasswordPage() {
   const { t } = useI18n();
@@ -18,6 +19,12 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Keep the OAuth authorize path so returning to login doesn't lose the flow
+  const redirect = resolveAuthRedirect(searchParams.get("redirect"));
+  const backToLogin = () => {
+    router.push(redirect !== "/profile" ? `/auth?redirect=${encodeURIComponent(redirect)}` : "/auth");
+  };
 
   useEffect(() => {
     const emailParam = searchParams.get("email");
@@ -50,7 +57,7 @@ export default function ForgotPasswordPage() {
       <AuthLayout
         title={t.auth.forgotPassword.success}
         subtitle={t.auth.forgotPassword.sentTo.replace("{{email}}", email)}
-        onBack={() => router.push("/auth")}
+        onBack={backToLogin}
         backLabel={t.auth.forgotPassword.backToLogin}
       >
         <div className="flex flex-col gap-5">
@@ -62,7 +69,7 @@ export default function ForgotPasswordPage() {
           <p className="text-sm text-muted text-center">
             {t.auth.forgotPassword.checkInbox}
           </p>
-          <Button type="button" onClick={() => router.push("/auth")} className="w-full">
+          <Button type="button" onClick={backToLogin} className="w-full">
             {t.auth.forgotPassword.backToLogin}
           </Button>
         </div>
@@ -74,7 +81,7 @@ export default function ForgotPasswordPage() {
     <AuthLayout
       title={t.auth.forgotPassword.title}
       subtitle={t.auth.forgotPassword.subtitle}
-      onBack={() => router.push("/auth")}
+      onBack={backToLogin}
       backLabel={t.auth.forgotPassword.backToLogin}
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">

@@ -36,7 +36,19 @@ export function proxy(request: NextRequest) {
 
   // Only bounce away from /auth when cookies prove a session. Client-side
   // ensureSession handles the localStorage-only case.
+  //
+  // Do NOT edge-redirect OAuth returns (/auth?redirect=/api/v1/oauth/...).
+  // Access JWT may be expired while refresh cookie still exists — bouncing
+  // straight to authorize without a client refresh causes:
+  //   /auth → authorize (401/no user) → /auth → … redirect loop.
+  // The auth page refreshes the session, then window.location.assign(redirect).
   if (pathname === "/auth" && authed) {
+    const redirect = request.nextUrl.searchParams.get("redirect");
+    if (redirect?.startsWith("/api/")) {
+      const response = NextResponse.next();
+      response.headers.set("x-locale", locale);
+      return response;
+    }
     return NextResponse.redirect(new URL("/profile", request.url));
   }
 
