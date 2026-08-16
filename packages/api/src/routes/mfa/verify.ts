@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { verifyTotp } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
-import { issueTokens } from "../../helpers/tokens";
+import { issueTokens, getReusableSessionId } from "../../helpers/tokens";
 import { setAuthCookies } from "../../helpers/auth-cookies";
 import { getRequestInfo } from "../../helpers/request";
 import { normalizeEmail, verifyAndUseMfaCode } from "../../helpers/mfa-code";
@@ -51,7 +51,10 @@ export async function verifyMfa(c: Context) {
     await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
 
     const { deviceInfo, ipAddress } = getRequestInfo(c);
-    const tokens = await issueTokens({ userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress });
+    const tokens = await issueTokens(
+      { userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress },
+      await getReusableSessionId(c, user.id),
+    );
 
     setAuthCookies(c, tokens);
 
@@ -83,15 +86,19 @@ export async function verifyMfa(c: Context) {
     return error(c, "INVALID_REQUEST", "Invalid MFA method. Use 'totp' or 'email'.");
   }
 
-  // MFA verified — issue tokens
+  // MFA verified — issue tokens. Reuse the browser's existing active session
+  // when the user is re-authenticating instead of minting a duplicate.
   const { deviceInfo, ipAddress } = getRequestInfo(c);
-  const tokens = await issueTokens({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-    deviceInfo,
-    ipAddress,
-  });
+  const tokens = await issueTokens(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      deviceInfo,
+      ipAddress,
+    },
+    await getReusableSessionId(c, user.id),
+  );
 
   setAuthCookies(c, tokens);
 

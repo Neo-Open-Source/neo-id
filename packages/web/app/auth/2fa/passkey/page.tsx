@@ -3,7 +3,7 @@
 import { useCallback, useEffect, Suspense, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
-import { setSessionTokens } from "@/lib/api";
+import { setSessionTokens, getStoredRefreshToken, logoutSession } from "@/lib/api";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
@@ -31,25 +31,60 @@ function PasskeyContent() {
   usePageTitle(t.pages.passkey);
   const email = searchParams.get("email") || "";
   const fallback = searchParams.get("fallback") === "password";
+  const purpose = searchParams.get("purpose");
+  const isExport = purpose === "export";
+  const isDelete = purpose === "delete";
   const redirect = resolveAuthRedirect(searchParams.get("redirect"));
   const redirectParam = redirect !== "/profile" ? `&redirect=${encodeURIComponent(redirect)}` : "";
   const [status, setStatus] = useState<"pending" | "failed">("pending");
   const authenticatingRef = useRef(false);
 
+  function buildAssertion(credential: PublicKeyCredential) {
+    const assertion = credential.response as AuthenticatorAssertionResponse;
+    return {
+      id: credential.id,
+      rawId: bufferToBase64Url(credential.rawId),
+      type: credential.type,
+      clientExtensionResults: credential.getClientExtensionResults(),
+      response: {
+        authenticatorData: bufferToBase64Url(assertion.authenticatorData),
+        clientDataJSON: bufferToBase64Url(assertion.clientDataJSON),
+        signature: bufferToBase64Url(assertion.signature),
+        userHandle: assertion.userHandle ? bufferToBase64Url(assertion.userHandle) : null,
+      },
+    };
+  }
+
+  function downloadExport(data: unknown) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `neo-id-data-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const authenticate = useCallback(async () => {
-    if (!email || !window.PublicKeyCredential || authenticatingRef.current) {
-      if (!email || !window.PublicKeyCredential) setStatus("failed");
+    // Email is only needed for sign-in; export/delete identify the user by session.
+    if ((!email && !isExport && !isDelete) || !window.PublicKeyCredential || authenticatingRef.current) {
+      if ((!email && !isExport && !isDelete) || !window.PublicKeyCredential) setStatus("failed");
       return;
     }
 
     authenticatingRef.current = true;
     try {
       setStatus("pending");
-      const start = await fetch("/api/v1/passkeys/authenticate/start", {
+      const startPath = isExport
+        ? "/api/v1/user/export/passkey/start"
+        : isDelete
+          ? "/api/v1/user/delete/passkey/start"
+          : "/api/v1/passkeys/authenticate/start";
+      const start = await fetch(startPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(isExport || isDelete ? {} : { email }),
       });
       const startPayload = await start.json();
       const options = startPayload.data;
@@ -68,7 +103,31 @@ function PasskeyContent() {
       }) as PublicKeyCredential | null;
       if (!credential) throw new Error("credential unavailable");
 
-      const assertion = credential.response as AuthenticatorAssertionResponse;
+      const assertion = buildAssertion(credential);
+
+      if (isExport || isDelete) {
+        const finish = await fetch(isExport ? "/api/v1/user/export" : "/api/v1/user", {
+          method: isExport ? "POST" : "DELETE",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            method: "passkey",
+            expectedChallenge: options.challenge,
+            response: assertion,
+          }),
+        });
+        const result = await finish.json();
+        if (!finish.ok || !result.ok) throw new Error("passkey verification failed");
+        if (isExport) {
+          downloadExport(result.data);
+          router.replace("/profile");
+        } else {
+          await logoutSession();
+          router.replace("/auth");
+        }
+        return;
+      }
+
       const finish = await fetch("/api/v1/passkeys/authenticate/finish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,18 +135,9 @@ function PasskeyContent() {
         body: JSON.stringify({
           email,
           expectedChallenge: options.challenge,
-          response: {
-            id: credential.id,
-            rawId: bufferToBase64Url(credential.rawId),
-            type: credential.type,
-            clientExtensionResults: credential.getClientExtensionResults(),
-            response: {
-              authenticatorData: bufferToBase64Url(assertion.authenticatorData),
-              clientDataJSON: bufferToBase64Url(assertion.clientDataJSON),
-              signature: bufferToBase64Url(assertion.signature),
-              userHandle: assertion.userHandle ? bufferToBase64Url(assertion.userHandle) : null,
-            },
-          },
+          response: assertion,
+          // Let the server reuse this browser's existing session on re-login.
+          refresh_token: getStoredRefreshToken() || undefined,
         }),
       });
       const result = await finish.json();
@@ -109,7 +159,7 @@ function PasskeyContent() {
     } finally {
       authenticatingRef.current = false;
     }
-  }, [email, router, redirect]);
+  }, [email, isExport, isDelete, router, redirect]);
 
   useEffect(() => { authenticate(); }, [authenticate]);
 

@@ -3,7 +3,7 @@ import { db } from "@neo-id/db";
 import { OAUTH_PROVIDERS } from "@neo-id/shared";
 import { generateToken, verifyAccessToken } from "@neo-id/auth-core";
 import { cacheExternalAvatar } from "../../helpers/avatar";
-import { issueTokens } from "../../helpers/tokens";
+import { issueTokens, getReusableSessionId } from "../../helpers/tokens";
 import {
   createOAuthStateToken,
   exchangeSocialCode,
@@ -254,13 +254,17 @@ export async function socialOAuthCallback(c: Context) {
     return c.redirect(mfaUrl.toString(), 302);
   }
 
-  const tokens = await issueTokens({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-    deviceInfo,
-    ipAddress,
-  });
+  // Reuse the browser's existing active session on social re-login.
+  const tokens = await issueTokens(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      deviceInfo,
+      ipAddress,
+    },
+    await getReusableSessionId(c, user.id),
+  );
 
   const ticket = generateToken(32);
   await db.oAuthState.create({

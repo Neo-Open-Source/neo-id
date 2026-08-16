@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@flaticon/flaticon-uicons/css/regular/all.css";
+@import "./flaticon.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 

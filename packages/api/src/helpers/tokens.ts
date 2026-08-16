@@ -1,6 +1,8 @@
+import type { Context } from "hono";
 import { db } from "@neo-id/db";
-import { signAccessToken, signIdToken, generateToken, hashToken, lookupIp, formatLocation } from "@neo-id/auth-core";
+import { signAccessToken, signIdToken, generateToken, hashToken, verifyAccessToken, lookupIp, formatLocation } from "@neo-id/auth-core";
 import { TOKEN, SESSION } from "@neo-id/shared";
+import { getAccessTokenFromRequest, getRefreshTokenFromRequest } from "./auth-cookies";
 
 interface SessionInfo {
   userId: string;
@@ -92,6 +94,51 @@ export async function issueTokens(info: SessionInfo, reuseSessionId?: string): P
   });
 
   return { accessToken, refreshToken, idToken, sessionId: session.id };
+}
+
+/**
+ * Find the session this browser already holds for the user so a re-login
+ * (password / MFA / passkey / social) reuses it instead of minting a duplicate.
+ * Mirrors what the OAuth code exchange already does via OAuthState.sessionId.
+ * Returns undefined when the browser has no active session for the user.
+ */
+export async function getReusableSessionId(
+  c: Context,
+  userId: string,
+): Promise<string | undefined> {
+  // 1) Access token (already validated by requireAuth where applicable)
+  const accessToken = getAccessTokenFromRequest(c);
+  if (accessToken) {
+    try {
+      const payload = await verifyAccessToken(accessToken);
+      if (payload.sub === userId && payload.session_id) return payload.session_id;
+    } catch {
+      // expired / invalid — fall through to refresh token
+    }
+  }
+
+  // 2) Refresh token (httpOnly cookie, or body token when the edge drops cookies)
+  // Hono memoizes c.req.json(), so re-reading the body here is cheap.
+  let bodyToken: string | undefined;
+  try {
+    const body = await c.req.json();
+    bodyToken = (body as Record<string, unknown>).refresh_token as string | undefined;
+  } catch {
+    // no JSON body
+  }
+  const refreshToken = getRefreshTokenFromRequest(c, bodyToken);
+  if (refreshToken) {
+    const stored = await db.refreshToken.findUnique({
+      where: { tokenHash: hashToken(refreshToken) },
+      select: { sessionId: true, userId: true },
+    });
+    if (stored?.sessionId && stored.userId === userId) {
+      const session = await db.session.findUnique({ where: { id: stored.sessionId } });
+      if (session?.isActive) return session.id;
+    }
+  }
+
+  return undefined;
 }
 
 type RefreshError = { ok: false; error: string; message: string };

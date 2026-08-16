@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Icon } from "@/components/ui/Icon";
 
 interface ModalProps {
   open: boolean;
@@ -310,7 +310,7 @@ export function Modal({
             onClick={() => requestClose(false)}
             aria-label="Close"
           >
-            <X size={18} />
+            <Icon name="cross-small" size={18} />
           </button>
         </div>
         <div className="modal-body">{children}</div>

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
 import { localeNames, type Locale } from "@/lib/i18n";
 
@@ -46,7 +46,7 @@ export function LanguagePicker() {
       >
         <Image src={FLAGS[locale]} alt="" width={18} height={18} className="language-flag language-flag--sm" />
         <span className="language-picker__code">{CODES[locale]}</span>
-        <ChevronDown size={13} className={`language-picker__chevron${open ? " language-picker__chevron--open" : ""}`} />
+        <Icon name="angle-small-down" size={13} className={`language-picker__chevron${open ? " language-picker__chevron--open" : ""}`} />
       </button>
 
       {open && (

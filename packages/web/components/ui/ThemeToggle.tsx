@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Moon, Sun } from "lucide-react";
+import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 
 interface ThemeToggleProps {
@@ -33,7 +33,7 @@ export function ThemeToggle({ className, iconSize = 20, showTooltip = true }: Th
         className,
       )}
     >
-      {dark ? <Sun size={iconSize} /> : <Moon size={iconSize} />}
+      {dark ? <Icon name="sun" size={iconSize} /> : <Icon name="moon" size={iconSize} />}
       {showTooltip && (
         <span className="absolute left-14 text-xs py-1.5 px-2.5 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity bg-surface-row text-content rounded-badge shadow-dropdown z-50">
           {dark ? "Light mode" : "Dark mode"}

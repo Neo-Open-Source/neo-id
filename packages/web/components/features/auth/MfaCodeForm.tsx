@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { CodeInput } from "@/components/ui/CodeInput";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, getStoredRefreshToken, logoutSession } from "@/lib/api";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { writeCache, readCache } from "@/lib/cache";
 
@@ -42,11 +42,14 @@ export function MfaCodeForm({
   );
 
   const isExport = purpose === "export";
+  const isDelete = purpose === "delete";
   const isVerifyEmail = purpose === "verify_email";
   const iconName = method === "totp" ? "shield" : "envelope";
-  const title = isExport ? t.profile.exportData : (isVerifyEmail ? t.auth.mfa.verifyEmail : (method === "totp" ? t.auth.mfa.enterTotp : t.auth.mfa.enterCode));
-  const subtitle = isExport
-    ? t.profile.exportDesc
+  const title = isExport || isDelete
+    ? (isExport ? t.profile.exportData : t.profile.deleteAccount)
+    : (isVerifyEmail ? t.auth.mfa.verifyEmail : (method === "totp" ? t.auth.mfa.enterTotp : t.auth.mfa.enterCode));
+  const subtitle = isExport || isDelete
+    ? (isExport ? t.profile.exportDesc : t.profile.deleteAccountDesc)
     : (isVerifyEmail
       ? `${t.auth.mfa.verifyEmailSubtitle} ${email}`.trim()
       : (method === "totp"
@@ -62,16 +65,20 @@ export function MfaCodeForm({
     return () => window.clearInterval(id);
   }, [resendCooldown]);
 
+  // Send the action verification code when the email method is chosen
   useEffect(() => {
-    if (!isExport) return;
-    api("/user/export/send-code", { method: "POST" }).catch(() => {});
-  }, [isExport]);
+    if ((!isExport && !isDelete) || method !== "email") return;
+    api(isExport ? "/user/export/send-code" : "/user/delete/send-code", { method: "POST" }).catch(() => {});
+  }, [isExport, isDelete, method]);
 
-  // Send email code when component mounts in login mode
+  // Send email code when component mounts in login mode. Skipped for export /
+  // email verification — those deliver their own code and sending the login
+  // MFA code here was the cause of users receiving two emails.
   useEffect(() => {
     if (method !== "email" || mode !== "login" || !email) return;
+    if (purpose) return;
     api("/mfa/email/resend", { method: "POST", body: { email, purpose: "mfa_login" } }).catch(() => {});
-  }, [method, mode, email]);
+  }, [method, mode, email, purpose]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +88,7 @@ export function MfaCodeForm({
 
     try {
       if (isExport) {
-        const data = await api("/user/export", { method: "POST", body: { code } });
+        const data = await api("/user/export", { method: "POST", body: { method, code } });
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -90,6 +97,13 @@ export function MfaCodeForm({
         a.click();
         URL.revokeObjectURL(url);
         router.push("/profile");
+        return;
+      }
+
+      if (isDelete) {
+        await api("/user", { method: "DELETE", body: { method, code } });
+        await logoutSession();
+        router.replace("/auth");
         return;
       }
 
@@ -114,6 +128,9 @@ export function MfaCodeForm({
 
       const body: Record<string, string> = { method, code, email };
       if (purpose) body.purpose = purpose;
+      // Let the server reuse this browser's existing session on re-login.
+      const storedRefresh = getStoredRefreshToken();
+      if (storedRefresh) body.refresh_token = storedRefresh;
 
       try {
         // Login MFA has no access token yet — don't force auth bootstrap
@@ -144,6 +161,8 @@ export function MfaCodeForm({
     try {
       if (isExport) {
         await api("/user/export/send-code", { method: "POST" });
+      } else if (isDelete) {
+        await api("/user/delete/send-code", { method: "POST" });
       } else if (mode === "setup") {
         await api("/mfa/email/setup", { method: "POST" });
       } else if (email) {
@@ -192,7 +211,9 @@ export function MfaCodeForm({
             disabled={code.length !== 6}
             className="w-full"
           >
-            {isExport ? t.profile.exportData : (mode === "setup" ? t.profile.verifyAndEnable : t.auth.mfa.verify)}
+            {isExport || isDelete
+              ? (isExport ? t.profile.exportData : t.profile.deleteAccount)
+              : (mode === "setup" ? t.profile.verifyAndEnable : t.auth.mfa.verify)}
           </Button>
         </form>
 

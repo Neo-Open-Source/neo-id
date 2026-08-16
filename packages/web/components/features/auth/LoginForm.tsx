@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { GoogleIcon, GithubIcon } from "@/components/ui/ProviderIcons";
 import { Icon } from "@/components/ui/Icon";
 import { Turnstile } from "@/components/ui/Turnstile";
-import { setSessionTokens } from "@/lib/api";
+import { setSessionTokens, getStoredRefreshToken } from "@/lib/api";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -57,7 +57,14 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, cfTurnstileToken: turnstileToken }),
+        body: JSON.stringify({
+          email,
+          password,
+          cfTurnstileToken: turnstileToken,
+          // Let the server reuse this browser's existing session on re-login
+          // (matters when the edge drops Set-Cookie and only localStorage survives).
+          refresh_token: getStoredRefreshToken() || undefined,
+        }),
       });
 
       const json = await res.json();

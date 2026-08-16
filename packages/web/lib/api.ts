@@ -5,6 +5,7 @@ export { ApiError } from "@neo-id/shared";
 
 const API_BASE = "/api/v1";
 const REFRESH_STORAGE_KEY = "neo_id_refresh_token";
+const ACCESS_STORAGE_KEY = "neo_id_access_token";
 
 interface ApiOptions {
   method?: string;
@@ -38,13 +39,67 @@ function writeStoredRefreshToken(token: string | null) {
   }
 }
 
+function getJwtExpiry(token: string): number | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const data = JSON.parse(json) as { exp?: number };
+    return typeof data.exp === "number" ? data.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ACCESS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { token?: string; exp?: number };
+    if (typeof parsed.token !== "string" || typeof parsed.exp !== "number") return null;
+    if (Date.now() >= parsed.exp) {
+      localStorage.removeItem(ACCESS_STORAGE_KEY);
+      return null;
+    }
+    return parsed.token;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAccessToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      // Refresh ~30s before the JWT actually expires so a slow request never
+      // rides an already-dead token. Unknown expiry falls back to 15 min.
+      const exp = getJwtExpiry(token) ?? Date.now() + 15 * 60 * 1000;
+      localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify({ token, exp: exp - 30_000 }));
+    } else {
+      localStorage.removeItem(ACCESS_STORAGE_KEY);
+    }
+  } catch {
+    // private mode / blocked storage — memory fallback only
+  }
+}
+
 function rememberTokens(data: { accessToken?: string; refreshToken?: string }) {
-  if (data.accessToken) accessToken = data.accessToken;
+  if (data.accessToken) {
+    accessToken = data.accessToken;
+    writeStoredAccessToken(data.accessToken);
+  }
   if (data.refreshToken) writeStoredRefreshToken(data.refreshToken);
 }
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+  if (token) writeStoredAccessToken(token);
+}
+
+/** Latest refresh token known to this browser (used to reuse the session on re-login). */
+export function getStoredRefreshToken(): string | null {
+  return readStoredRefreshToken();
 }
 
 /** Call after login/MFA/OAuth so refresh survives tab close within the session. */
@@ -56,7 +111,10 @@ export function setSessionTokens(tokens: {
   accessToken?: string | null;
   refreshToken?: string | null;
 }) {
-  if (tokens.accessToken !== undefined) accessToken = tokens.accessToken;
+  if (tokens.accessToken !== undefined) {
+    accessToken = tokens.accessToken;
+    writeStoredAccessToken(tokens.accessToken);
+  }
   if (tokens.refreshToken !== undefined) writeStoredRefreshToken(tokens.refreshToken);
 }
 
@@ -68,7 +126,7 @@ async function refreshSession(): Promise<string | null> {
     const MAX_ATTEMPTS = 3;
     const BACKOFF_MS = [0, 800, 1500];
 
-    // Prefer in-memory, then sessionStorage (survives reload), then httpOnly cookie.
+    // Prefer in-memory, then localStorage (survives reload), then httpOnly cookie.
     if (!pendingRefreshToken) {
       pendingRefreshToken = readStoredRefreshToken();
     }
@@ -77,6 +135,14 @@ async function refreshSession(): Promise<string | null> {
       if (attempt > 0) {
         await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
       }
+
+      // Cross-tab safety: another tab may have rotated the refresh token while
+      // this tab was idle. Always retry with the freshest token from storage —
+      // otherwise a stale in-memory token gets rejected and the browser is
+      // force-logged-out, which on re-login silently mints a duplicate session.
+      const latest = readStoredRefreshToken();
+      if (latest) pendingRefreshToken = latest;
+
       try {
         const body: Record<string, string> = {};
         if (pendingRefreshToken) {
@@ -93,8 +159,11 @@ async function refreshSession(): Promise<string | null> {
           rememberTokens(json.data);
           return json.data.accessToken as string;
         }
-        // Token genuinely invalid (not a network/server error) — stop retrying
+        // Token genuinely invalid (not a network/server error)
         if (res.status === 400 || res.status === 401) {
+          // If storage advanced meanwhile (another tab rotated it), retry with
+          // the fresher token instead of giving up the whole session.
+          if (pendingRefreshToken !== readStoredRefreshToken()) continue;
           writeStoredRefreshToken(null);
           return null;
         }
@@ -116,15 +185,26 @@ async function refreshSession(): Promise<string | null> {
 /**
  * Ensure we have a live access token before the first authenticated call.
  * Critical after tab reopen: access JWT is ~15m, refresh cookie is 30d.
+ * A still-valid access token from localStorage skips the refresh round-trip,
+ * so a page reload no longer rotates the refresh token (and no longer churns
+ * server-side session rows).
  */
 export async function ensureSession(): Promise<boolean> {
   if (accessToken) return true;
+
+  const stored = readStoredAccessToken();
+  if (stored) {
+    accessToken = stored;
+    return true;
+  }
+
   const token = await refreshSession();
   return token !== null;
 }
 
 export async function logoutSession(): Promise<void> {
   accessToken = null;
+  writeStoredAccessToken(null);
   writeStoredRefreshToken(null);
   try {
     await fetch(`${API_BASE}/auth/logout`, {
@@ -215,9 +295,10 @@ export async function apiUpload<T = any>(
 
 export async function hasSession(): Promise<boolean> {
   if (accessToken) return true;
+  if (readStoredAccessToken()) return true;
 
   // Auth cookies are httpOnly, so they are invisible to document.cookie.
-  // Probe refresh with credentials + sessionStorage fallback.
+  // Probe refresh with credentials + localStorage fallback.
   try {
     return (await refreshSession()) !== null;
   } catch {

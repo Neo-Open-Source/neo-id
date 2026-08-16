@@ -279,7 +279,7 @@ export default function ServiceDetailPage() {
               </p>
               {revealedSecret && (
                 <p className="text-xs text-warning mt-1.5 flex items-center gap-1">
-                  <Icon name="warning" size={12} />
+                  <Icon name="triangle-warning" size={12} />
                   {t.developer.secretWarning}
                 </p>
               )}

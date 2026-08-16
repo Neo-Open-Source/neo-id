@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { generateAuthenticationOpts, verifyAuthentication } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
-import { issueTokens } from "../../helpers/tokens";
+import { issueTokens, getReusableSessionId } from "../../helpers/tokens";
 import { setAuthCookies } from "../../helpers/auth-cookies";
 import { getRequestInfo } from "../../helpers/request";
 
@@ -91,19 +91,23 @@ export async function finishPasskeyAuthentication(c: Context) {
   await db.passkey.update({
     where: { id: passkey.id },
     data: {
-      counter: 0,
+      counter: result.newCounter ?? passkey.counter,
       lastUsedAt: new Date(),
     },
   });
 
   const { deviceInfo, ipAddress } = getRequestInfo(c);
-  const tokens = await issueTokens({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-    deviceInfo,
-    ipAddress,
-  });
+  // Reuse the browser's existing active session instead of minting a duplicate.
+  const tokens = await issueTokens(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      deviceInfo,
+      ipAddress,
+    },
+    await getReusableSessionId(c, user.id),
+  );
 
   setAuthCookies(c, tokens);
 

@@ -3,40 +3,44 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { api, ApiError, logoutSession } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 
 interface DeleteAccountModalProps {
   open: boolean;
-  hasPassword: boolean;
+  email: string;
   onClose: () => void;
 }
 
-export function DeleteAccountModal({ open, hasPassword, onClose }: DeleteAccountModalProps) {
+export function DeleteAccountModal({ open, email, onClose }: DeleteAccountModalProps) {
   const { t } = useI18n();
   const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Account deletion uses the same step-up challenge as login/export:
+  // the user picks passkey / TOTP / email code to confirm the deletion.
   const handleDelete = async () => {
-    if (deleting) return;
-    if (hasPassword && !password) return;
-    setDeleting(true);
+    if (starting) return;
+    setStarting(true);
     setError(null);
     try {
-      await api("/user", {
-        method: "DELETE",
-        body: { password: password || undefined },
+      const challenge = await api<{ methods?: string[]; emailHint?: string }>(
+        "/user/delete/challenge",
+        { method: "POST" },
+      );
+      const methods = challenge?.methods?.length ? challenge.methods : ["email"];
+      const params = new URLSearchParams({
+        purpose: "delete",
+        email,
+        methods: methods.join(","),
       });
-      await logoutSession();
-      router.replace("/auth");
+      if (challenge?.emailHint) params.set("emailHint", challenge.emailHint);
+      router.push(`/auth/2fa?${params.toString()}`);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : t.common.deleteFailed);
-    } finally {
-      setDeleting(false);
+      setError(e instanceof ApiError ? e.message : t.common.error);
+      setStarting(false);
     }
   };
 
@@ -47,15 +51,14 @@ export function DeleteAccountModal({ open, hasPassword, onClose }: DeleteAccount
       title={t.profile.deleteAccount}
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={deleting}>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={starting}>
             {t.common.cancel}
           </Button>
           <Button
             variant="danger"
             size="sm"
             onClick={handleDelete}
-            loading={deleting}
-            disabled={hasPassword && !password}
+            loading={starting}
           >
             {t.profile.deleteAccount}
           </Button>
@@ -64,15 +67,6 @@ export function DeleteAccountModal({ open, hasPassword, onClose }: DeleteAccount
     >
       <div className="flex flex-col gap-4">
         <p className="text-sm text-muted">{t.profile.deleteAccountDesc}</p>
-        {hasPassword && (
-          <Input
-            label={t.profile.enterPasswordConfirm}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-          />
-        )}
         {error && <div className="alert alert--error">{error}</div>}
       </div>
     </Modal>

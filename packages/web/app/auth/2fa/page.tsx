@@ -57,7 +57,14 @@ function PickerContent() {
     <AuthLayout
       title={t.auth.mfa.title}
       subtitle={t.auth.mfa.subtitle}
-      onBack={() => router.push(`/auth?email=${encodeURIComponent(email)}${redirectParam}`)}
+      onBack={() => {
+        const purpose = searchParams.get("purpose");
+        if (purpose === "export" || purpose === "delete") {
+          router.push("/profile");
+          return;
+        }
+        router.push(`/auth?email=${encodeURIComponent(email)}${redirectParam}`);
+      }}
       backLabel={t.common.back}
     >
       <div className="flex flex-col gap-3 animate-[slideUp_250ms_ease-out]">

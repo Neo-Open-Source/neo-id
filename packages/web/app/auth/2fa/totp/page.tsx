@@ -14,6 +14,7 @@ function TotpContent() {
   const email = searchParams.get("email") || "";
   const emailHint = searchParams.get("emailHint") || "";
   const mode = searchParams.get("mode") === "setup" ? "setup" : "login";
+  const purpose = searchParams.get("purpose") || undefined;
 
   return (
     <MfaCodeForm
@@ -21,6 +22,7 @@ function TotpContent() {
       email={email}
       emailHint={emailHint}
       mode={mode}
+      purpose={purpose}
       onBack={() => {
         if (mode === "setup") {
           router.push("/profile/mfa");

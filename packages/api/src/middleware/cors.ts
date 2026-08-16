@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { db } from "@neo-id/db";
 
-const STATIC_ORIGINS = (process.env.CORS_ORIGIN)
+const STATIC_ORIGINS = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);

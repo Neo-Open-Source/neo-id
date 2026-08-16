@@ -3,7 +3,7 @@ import { db } from "@neo-id/db";
 import { verify } from "@neo-id/auth-core";
 import { loginSchema } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
-import { issueTokens } from "../../helpers/tokens";
+import { issueTokens, getReusableSessionId } from "../../helpers/tokens";
 import { setAuthCookies } from "../../helpers/auth-cookies";
 import { verifyTurnstileToken } from "../../helpers/turnstile";
 import { normalizeEmail } from "../../helpers/mfa-code";
@@ -62,13 +62,18 @@ export async function login(c: Context) {
     });
   }
 
-  const tokens = await issueTokens({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-    deviceInfo,
-    ipAddress,
-  });
+  // Reuse the browser's existing active session on re-login instead of
+  // accumulating a new Session row per login.
+  const tokens = await issueTokens(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      deviceInfo,
+      ipAddress,
+    },
+    await getReusableSessionId(c, user.id),
+  );
 
   setAuthCookies(c, tokens);
 

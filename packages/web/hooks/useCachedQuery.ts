@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ApiError, api } from "@/lib/api";
-import { clearCache, readCache, subscribeCache, writeCache } from "@/lib/cache";
+import { clearCache, getCacheAge, readCache, subscribeCache, writeCache, CACHE_PERSIST_TTL_MS } from "@/lib/cache";
 
 interface UseCachedQueryOptions {
   enabled?: boolean;
@@ -62,13 +62,17 @@ export function useCachedQuery<T>(
 
   useEffect(() => {
     if (!enabled) return;
-    if (!cached) void fetchData();
+    // Paint cached data immediately on reload (persisted in sessionStorage),
+    // but revalidate in the background once the copy is older than the TTL.
+    if (!cached || (getCacheAge(cacheKey) ?? 0) > CACHE_PERSIST_TTL_MS) {
+      void fetchData();
+    }
     return () => {
       disposedRef.current = true;
     };
     // Only run on mount / when enabled flips
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled]);
+  }, [enabled, cacheKey]);
 
   const refresh = useCallback(async () => {
     await fetchData(true);

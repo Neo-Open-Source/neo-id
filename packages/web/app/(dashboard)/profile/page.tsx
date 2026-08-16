@@ -17,7 +17,8 @@ import { useCachedQuery } from "@/hooks/useCachedQuery";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
 import { localeNames } from "@/lib/i18n";
-import { apiUpload, ApiError, logoutSession } from "@/lib/api";
+import { toast } from "sonner";
+import { api, apiUpload, ApiError, logoutSession } from "@/lib/api";
 
 interface Profile {
   id: string; email: string; username?: string; displayName?: string;
@@ -67,11 +68,29 @@ export default function ProfilePage() {
     try { await logoutSession(); } finally { router.replace("/auth"); }
   }, [loggingOut, router]);
 
-  const handleExportAction = useCallback(() => {
+  // Export requires the same MFA step-up as login: show the method picker
+  // (passkey / TOTP / email) instead of always forcing an email code.
+  const handleExportAction = useCallback(async () => {
     if (exportRedirecting) return;
     setExportRedirecting(true);
-    router.push(`/auth/2fa/mfa?purpose=export&email=${encodeURIComponent(profile?.email || "")}&mode=login`);
-  }, [exportRedirecting, profile, router]);
+    try {
+      const challenge = await api<{ methods?: string[]; emailHint?: string }>(
+        "/user/export/challenge",
+        { method: "POST" },
+      );
+      const methods = challenge?.methods?.length ? challenge.methods : ["email"];
+      const params = new URLSearchParams({
+        purpose: "export",
+        email: profile?.email || "",
+        methods: methods.join(","),
+      });
+      if (challenge?.emailHint) params.set("emailHint", challenge.emailHint);
+      router.push(`/auth/2fa?${params.toString()}`);
+    } catch {
+      setExportRedirecting(false);
+      toast.error(t.common.error);
+    }
+  }, [exportRedirecting, profile, router, t.common.error]);
 
   if (!profile) {
     if (loadError) {
@@ -168,7 +187,7 @@ export default function ProfilePage() {
 
       <DeleteAccountModal
         open={modal === "delete"}
-        hasPassword={profile.hasPassword}
+        email={profile.email}
         onClose={() => setModal(null)}
       />
     </div>
