@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "cd ../.. && pnpm --filter @neo-id/db exec prisma generate && pnpm turbo run build --filter=@neo-id/web...",
+  "buildCommand": "cd ../.. && pnpm --filter @neo-id/db exec prisma db push && pnpm --filter @neo-id/db exec prisma generate && pnpm turbo run build --filter=@neo-id/web...",
   "devCommand": "pnpm run dev",
   "regions": ["fra1"],
   "headers": [

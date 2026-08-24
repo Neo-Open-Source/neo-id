@@ -434,7 +434,7 @@ const en = {
       { title: "6. Your Choices and Rights", body: "You can update your profile information, change your password, manage passkeys, configure multi-factor authentication (TOTP, email codes), manage linked OAuth providers, and revoke access for connected applications. You can also export your personal data or request account deletion from your profile settings." },
       { title: "7. Security", body: "We use reasonable security measures to protect the Service and your data, including password hashing, encrypted tokens, and rate limiting. No method of transmission or storage is completely secure, and we cannot guarantee absolute security." },
       { title: "8. Changes to this Policy", body: "We may update this Privacy Policy from time to time. The \"Last updated\" date indicates when changes were last made." },
-      { title: "9. Contact", body: "For privacy-related questions or requests, contact Neo ID administration at fenixoffc@gmail.com." },
+      { title: "9. Contact", body: "For privacy-related questions or requests, contact Neo ID administration at emilumiq@gmail.com." },
     ],
   },
 } satisfies Translations;

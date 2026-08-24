@@ -459,7 +459,7 @@ const ro = {
       { title: "6. Alegerile și Drepturile Dvs.", body: "Puteți actualiza informațiile de profil, schimba parola, gestiona furnizorii OAuth conectați și revoca accesul pentru aplicațiile conectate. Dacă vă aflați în UE, puteți solicita, de asemenea, retragerea consimțământului, ștergerea datelor personale (dreptul de a fi uitat) și exportul datelor personale contactând administratorii Neo ID." },
       { title: "7. Securitate", body: "Folosim măsuri de securitate rezonabile pentru a proteja Serviciul și datele dvs. Nicio metodă de transmitere sau stocare nu este complet sigură și nu putem garanta securitatea absolută." },
       { title: "8. Modificări ale Politicii", body: "Putem actualiza această Politică de confidențialitate din când în când. Data „Ultima actualizare” indică când au fost făcute ultimele modificări." },
-      { title: "9. Contact", body: "Pentru întrebări sau solicitări legate de confidențialitate, contactați administrația Neo ID la fenixoffc@gmail.com." },
+      { title: "9. Contact", body: "Pentru întrebări sau solicitări legate de confidențialitate, contactați administrația Neo ID la emilumiq@gmail.com." },
     ],
   },
 } satisfies Translations;

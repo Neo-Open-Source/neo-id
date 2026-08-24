@@ -1,5 +1,5 @@
 [build]
-  command = "pnpm --filter @neo-id/web build"
+  command = "pnpm --filter @neo-id/db exec prisma db push && pnpm --filter @neo-id/web build"
   publish = "packages/web/.next"
 
 [build.environment]
