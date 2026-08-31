@@ -1246,15 +1246,11 @@
   min-height: 0;
 }
 
-.dashboard-content:has(.scalar-frame) {
-  padding: 0;
-  flex: 1;
-  min-height: 0;
-}
-
 .dashboard-main:has(.scalar-frame) {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .dashboard-main:has(.scalar-frame) > .dashboard-content {
@@ -1278,14 +1274,33 @@
   max-width: var(--width-dashboard-max);
   margin: 0 auto;
   padding: 2rem 2.5rem 4rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .panel-shell:has(.scalar-frame) {
-  max-width: none;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel-shell:has(.scalar-frame) .panel-shell__content {
   max-width: none;
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-shell:has(.scalar-frame) .scalar-frame {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: block;
+  border: 0;
 }
 
 @media (max-width: 767px) {
@@ -1295,25 +1310,6 @@
   .panel-shell__content {
     padding: 1.25rem 1rem 3rem;
   }
-}
-
-.panel-shell:has(.scalar-frame) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.panel-shell__content:has(.scalar-frame) {
-  padding: 0;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.panel-shell__content:has(.scalar-frame) .scalar-frame {
-  width: 100%;
-  height: 100%;
-  display: block;
 }
 
 .service-detail-page__header {
@@ -1469,24 +1465,6 @@
   .panel-shell__content {
     padding: 1rem 1rem 2.5rem;
     align-items: flex-start;
-  }
-
-  .panel-shell:has(.scalar-frame) {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .panel-shell__content:has(.scalar-frame) {
-    padding: 0;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .panel-shell__content:has(.scalar-frame) .scalar-frame {
-    width: 100%;
-    height: 100%;
   }
 }
 

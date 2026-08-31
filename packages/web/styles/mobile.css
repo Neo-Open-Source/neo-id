@@ -40,6 +40,7 @@
   .dashboard-main:has(.scalar-frame) {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .dashboard-main:has(.scalar-frame) > .dashboard-content {
@@ -51,12 +52,12 @@
   }
 
   .dashboard-main:has(.scalar-frame) .panel-shell {
-    height: auto;
     flex: 1;
     min-height: 0;
   }
 
   .dashboard-main:has(.scalar-frame) .panel-shell__content {
+    flex: 1;
     min-height: 0;
     overflow: hidden;
   }
