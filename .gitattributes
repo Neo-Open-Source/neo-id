@@ -1,0 +1,17 @@
+# Prevent git from making files executable by default
+* text=auto eol=lf
+* -diff
+*.sh diff
+*.bash diff
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
