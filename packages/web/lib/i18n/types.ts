@@ -20,6 +20,11 @@ export interface Translations {
       sentTo: string;
       checkInbox: string;
       backToLogin: string;
+      mfaRequired: string;
+      mfaSubtitle: string;
+      mfaVerifyButton: string;
+      mfaSentCode: string;
+      mfaResetLinkSent: string;
     };
     resetPassword: {
       title: string;
@@ -206,6 +211,13 @@ export interface Translations {
     noPasskeysDesc: string;
     addedDate: string;
     changePassword: string;
+    resetPassword: string;
+    resetPasswordDesc: string;
+    resetPasswordButton: string;
+    resetPasswordMfaRequired: string;
+    resetPasswordMfaSubtitle: string;
+    resetPasswordSuccess: string;
+    resetPasswordSuccessDesc: string;
     updatePassword: string;
     setPassword: string;
     updateYourPassword: string;
