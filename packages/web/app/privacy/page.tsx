@@ -66,7 +66,7 @@ export default function PrivacyPage() {
   return (
     <div className="legal-root">
       <nav className="legal-nav">
-        <BackButton onClick={() => router.back()} label={t.legal.back} className="legal-back" />
+        <BackButton onClick={() => { if (window.history.length > 1) router.back(); else router.push("/profile"); }} label={t.legal.back} className="legal-back" />
       </nav>
 
       <main className="legal-main">
