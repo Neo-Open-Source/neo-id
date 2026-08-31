@@ -1,8 +1,4 @@
-# Prevent git from making files executable by default
 * text=auto eol=lf
-* -diff
-*.sh diff
-*.bash diff
 
 # Binary files
 *.png binary
