@@ -42,7 +42,7 @@ export default function ServicesPage() {
           <h1>{t.developer.servicesCount.replace("{{count}}", String(services.length))}</h1>
         </div>
         <Link href="/developer/services/new">
-          <Button size="sm">
+          <Button>
             <Icon name="plus" size={14} />
             {t.developer.newService}
           </Button>
@@ -57,7 +57,7 @@ export default function ServicesPage() {
           <p className="empty-panel__title">{t.developer.noServices}</p>
           <p className="empty-panel__desc">{t.developer.noServicesDesc}</p>
           <Link href="/developer/services/new" className="mt-2">
-            <Button size="sm">{t.developer.createService}</Button>
+            <Button>{t.developer.createService}</Button>
           </Link>
         </div>
       ) : (

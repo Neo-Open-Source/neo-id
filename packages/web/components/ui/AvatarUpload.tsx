@@ -168,7 +168,6 @@ export function AvatarUpload({
             <>
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={() => {
                   reset();
                   setModalOpen(false);
@@ -178,7 +177,6 @@ export function AvatarUpload({
                 {t.common.cancel}
               </Button>
               <Button
-                size="sm"
                 loading={saving}
                 disabled={!uploadFile && !selected}
                 onClick={handleSave}

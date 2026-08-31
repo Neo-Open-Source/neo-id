@@ -183,15 +183,42 @@ export async function sendPasswordResetEmail(to: string, resetLink: string): Pro
   });
 }
 
+function buildBroadcastHTML(subject: string, body: string): string {
+  const urlMatch = body.match(/(https?:\/\/[^\s]+)/);
+  const url = urlMatch ? urlMatch[1] : null;
+  const textParts = url ? body.split(url) : [body];
+  const text = textParts.join("").trim();
+
+  const buttonHtml = url
+    ? `<div style="text-align:center;margin-bottom:24px;">
+        <a href="${esc(url)}" style="display:inline-block;padding:12px 24px;background:#111111;color:#ffffff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Learn more</a>
+       </div>`
+    : "";
+
+  const linkHtml = url
+    ? `<div style="font-size:12px;color:#999999;line-height:1.6;margin-bottom:18px;word-break:break-all;">
+        Or open this link directly:<br/>
+        <a href="${esc(url)}" style="color:#666666;text-decoration:underline;">${esc(url)}</a>
+       </div>`
+    : "";
+
+  return BASE_TEMPLATE(`
+    <div style="font-size:18px;font-weight:700;color:#111111;letter-spacing:-0.3px;margin-bottom:24px;">Neo ID</div>
+    <div style="font-size:22px;font-weight:700;color:#111111;letter-spacing:-0.5px;margin-bottom:8px;">${esc(subject)}</div>
+    <div style="font-size:14px;color:#666666;line-height:1.5;margin-bottom:32px;white-space:pre-wrap;">${esc(text)}</div>
+    ${buttonHtml}
+    ${linkHtml}
+    <div style="font-size:12px;color:#999999;line-height:1.5;border-top:1px solid #e5e5e5;padding-top:18px;margin-top:8px;">
+      This message was sent by Neo ID. If you no longer wish to receive these emails, you can unsubscribe in your account settings.
+    </div>`);
+}
+
 async function sendSingleBroadcast(recipient: string, subject: string, body: string): Promise<boolean> {
   return sendRawEmail({
     to: recipient,
     subject,
     text: body,
-    html: `<pre style="font-family:inherit;white-space:pre-wrap">${body
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")}</pre>`,
+    html: buildBroadcastHTML(subject, body),
   });
 }
 

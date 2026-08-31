@@ -7,6 +7,12 @@ import { clearCache, getCacheAge, readCache, subscribeCache, writeCache, CACHE_P
 interface UseCachedQueryOptions {
   enabled?: boolean;
   cacheKey?: string;
+  /**
+   * Skip fetch if cached data is fresher than this many ms.
+   * Defaults to 0 (always revalidate on mount).
+   * Set to CACHE_PERSIST_TTL_MS to fully rely on cache until it expires.
+   */
+  staleTime?: number;
 }
 
 interface UseCachedQueryResult<T> {
@@ -21,7 +27,7 @@ export function useCachedQuery<T>(
   path: string,
   options: UseCachedQueryOptions = {},
 ): UseCachedQueryResult<T> {
-  const { enabled = true, cacheKey = path } = options;
+  const { enabled = true, cacheKey = path, staleTime = 0 } = options;
 
   const cached = useSyncExternalStore(
     (onChange) => subscribeCache(cacheKey, onChange),
@@ -32,7 +38,8 @@ export function useCachedQuery<T>(
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!cached && enabled);
   const fetchingRef = useRef(false);
-  const disposedRef = useRef(false);
+  // Use a ref object so the cleanup closure always sees the current value
+  const mountedRef = useRef(true);
 
   const fetchData = useCallback(
     async (background = false): Promise<T | null> => {
@@ -42,35 +49,42 @@ export function useCachedQuery<T>(
 
       try {
         const fresh = await api<T>(path);
-        if (disposedRef.current) return fresh;
+        if (!mountedRef.current) return fresh;
         writeCache(cacheKey, fresh);
         setError(null);
         return fresh;
       } catch (e) {
-        if (disposedRef.current) return null;
+        if (!mountedRef.current) return null;
         if (!readCache(cacheKey)) {
           setError(e instanceof ApiError ? e.message : "Failed to load");
         }
         return null;
       } finally {
         fetchingRef.current = false;
-        if (!disposedRef.current) setIsLoading(false);
+        if (mountedRef.current) setIsLoading(false);
       }
     },
     [cacheKey, enabled, path],
   );
 
   useEffect(() => {
+    // Reset on each mount (strict mode / remounts)
+    mountedRef.current = true;
+
     if (!enabled) return;
-    // Paint cached data immediately on reload (persisted in sessionStorage),
-    // but revalidate in the background once the copy is older than the TTL.
-    if (!cached || (getCacheAge(cacheKey) ?? 0) > CACHE_PERSIST_TTL_MS) {
-      void fetchData();
-    }
+
+    const age = getCacheAge(cacheKey) ?? Infinity;
+    const effectiveStale = Math.max(staleTime, CACHE_PERSIST_TTL_MS);
+
+    // If we have fresh-enough cached data, skip the network fetch entirely.
+    // DashboardLayout already fetched /user/profile — ProfilePage reuses it.
+    if (cached && age < effectiveStale) return;
+
+    void fetchData();
+
     return () => {
-      disposedRef.current = true;
+      mountedRef.current = false;
     };
-    // Only run on mount / when enabled flips
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, cacheKey]);
 

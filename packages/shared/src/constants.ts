@@ -32,6 +32,9 @@ export const RATE_LIMITS = {
   PASSWORD_RESET: { limit: 3, window: 600 },
   FORGOT_PASSWORD: { limit: 3, window: 600 },
   RESET_PASSWORD: { limit: 3, window: 600 },
+  FORGOT_PASSWORD_MFA: { limit: 5, window: 60 },
+  PROFILE_PASSWORD_RESET: { limit: 3, window: 600 },
+  PROFILE_PASSWORD_RESET_MFA: { limit: 5, window: 60 },
   EMAIL_VERIFY: { limit: 3, window: 600 },
 } as const;
 

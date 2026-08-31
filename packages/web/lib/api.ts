@@ -17,6 +17,10 @@ let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 let pendingRefreshToken: string | null = null;
 
+// Kicked off at the bottom of this file (after ensureSession is declared).
+// fetchWithRetry awaits it so the token is ready before the first request.
+let _bootPromise: Promise<boolean> | null = null;
+
 function readStoredRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -218,11 +222,11 @@ export async function logoutSession(): Promise<void> {
 }
 
 async function fetchWithRetry<T>(path: string, init: RequestInit, token: boolean): Promise<T> {
-  // Rehydrate access token from refresh before the first protected request.
-  // Without this, a cold open after 15m hits /profile with an expired JWT
-  // (or only the locale cookie) and races into logout.
+  // Await the module-level boot promise — kicked off at import time so the
+  // token is usually already resolved by the time the first component fetch
+  // arrives. Falls back to a new ensureSession() if somehow not yet started.
   if (token && !accessToken) {
-    await ensureSession();
+    await (_bootPromise ?? ensureSession());
   }
 
   const headers = new Headers(init.headers);
@@ -304,4 +308,14 @@ export async function hasSession(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ─── Eager session boot ────────────────────────────────────────────────────
+// Start rehydrating the access token immediately when this module is first
+// imported — before any React component mounts. On a cold page load this
+// fires the POST /auth/refresh in the background so that by the time
+// useCachedQuery triggers GET /user/profile the token is already in memory
+// and fetchWithRetry can skip the sequential refresh→profile chain entirely.
+if (typeof window !== "undefined") {
+  _bootPromise = ensureSession();
 }

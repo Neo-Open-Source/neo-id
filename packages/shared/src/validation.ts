@@ -29,6 +29,14 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
 });
 
+export const verifyForgotPasswordMfaSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  method: z.enum(["totp", "email", "passkey"]),
+  code: z.string().min(1).optional(),
+  response: z.any().optional(),
+  expectedChallenge: z.string().optional(),
+});
+
 export const resetPasswordSchema = z.object({
   token: z.string().min(1),
   password: z
@@ -68,6 +76,19 @@ export const updateProfileSchema = z.object({
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z
+    .string()
+    .min(PASSWORD.MIN_LENGTH, `Password must be at least ${PASSWORD.MIN_LENGTH} characters`)
+    .max(PASSWORD.MAX_LENGTH),
+});
+
+export const requestProfilePasswordResetSchema = z.object({});
+
+export const verifyProfilePasswordResetSchema = z.object({
+  method: z.enum(["totp", "email", "passkey"]),
+  code: z.string().min(1).optional(),
+  response: z.any().optional(),
+  expectedChallenge: z.string().optional(),
   newPassword: z
     .string()
     .min(PASSWORD.MIN_LENGTH, `Password must be at least ${PASSWORD.MIN_LENGTH} characters`)
@@ -122,9 +143,12 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type MfaVerifyInput = z.infer<typeof mfaVerifySchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type RequestProfilePasswordResetInput = z.infer<typeof requestProfilePasswordResetSchema>;
+export type VerifyProfilePasswordResetInput = z.infer<typeof verifyProfilePasswordResetSchema>;
 export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type CreateServiceAppInput = z.infer<typeof createServiceAppSchema>;
 export type UpdateServiceAppInput = z.infer<typeof updateServiceAppSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type VerifyForgotPasswordMfaInput = z.infer<typeof verifyForgotPasswordMfaSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

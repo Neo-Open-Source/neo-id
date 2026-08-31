@@ -79,7 +79,7 @@ export default function AdminServicesPage() {
           <h1>{t.admin.servicesTitle}</h1>
           <p>{t.admin.servicesCount.replace("{{count}}", String(services.length))}</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => refresh()}>
+        <Button variant="ghost" onClick={() => refresh()}>
           {t.common.refresh}
         </Button>
       </div>

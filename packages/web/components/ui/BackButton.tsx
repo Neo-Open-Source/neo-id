@@ -14,17 +14,24 @@ interface BackButtonProps {
 export function BackButton({ href, onClick, label = "Back", className }: BackButtonProps) {
   const classes = cn("back-btn", className);
 
+  const content = (
+    <>
+      <Icon name="arrow-left" size={14} />
+      <span>{label}</span>
+    </>
+  );
+
   if (href) {
     return (
-      <Link href={href} className={classes} aria-label={label}>
-        <Icon name="arrow-left" size={18} />
+      <Link href={href} className={classes}>
+        {content}
       </Link>
     );
   }
 
   return (
-    <button type="button" className={classes} onClick={onClick} aria-label={label}>
-      <Icon name="arrow-left" size={18} />
+    <button type="button" className={classes} onClick={onClick}>
+      {content}
     </button>
   );
 }

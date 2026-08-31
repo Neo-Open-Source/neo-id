@@ -32,7 +32,7 @@ function MfaContent() {
           router.push("/auth");
           return;
         }
-        if (purpose === "export") {
+        if (purpose === "export" || purpose === "delete" || purpose === "email_change") {
           router.push("/profile");
           return;
         }

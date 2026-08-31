@@ -44,12 +44,17 @@ export function MfaCodeForm({
   const isExport = purpose === "export";
   const isDelete = purpose === "delete";
   const isVerifyEmail = purpose === "verify_email";
+  const isEmailChange = purpose === "email_change";
   const iconName = method === "totp" ? "shield" : "envelope";
   const title = isExport || isDelete
     ? (isExport ? t.profile.exportData : t.profile.deleteAccount)
+    : isEmailChange
+    ? t.profile.changeEmailTitle
     : (isVerifyEmail ? t.auth.mfa.verifyEmail : (method === "totp" ? t.auth.mfa.enterTotp : t.auth.mfa.enterCode));
   const subtitle = isExport || isDelete
     ? (isExport ? t.profile.exportDesc : t.profile.deleteAccountDesc)
+    : isEmailChange
+    ? t.profile.emailChangeCodeHint
     : (isVerifyEmail
       ? `${t.auth.mfa.verifyEmailSubtitle} ${email}`.trim()
       : (method === "totp"
@@ -70,6 +75,13 @@ export function MfaCodeForm({
     if ((!isExport && !isDelete) || method !== "email") return;
     api(isExport ? "/user/export/send-code" : "/user/delete/send-code", { method: "POST" }).catch(() => {});
   }, [isExport, isDelete, method]);
+
+  // Send email change verification code on mount
+  useEffect(() => {
+    if (!isEmailChange || method !== "email") return;
+    const newEmail = searchParams.get("newEmail") || "";
+    api("/user/email/change/request", { method: "POST", body: { newEmail } }).catch(() => {});
+  }, [isEmailChange, method, searchParams]);
 
   // Send email code when component mounts in login mode. Skipped for export /
   // email verification — those deliver their own code and sending the login
@@ -104,6 +116,13 @@ export function MfaCodeForm({
         await api("/user", { method: "DELETE", body: { method, code } });
         await logoutSession();
         router.replace("/auth");
+        return;
+      }
+
+      if (isEmailChange) {
+        const newEmail = searchParams.get("newEmail") || "";
+        await api("/user/email/change/confirm", { method: "POST", body: { newEmail, code } });
+        router.replace("/profile");
         return;
       }
 

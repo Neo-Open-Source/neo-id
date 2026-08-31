@@ -21,16 +21,11 @@ interface UserData {
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
-  const { data: user, error } = useCachedQuery<UserData>("/user/profile", {
-    enabled: true,
-  });
+  const { data: user, error } = useCachedQuery<UserData>("/user/profile");
 
-  // Redirect to auth on error, but only after a short delay to avoid
-  // flashing on transient network failures
   useEffect(() => {
     if (error && !user) {
       const timer = setTimeout(() => {
-        // Re-check — cached data may have arrived by now
         if (!readCache<UserData>("/user/profile")) {
           router.replace("/auth");
         }
@@ -44,28 +39,22 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     router.replace("/auth");
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-app">
-        <div className="loading">
-          <div className="loading__spinner" />
-        </div>
-      </div>
-    );
-  }
-
+  // Render children immediately — they render their own skeletons while data
+  // loads. The header/nav gracefully handle user=null with placeholders.
   return (
     <div className="dashboard-shell min-h-dvh bg-app flex flex-col">
       <div className="hidden md:block">
-        <Header user={user} />
+        <Header user={user ?? null} />
       </div>
       <main className="dashboard-main flex-1 md:pt-[52px]">
-        <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-10">{children}</div>
+        <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-10">
+          {children}
+        </div>
       </main>
       <div className="hidden md:block">
         <Footer />
       </div>
-      <BottomNav user={user} onLogout={handleLogout} />
+      <BottomNav user={user ?? null} onLogout={handleLogout} />
       <ScrollToTop />
     </div>
   );

@@ -1,6 +1,12 @@
 import { PrismaClient } from "./__generated__/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 export { PrismaClient, PrismaPg };
 export type * from "./__generated__/prisma/client";

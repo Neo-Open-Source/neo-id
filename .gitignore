@@ -7,6 +7,7 @@ dist/
 .env.*.local
 .env.test
 .turbo/
+.direnv/
 coverage/
 *.log
 .DS_Store
@@ -15,3 +16,4 @@ coverage/
 *.pem
 .vercel
 .env*
+!.envrc

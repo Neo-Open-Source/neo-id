@@ -137,9 +137,42 @@ export class NeoIdClient {
   }
 
   async forgotPassword(email: string) {
-    return this.request<{ sent: boolean }>(
+    return this.request<{
+      sent?: boolean;
+      mfa_required?: boolean;
+      mfa_methods?: string[];
+      email_hint?: string;
+    }>(
       "POST",
       "/api/v1/auth/forgot-password",
+      { email },
+      false
+    );
+  }
+
+  async verifyForgotPasswordMfa(data: {
+    email: string;
+    method: string;
+    code?: string;
+    response?: Record<string, unknown>;
+    expectedChallenge?: string;
+  }) {
+    return this.request<{ sent: boolean }>(
+      "POST",
+      "/api/v1/auth/forgot-password/verify",
+      data,
+      false
+    );
+  }
+
+  async startPasskeyResetChallenge(email: string) {
+    return this.request<{
+      allow_credentials: Array<{ id: string; transports?: string[] }>;
+      challenge: string;
+      timeout: number;
+    }>(
+      "POST",
+      "/api/v1/auth/forgot-password/passkey/start",
       { email },
       false
     );
@@ -173,6 +206,37 @@ export class NeoIdClient {
       currentPassword,
       newPassword,
     });
+  }
+
+  async requestProfilePasswordReset() {
+    return this.request<{
+      mfa_required: boolean;
+      mfa_methods: string[];
+      email_hint?: string;
+    }>("POST", "/api/v1/user/password/reset");
+  }
+
+  async verifyProfilePasswordReset(data: {
+    method: string;
+    code?: string;
+    response?: Record<string, unknown>;
+    expectedChallenge?: string;
+    newPassword: string;
+  }) {
+    return this.request<{
+      ok: boolean;
+      accessToken?: string;
+      refreshToken?: string;
+      idToken?: string;
+    }>("POST", "/api/v1/user/password/reset/verify", data);
+  }
+
+  async startProfilePasskeyResetChallenge() {
+    return this.request<{
+      allow_credentials: Array<{ id: string; transports?: string[] }>;
+      challenge: string;
+      timeout: number;
+    }>("POST", "/api/v1/user/password/reset/passkey/start");
   }
 
   async uploadAvatar(file: File) {

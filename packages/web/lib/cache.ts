@@ -8,7 +8,7 @@ const listeners = new Map<string, Set<() => void>>();
 
 // Persisted copies are only trusted while fresh; stale ones are dropped so the
 // next read falls back to the network.
-export const CACHE_PERSIST_TTL_MS = 60_000;
+export const CACHE_PERSIST_TTL_MS = 5 * 60_000; // 5 minutes
 const STORAGE_PREFIX = "neo_id_cache:";
 
 function notify(key: string) {

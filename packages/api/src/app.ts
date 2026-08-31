@@ -15,7 +15,7 @@ import { verifyEmail, verifyEmailByToken } from "./routes/auth/verify-email";
 
 // User Routes
 import { getProfile, updateProfile, checkUsername } from "./routes/user/profile";
-import { changePassword } from "./routes/user/password";
+import { changePassword, requestProfilePasswordReset, verifyProfilePasswordReset, startProfilePasskeyResetChallenge } from "./routes/user/password";
 import { uploadAvatar, deleteAvatar, setStockAvatar } from "./routes/user/avatar";
 import { getAvatarImage } from "./routes/user/avatar-image";
 import { deleteAccount, deleteChallenge, startDeletePasskey, sendDeleteCode } from "./routes/user/delete";
@@ -89,7 +89,7 @@ import {
 } from "./routes/device/verify";
 
 // Password Reset
-import { requestPasswordReset, resetPassword } from "./routes/auth/forgot-password";
+import { requestPasswordReset, verifyForgotPasswordMfa, startPasskeyResetChallenge, resetPassword } from "./routes/auth/forgot-password";
 
 const app = new Hono();
 
@@ -122,6 +122,8 @@ app.post("/api/v1/auth/refresh", rateLimit("REFRESH"), refresh);
 app.post("/api/v1/auth/logout", logout);
 
 app.post("/api/v1/auth/forgot-password", rateLimit("FORGOT_PASSWORD"), requestPasswordReset);
+app.post("/api/v1/auth/forgot-password/verify", rateLimit("FORGOT_PASSWORD_MFA"), verifyForgotPasswordMfa);
+app.post("/api/v1/auth/forgot-password/passkey/start", rateLimit("FORGOT_PASSWORD"), startPasskeyResetChallenge);
 app.post("/api/v1/auth/reset-password", rateLimit("RESET_PASSWORD"), resetPassword);
 
 app.get("/api/v1/auth/oauth/:provider", startSocialOAuth);
@@ -135,6 +137,9 @@ app.get("/api/v1/user/profile", requireAuth, getProfile);
 app.put("/api/v1/user/profile", requireAuth, updateProfile);
 app.get("/api/v1/user/username/check", requireAuth, checkUsername);
 app.put("/api/v1/user/password", requireAuth, changePassword);
+app.post("/api/v1/user/password/reset", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), requestProfilePasswordReset);
+app.post("/api/v1/user/password/reset/verify", requireAuth, rateLimit("PROFILE_PASSWORD_RESET_MFA"), verifyProfilePasswordReset);
+app.post("/api/v1/user/password/reset/passkey/start", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), startProfilePasskeyResetChallenge);
 app.post("/api/v1/user/avatar", requireAuth, uploadAvatar);
 app.put("/api/v1/user/avatar/stock", requireAuth, setStockAvatar);
 app.get("/api/v1/user/avatar/image", requireAuth, getAvatarImage);

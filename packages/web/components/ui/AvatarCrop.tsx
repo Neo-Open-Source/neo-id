@@ -113,10 +113,10 @@ export function AvatarCrop({ imageSrc, onConfirm, onCancel }: AvatarCropProps) {
       </div>
 
       <div className="avatar-crop__actions">
-        <Button variant="ghost" size="sm" onClick={onCancel} disabled={applying}>
+        <Button variant="ghost" onClick={onCancel} disabled={applying}>
           {t.profile.cropBack}
         </Button>
-        <Button size="sm" loading={applying} onClick={handleConfirm}>
+        <Button loading={applying} onClick={handleConfirm}>
           {t.profile.cropApply}
         </Button>
       </div>

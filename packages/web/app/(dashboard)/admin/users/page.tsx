@@ -211,7 +211,6 @@ export default function AdminUsersPage() {
         </div>
         <Button
           variant="secondary"
-          size="sm"
           loading={notifying}
           onClick={notifyTerms}
         >
@@ -345,7 +344,6 @@ export default function AdminUsersPage() {
           <div className="admin-pagination__btns">
             <Button
               variant="ghost"
-              size="sm"
               disabled={page <= 1 || loading}
               onClick={() => {
                 const next = page - 1;
@@ -357,7 +355,6 @@ export default function AdminUsersPage() {
             </Button>
             <Button
               variant="ghost"
-              size="sm"
               disabled={page >= pagination.pages || loading}
               onClick={() => {
                 const next = page + 1;

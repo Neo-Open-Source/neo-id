@@ -23,7 +23,6 @@ export function Pagination({ page, pages, loading, onPrev, onNext, labels }: Pag
       <div className="admin-pagination__btns">
         <Button
           variant="ghost"
-          size="sm"
           disabled={page <= 1 || loading}
           onClick={onPrev}
         >
@@ -31,7 +30,6 @@ export function Pagination({ page, pages, loading, onPrev, onNext, labels }: Pag
         </Button>
         <Button
           variant="ghost"
-          size="sm"
           disabled={page >= pages || loading}
           onClick={onNext}
         >

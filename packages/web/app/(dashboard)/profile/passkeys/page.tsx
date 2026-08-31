@@ -140,7 +140,7 @@ export default function PasskeysPage() {
           <p className="text-sm text-muted">
             {t.profile.passkeysRegistered.replace("{{count}}", String(passkeys.length))}
           </p>
-          <Button size="sm" onClick={handleAdd} loading={actionLoading}>
+          <Button onClick={handleAdd} loading={actionLoading}>
             <Icon name="plus" size={14} />
             {t.profile.addPasskey}
           </Button>
@@ -169,7 +169,6 @@ export default function PasskeysPage() {
                 </div>
                 <Button
                   variant="ghost"
-                  size="sm"
                   className="text-danger"
                   loading={actionLoading}
                   onClick={() => handleDelete(passkey.id)}

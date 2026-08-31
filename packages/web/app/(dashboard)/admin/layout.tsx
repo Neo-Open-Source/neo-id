@@ -9,7 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <PanelShell
       items={[
-        { href: "/admin/users", label: t.nav.users, icon: "users" },
+        { href: "/admin/users", label: t.nav.users, icon: "user" },
         { href: "/admin/services", label: t.nav.services, icon: "apps" },
       ]}
     >

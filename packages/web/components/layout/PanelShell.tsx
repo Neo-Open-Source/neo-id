@@ -1,7 +1,10 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { SecondaryNav } from "./SecondaryNav";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Icon } from "@/components/ui/Icon";
+import { cn } from "@/lib/cn";
 
 interface NavItem {
   href: string;
@@ -15,10 +18,26 @@ interface PanelShellProps {
 }
 
 export function PanelShell({ children, items }: PanelShellProps) {
+  const pathname = usePathname();
+
   return (
-    <div className="panel-shell flex min-h-svh w-full max-md:min-h-0 max-md:flex-col">
-      <SecondaryNav items={items} />
-      <div className="panel-shell__content flex-1 min-w-0 flex justify-center px-8 pb-12 pt-8 max-md:px-4 max-md:pb-8 max-md:pt-4">
+    <div className="panel-shell flex flex-col w-full">
+      <div className="panel-tabs">
+        {items.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn("panel-tab", active && "panel-tab--active")}
+            >
+              <Icon name={item.icon} size={15} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+      <div className="panel-shell__content">
         {children}
       </div>
     </div>

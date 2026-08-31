@@ -89,12 +89,11 @@ export function LoginMethodRows({ identities, onChanged }: LoginMethodRowsProps)
         size="sm"
         footer={
           <>
-            <Button variant="ghost" size="sm" onClick={() => setDisconnectProvider(null)}>
+            <Button variant="ghost" onClick={() => setDisconnectProvider(null)}>
               {t.common.cancel}
             </Button>
             <Button
               variant="danger"
-              size="sm"
               loading={Boolean(loadingProvider)}
               onClick={handleDisconnect}
             >

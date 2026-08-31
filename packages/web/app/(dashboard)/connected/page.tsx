@@ -114,7 +114,6 @@ export default function ConnectedPage() {
                 )}
                 <Button
                   variant="ghost"
-                  size="sm"
                   className="text-danger"
                   loading={revokingId === connection.id}
                   onClick={() => handleRevoke(connection.id)}
@@ -128,7 +127,7 @@ export default function ConnectedPage() {
       )}
 
       <div className="page-footer-actions">
-        <Button variant="ghost" size="sm" onClick={() => refresh()}>
+        <Button variant="ghost" onClick={() => refresh()}>
           {t.common.refresh}
         </Button>
       </div>

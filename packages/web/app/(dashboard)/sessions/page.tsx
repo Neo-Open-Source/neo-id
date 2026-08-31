@@ -110,7 +110,6 @@ export default function SessionsPage() {
                 <div className="list-row__actions">
                   <Button
                     variant="ghost"
-                    size="sm"
                     className="text-danger"
                     loading={revokingId === session.id}
                     onClick={() => handleRevoke(session.id)}
@@ -125,7 +124,7 @@ export default function SessionsPage() {
       )}
 
       <div className="page-footer-actions">
-        <Button variant="ghost" size="sm" onClick={() => refresh()}>
+        <Button variant="ghost" onClick={() => refresh()}>
           {t.common.refresh}
         </Button>
       </div>
