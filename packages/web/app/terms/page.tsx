@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { BackButton } from "@/components/ui/BackButton";
 import { Footer } from "@/components/layout/Footer";
+import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
 import { usePageTitle } from "@/lib/use-page-title";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -67,6 +68,7 @@ export default function TermsPage() {
     <div className="legal-root">
       <nav className="legal-nav">
         <BackButton onClick={() => { if (window.history.length > 1) router.back(); else router.push("/profile"); }} label={t.legal.back} className="legal-back" />
+        <LanguagePicker />
       </nav>
 
       <main className="legal-main">
