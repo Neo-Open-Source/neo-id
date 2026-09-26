@@ -10,7 +10,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/lib/i18n/context";
 import { api, ApiError, getStoredRefreshToken, logoutSession } from "@/lib/api";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
-import { writeCache, readCache } from "@/lib/cache";
+import { writeCache, readCache, clearAllCaches } from "@/lib/cache";
 
 interface MfaCodeFormProps {
   method: "totp" | "email";
@@ -45,16 +45,27 @@ export function MfaCodeForm({
   const isDelete = purpose === "delete";
   const isVerifyEmail = purpose === "verify_email";
   const isEmailChange = purpose === "email_change";
+  const isPasswordReset = purpose === "password-reset";
+  const isMfaDisable = purpose === "mfa-disable";
+  const disableTarget = searchParams.get("target") === "email" ? "email" : "totp";
   const iconName = method === "totp" ? "shield" : "envelope";
   const title = isExport || isDelete
     ? (isExport ? t.profile.exportData : t.profile.deleteAccount)
     : isEmailChange
     ? t.profile.changeEmailTitle
+    : isPasswordReset
+    ? t.profile.resetPassword
+    : isMfaDisable
+    ? t.profile.twoFactor
     : (isVerifyEmail ? t.auth.mfa.verifyEmail : (method === "totp" ? t.auth.mfa.enterTotp : t.auth.mfa.enterCode));
   const subtitle = isExport || isDelete
     ? (isExport ? t.profile.exportDesc : t.profile.deleteAccountDesc)
     : isEmailChange
     ? t.profile.emailChangeCodeHint
+    : isPasswordReset
+    ? t.profile.resetPasswordMfaSubtitle
+    : isMfaDisable
+    ? t.auth.forgotPassword.mfaSubtitle
     : (isVerifyEmail
       ? `${t.auth.mfa.verifyEmailSubtitle} ${email}`.trim()
       : (method === "totp"
@@ -72,9 +83,18 @@ export function MfaCodeForm({
 
   // Send the action verification code when the email method is chosen
   useEffect(() => {
-    if ((!isExport && !isDelete) || method !== "email") return;
-    api(isExport ? "/user/export/send-code" : "/user/delete/send-code", { method: "POST" }).catch(() => {});
-  }, [isExport, isDelete, method]);
+    if ((!isExport && !isDelete && !isPasswordReset && !isMfaDisable) || method !== "email") return;
+    api(
+      isExport
+        ? "/user/export/send-code"
+        : isDelete
+          ? "/user/delete/send-code"
+          : isPasswordReset
+            ? "/user/password/reset/send-code"
+            : "/mfa/disable/send-code",
+      { method: "POST" },
+    ).catch(() => {});
+  }, [isExport, isDelete, isPasswordReset, isMfaDisable, method]);
 
   // Send email change verification code on mount
   useEffect(() => {
@@ -83,9 +103,7 @@ export function MfaCodeForm({
     api("/user/email/change/request", { method: "POST", body: { newEmail } }).catch(() => {});
   }, [isEmailChange, method, searchParams]);
 
-  // Send email code when component mounts in login mode. Skipped for export /
-  // email verification — those deliver their own code and sending the login
-  // MFA code here was the cause of users receiving two emails.
+  // Skip auto-send for flows that deliver their own code (avoids double emails).
   useEffect(() => {
     if (method !== "email" || mode !== "login" || !email) return;
     if (purpose) return;
@@ -99,6 +117,43 @@ export function MfaCodeForm({
     setLoading(true);
 
     try {
+      if (isMfaDisable) {
+        await api(disableTarget === "email" ? "/mfa/email/disable" : "/mfa/totp/disable", {
+          method: "POST",
+          body: { method, code },
+        });
+        clearAllCaches();
+        toast.success(t.common.success);
+        router.push("/profile/mfa");
+        return;
+      }
+
+      if (isPasswordReset) {
+        let pending: string | null = null;
+        try {
+          pending = sessionStorage.getItem("neo_id_pending_password_reset");
+        } catch {
+          pending = null;
+        }
+        if (!pending) {
+          toast.error(t.common.error);
+          router.push("/profile/password");
+          return;
+        }
+        await api("/user/password/reset/verify", {
+          method: "POST",
+          body: { method, code, newPassword: pending },
+        });
+        try {
+          sessionStorage.removeItem("neo_id_pending_password_reset");
+        } catch {
+          // ignore
+        }
+        toast.success(t.profile.resetPasswordSuccess);
+        router.push("/profile/password");
+        return;
+      }
+
       if (isExport) {
         const data = await api("/user/export", { method: "POST", body: { method, code } });
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -182,6 +237,10 @@ export function MfaCodeForm({
         await api("/user/export/send-code", { method: "POST" });
       } else if (isDelete) {
         await api("/user/delete/send-code", { method: "POST" });
+      } else if (isPasswordReset) {
+        await api("/user/password/reset/send-code", { method: "POST" });
+      } else if (isMfaDisable) {
+        await api("/mfa/disable/send-code", { method: "POST" });
       } else if (mode === "setup") {
         await api("/mfa/email/setup", { method: "POST" });
       } else if (email) {
@@ -232,7 +291,11 @@ export function MfaCodeForm({
           >
             {isExport || isDelete
               ? (isExport ? t.profile.exportData : t.profile.deleteAccount)
-              : (mode === "setup" ? t.profile.verifyAndEnable : t.auth.mfa.verify)}
+              : isPasswordReset
+                ? t.profile.resetPassword
+                : isMfaDisable
+                  ? t.common.disable
+                  : (mode === "setup" ? t.profile.verifyAndEnable : t.auth.mfa.verify)}
           </Button>
         </form>
 

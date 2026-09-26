@@ -36,17 +36,25 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="panel-page">
+    <div className="panel-page panel-page--narrow">
       <div className="panel-page__header panel-page__header--row">
         <div>
           <h1>{t.developer.servicesCount.replace("{{count}}", String(services.length))}</h1>
         </div>
-        <Link href="/developer/services/new">
-          <Button>
-            <Icon name="plus" size={14} />
-            {t.developer.newService}
-          </Button>
-        </Link>
+        <div className="panel-page__header-actions">
+          <Link href="/docs">
+            <Button variant="ghost">
+              <Icon name="document-signed" size={14} />
+              {t.nav.apiDocs}
+            </Button>
+          </Link>
+          <Link href="/developer/services/new">
+            <Button>
+              <Icon name="plus" size={14} />
+              {t.developer.newService}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {services.length === 0 ? (

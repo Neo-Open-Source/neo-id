@@ -63,6 +63,14 @@ function PickerContent() {
           router.push("/profile");
           return;
         }
+        if (purpose === "password-reset") {
+          router.push("/profile/password");
+          return;
+        }
+        if (purpose === "mfa-disable") {
+          router.push("/profile/mfa");
+          return;
+        }
         router.push(`/auth?email=${encodeURIComponent(email)}${redirectParam}`);
       }}
       backLabel={t.common.back}
@@ -92,7 +100,7 @@ function PickerContent() {
                 <div className="text-xs text-muted">{info.desc}</div>
               </div>
               {requiresPassword && method !== "passkey" && (
-                <Icon name="lock" size={16} className="ml-auto text-dim" />
+                <Icon name="password" size={16} className="ml-auto text-dim" />
               )}
             </button>
           );

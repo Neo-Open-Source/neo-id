@@ -113,7 +113,7 @@ export function AvatarImage({
 
   return (
     <div className={cn("avatar__initials", className)}>
-      <Icon name="user" size={iconSizeMap[size]} className="text-dim" />
+      <Icon name="circle-user" size={iconSizeMap[size]} className="text-dim" />
     </div>
   );
 }

@@ -208,8 +208,6 @@ export function AvatarUpload({
               </div>
             </button>
             <p className="avatar-picker__hint">{t.profile.uploadPhotoHint}</p>
-
-            <p className="avatar-picker__label">{t.profile.orChooseAvatar}</p>
             <div className="avatar-picker__grid">
               {STOCK_AVATARS.map((url) => (
                 <button

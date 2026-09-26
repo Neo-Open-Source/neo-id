@@ -71,6 +71,7 @@ export async function register(c: Context) {
       displayName: displayName || email.split("@")[0],
       role: isAutoAdmin ? "admin" : "user",
       emailVerified: isAutoAdmin,
+      ageVerified: true,
     },
   });
 

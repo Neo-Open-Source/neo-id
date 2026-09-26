@@ -47,6 +47,10 @@ const ro = {
       ageConfirm: "Confirm că am cel puțin 16 ani",
       success: "Cont creat! Acum te poți autentifica",
     },
+    age: {
+      title: "Verificarea vârstei",
+      subtitle: "Înainte de a folosi Neo ID, confirmă-ți vârsta.",
+    },
     mfa: {
       title: "Verifică-ți identitatea",
       subtitle: "Alege o metodă de verificare",
@@ -95,6 +99,7 @@ const ro = {
     save: "Salvează",
     cancel: "Anulează",
     delete: "Șterge",
+    disable: "Dezactivează",
     edit: "Editează",
     back: "Înapoi",
     next: "Următorul",
@@ -142,9 +147,10 @@ const ro = {
   footer: {
     ecosystem: "Ecosistem",
     community: "Comunitate",
+    legal: "Legal",
     blog: "Blog",
     api: "API",
-    neoid: "Neo ID",
+    neowatch: "NeoWatch",
     telegram: "Telegram",
     github: "GitHub",
     tos: "Termeni de utilizare",
@@ -174,6 +180,12 @@ const ro = {
     exportDesc: "Descarcă toate datele tale stocate în Neo ID ca fișier JSON.",
     deleteAccountDesc:
       "Această acțiune este permanentă. Toate datele, sesiunile și conturile conectate vor fi șterse.",
+    under16Instead: "Nu ai 16 ani? Șterge contul",
+    under16Title: "Ștergi acest cont?",
+    under16Desc: "Pentru a folosi Neo ID trebuie să ai cel puțin 16 ani. Vom trimite un cod de confirmare pe email, apoi vom șterge definitiv contul și toate datele.",
+    sendCode: "Trimite codul",
+    codeSent: "Cod trimis — verifică emailul",
+    confirmDeleteAccount: "Da, șterge contul meu",
     editDisplayName: "Editează numele afișat",
     editUsername: "Editează numele de utilizator",
     editUsernameDesc:
@@ -266,7 +278,7 @@ const ro = {
     changePhoto: "Schimbă fotografia de profil",
     uploadPhoto: "Încarcă fotografie",
     changePhotoHint: "Alege o imagine de pe dispozitivul tău.",
-    appsAndAgents: "Aplicații și agenți",
+    appsAndAgents: "Aplicații conectate",
     loginMethods: "Metode de autentificare",
     loginMethodsDesc:
       "Conectează Google sau GitHub pentru a te autentifica fără parolă.",
@@ -284,6 +296,8 @@ const ro = {
     terms: "Termeni",
     privacy: "Confidențialitate",
     language: "Limbă",
+    appearance: "Aspect",
+    darkMode: "Mod întunecat",
     uploadPhotoHint:
       "Încarcă o fotografie sau alege un avatar prestabilit.",
     orChooseAvatar: "Sau alege un avatar",

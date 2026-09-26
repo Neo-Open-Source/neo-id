@@ -210,7 +210,7 @@ export async function socialOAuthCallback(c: Context) {
       user = await db.user.create({
         data: {
           email: userInfo.email,
-          emailVerified: true,
+          emailVerified: userInfo.emailVerified,
           displayName: userInfo.name,
           firstName: names[0],
           lastName: names.slice(1).join(" ") || undefined,
@@ -226,6 +226,13 @@ export async function socialOAuthCallback(c: Context) {
     }
   }
 
+  if (!user.emailVerified && userInfo.emailVerified && user.email === userInfo.email) {
+    user = await db.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
+    });
+  }
+
   if (user.status === "banned") {
     return c.redirect(redirectWithError(WEB_URL, "user_banned"), 302);
   }
@@ -237,7 +244,10 @@ export async function socialOAuthCallback(c: Context) {
   const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
   const hasMfa = user.totpEnabled || user.emailMfaEnabled;
 
-  const returnTo = oauthState.redirectUri || `${WEB_URL}/profile`;
+  let returnTo = oauthState.redirectUri || `${WEB_URL}/profile`;
+  if (!user.ageVerified && returnTo === `${WEB_URL}/profile`) {
+    returnTo = `${WEB_URL}/auth/age-consent`;
+  }
 
   if (hasMfa) {
     const mfaMethods = [

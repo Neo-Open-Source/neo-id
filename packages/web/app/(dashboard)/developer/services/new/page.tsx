@@ -69,7 +69,7 @@ export default function NewServicePage() {
   };
 
   return (
-    <div className="page max-w-5xl mx-auto">
+    <div className="page panel-page--narrow mx-auto">
       <BackButton href="/developer/services" label={t.developer.backToServices} />
 
       <h1 className="text-2xl font-bold text-content">{t.developer.createService}</h1>

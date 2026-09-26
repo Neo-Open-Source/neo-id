@@ -311,8 +311,8 @@ export class NeoIdClient {
     return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/totp/enable", { code });
   }
 
-  async disableTotp() {
-    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/totp/disable");
+  async disableTotp(proof?: { method: string; code?: string; response?: unknown; expectedChallenge?: string }) {
+    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/totp/disable", proof ?? {});
   }
 
   async setupEmailMfa() {
@@ -323,8 +323,8 @@ export class NeoIdClient {
     return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/email/enable", { code });
   }
 
-  async disableEmailMfa() {
-    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/email/disable");
+  async disableEmailMfa(proof?: { method: string; code?: string; response?: unknown; expectedChallenge?: string }) {
+    return this.request<{ ok: boolean }>("POST", "/api/v1/mfa/email/disable", proof ?? {});
   }
 
   async verifyMfa(email: string, method: string, code: string, purpose?: string) {

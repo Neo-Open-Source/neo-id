@@ -16,6 +16,7 @@ interface UserData {
   displayName?: string;
   avatar?: string;
   role: string;
+  ageVerified?: boolean;
 }
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     }
   }, [error, user, router]);
 
+  useEffect(() => {
+    if (user && user.ageVerified === false) {
+      router.replace("/auth/age-consent");
+    }
+  }, [user, router]);
+
   const handleLogout = async () => {
     await logoutSession();
     router.replace("/auth");
@@ -44,7 +51,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="dashboard-shell min-h-dvh bg-app flex flex-col">
       <div className="hidden md:block">
-        <Header user={user ?? null} />
+        <Header user={user ?? null} onLogout={handleLogout} />
       </div>
       <main className="dashboard-main flex-1 md:pt-[52px]">
         <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-10">
@@ -54,7 +61,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="hidden md:block">
         <Footer />
       </div>
-      <BottomNav user={user ?? null} onLogout={handleLogout} />
+      <BottomNav user={user ?? null} />
       <ScrollToTop />
     </div>
   );

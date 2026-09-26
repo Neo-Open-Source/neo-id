@@ -1,11 +1,13 @@
 import { cn } from "@/lib/cn";
+import type { CSSProperties } from "react";
 
 interface SkeletonProps {
   className?: string;
+  style?: CSSProperties;
 }
 
-export function Skeleton({ className }: SkeletonProps) {
-  return <div className={cn("skeleton", className)} aria-hidden="true" />;
+export function Skeleton({ className, style }: SkeletonProps) {
+  return <div className={cn("skeleton", className)} style={style} aria-hidden="true" />;
 }
 
 export function ProfileSkeleton() {

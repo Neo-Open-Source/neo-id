@@ -76,7 +76,7 @@ export default function SessionsPage() {
       {items.length === 0 ? (
         <div className="empty-panel">
           <div className="empty-panel__icon">
-            <Icon name="laptop" size={28} />
+            <Icon name="devices" size={28} />
           </div>
           <p className="empty-panel__title">{t.sessions.empty}</p>
           <p className="empty-panel__desc">{t.sessions.emptyDesc}</p>

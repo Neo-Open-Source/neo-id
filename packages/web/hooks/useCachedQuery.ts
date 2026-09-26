@@ -7,11 +7,7 @@ import { clearCache, getCacheAge, readCache, subscribeCache, writeCache, CACHE_P
 interface UseCachedQueryOptions {
   enabled?: boolean;
   cacheKey?: string;
-  /**
-   * Skip fetch if cached data is fresher than this many ms.
-   * Defaults to 0 (always revalidate on mount).
-   * Set to CACHE_PERSIST_TTL_MS to fully rely on cache until it expires.
-   */
+  /** Skip fetch if cached data is fresher than this many ms (default 0). */
   staleTime?: number;
 }
 
@@ -21,6 +17,24 @@ interface UseCachedQueryResult<T> {
   isLoading: boolean;
   refresh: () => Promise<T | null>;
   mutate: (updater: T | ((current: T | null) => T | null)) => void;
+}
+
+const inflight = new Map<string, Promise<unknown>>();
+
+async function fetchOnce<T>(path: string, cacheKey: string): Promise<T> {
+  const existing = inflight.get(cacheKey);
+  if (existing) return existing as Promise<T>;
+
+  const request = api<T>(path)
+    .then((fresh) => {
+      writeCache(cacheKey, fresh);
+      return fresh;
+    })
+    .finally(() => {
+      if (inflight.get(cacheKey) === request) inflight.delete(cacheKey);
+    });
+  inflight.set(cacheKey, request);
+  return request;
 }
 
 export function useCachedQuery<T>(
@@ -37,20 +51,17 @@ export function useCachedQuery<T>(
 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!cached && enabled);
-  const fetchingRef = useRef(false);
   // Use a ref object so the cleanup closure always sees the current value
   const mountedRef = useRef(true);
 
   const fetchData = useCallback(
     async (background = false): Promise<T | null> => {
-      if (!enabled || fetchingRef.current) return null;
-      fetchingRef.current = true;
+      if (!enabled) return null;
       if (!background) setIsLoading(true);
 
       try {
-        const fresh = await api<T>(path);
+        const fresh = await fetchOnce<T>(path, cacheKey);
         if (!mountedRef.current) return fresh;
-        writeCache(cacheKey, fresh);
         setError(null);
         return fresh;
       } catch (e) {
@@ -60,7 +71,6 @@ export function useCachedQuery<T>(
         }
         return null;
       } finally {
-        fetchingRef.current = false;
         if (mountedRef.current) setIsLoading(false);
       }
     },

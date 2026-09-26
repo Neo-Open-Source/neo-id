@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
-import { AvatarImage } from "@/components/ui/AvatarImage";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
 import { useI18n } from "@/lib/i18n/context";
@@ -30,9 +30,10 @@ function HeaderLink({ href, label }: NavItem) {
 
 interface HeaderProps {
   user?: { avatar?: string; email?: string; displayName?: string; role?: string } | null;
+  onLogout?: () => void | Promise<void>;
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, onLogout }: HeaderProps) {
   const { t } = useI18n();
   const isAdmin = user?.role === "admin";
   const isDev = user?.role === "developer" || isAdmin;
@@ -59,9 +60,7 @@ export function Header({ user }: HeaderProps) {
         <div className="site-header__actions">
           <LanguagePicker />
           <ThemeToggle className="w-8 h-8" iconSize={15} showTooltip={false} />
-          <Link href="/profile" className="site-header__avatar-btn" aria-label={t.nav.profile}>
-            <AvatarImage src={user?.avatar} name={user?.displayName || user?.email} size="sm" proxy />
-          </Link>
+          <UserMenu user={user} onLogout={onLogout} />
         </div>
       </div>
     </header>

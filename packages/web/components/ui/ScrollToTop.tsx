@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { getScrollY, onScrollRoot, scrollRootTo } from "@/lib/scroll-root";
 
 const SHOW_AFTER = 360;
 
 export function ScrollToTop() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export function ScrollToTop() {
   }, []);
 
   if (!visible) return null;
+  if (pathname.startsWith("/admin")) return null;
 
   return (
     <button

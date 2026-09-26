@@ -32,6 +32,7 @@ export default function ServiceDetailPage() {
   const [saving, setSaving] = useState(false);
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [showRotateModal, setShowRotateModal] = useState(false);
+  const [showSecretModal, setShowSecretModal] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -82,7 +83,8 @@ export default function ServiceDetailPage() {
       });
       setRevealedSecret(data.client_secret);
       setShowRotateModal(false);
-      toast.success("New secret generated");
+      setShowSecretModal(true);
+      toast.success(t.common.success);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : t.common.error);
     } finally {
@@ -136,7 +138,7 @@ export default function ServiceDetailPage() {
   if (!service) return null;
 
   return (
-    <div className="page service-detail-page max-w-5xl mx-auto">
+    <div className="page service-detail-page panel-page--narrow mx-auto">
       <BackButton href="/developer/services" label={t.developer.backToServices} />
 
       {/* Header */}
@@ -158,7 +160,7 @@ export default function ServiceDetailPage() {
             {service.logoUrl ? (
               <Image src={service.logoUrl} alt="" fill className="object-cover rounded-2xl" unoptimized />
             ) : (
-              <Icon name="terminal" size={28} className="text-accent" />
+              <Icon name="square-terminal" size={28} className="text-accent" />
             )}
             <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               {uploadingLogo ? (
@@ -274,25 +276,8 @@ export default function ServiceDetailPage() {
           <div className="flex items-start gap-4 p-4 bg-surface-hover rounded-xl min-h-18">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-muted mb-1.5">{t.developer.clientSecret}</p>
-              <p className="text-sm font-mono text-content break-all">
-                {revealedSecret || "••••••••••••••••••••••••••••••••"}
-              </p>
-              {revealedSecret && (
-                <p className="text-xs text-warning mt-1.5 flex items-center gap-1">
-                  <Icon name="triangle-warning" size={12} />
-                  {t.developer.secretWarning}
-                </p>
-              )}
+              <p className="text-sm font-mono text-content">••••••••••••••••••••••••••••••••</p>
             </div>
-            {revealedSecret && (
-              <button
-                type="button"
-                onClick={() => copyToClipboard(revealedSecret, "Client secret")}
-                className="shrink-0 w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center text-muted hover:text-content hover:border-border-hover transition-all"
-              >
-                <Icon name="copy" size={15} />
-              </button>
-            )}
           </div>
 
           <div className="service-detail-page__actions">
@@ -326,6 +311,37 @@ export default function ServiceDetailPage() {
         }
       >
         <p className="text-sm text-muted">{t.developer.rotateSecretConfirm}</p>
+      </Modal>
+
+      {/* New Secret Modal */}
+      <Modal
+        open={showSecretModal}
+        onClose={() => { setShowSecretModal(false); setRevealedSecret(null); }}
+        title={t.developer.rotateSecret}
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => revealedSecret && copyToClipboard(revealedSecret, "Client secret")}
+            >
+              <Icon name="copy" size={15} />
+            </Button>
+            <Button onClick={() => { setShowSecretModal(false); setRevealedSecret(null); }}>
+              {t.common.confirm}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-warning flex items-center gap-1.5">
+            <Icon name="triangle-warning" size={14} />
+            {t.developer.secretWarning}
+          </p>
+          <p className="text-sm font-mono text-content break-all p-4 bg-surface-hover rounded-xl">
+            {revealedSecret}
+          </p>
+        </div>
       </Modal>
 
       {/* Delete Modal */}

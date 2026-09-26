@@ -34,9 +34,7 @@ async function populateSessionGeo(sessionId: string, ipAddress?: string) {
 export async function issueTokens(info: SessionInfo, reuseSessionId?: string): Promise<TokenResult> {
   let session: { id: string } | undefined;
 
-  // OAuth code exchanges reuse the session the user already has in the browser
-  // (carried through OAuthState) instead of minting a fresh Session per app.
-  // Fall back to a new session if the stored one was revoked/expired meanwhile.
+  // Reuse the browser's existing session when possible instead of minting a new one.
   if (reuseSessionId) {
     const existing = await db.session.findUnique({ where: { id: reuseSessionId } });
     if (existing?.isActive && existing.userId === info.userId) {
@@ -96,12 +94,7 @@ export async function issueTokens(info: SessionInfo, reuseSessionId?: string): P
   return { accessToken, refreshToken, idToken, sessionId: session.id };
 }
 
-/**
- * Find the session this browser already holds for the user so a re-login
- * (password / MFA / passkey / social) reuses it instead of minting a duplicate.
- * Mirrors what the OAuth code exchange already does via OAuthState.sessionId.
- * Returns undefined when the browser has no active session for the user.
- */
+/** Find the browser's active session for the user to reuse it on re-login. */
 export async function getReusableSessionId(
   c: Context,
   userId: string,
@@ -238,41 +231,41 @@ export async function rotateSessionTokens(info: {
   deviceInfo?: string;
   ipAddress?: string;
 }): Promise<TokenResult> {
-  await db.session.update({
-    where: { id: info.sessionId },
-    data: {
-      lastActiveAt: new Date(),
-      ipAddress: info.ipAddress,
-      deviceInfo: info.deviceInfo,
-      expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
-    },
-  });
+  const newRefreshToken = generateToken(TOKEN.REFRESH_TOKEN_LENGTH);
+
+  const [accessToken, idToken] = await Promise.all([
+    signAccessToken(
+      { sub: info.userId, email: info.email, role: info.role },
+      info.sessionId,
+    ),
+    signIdToken({
+      sub: info.userId,
+      email: info.email,
+      role: info.role,
+    }),
+    db.session.update({
+      where: { id: info.sessionId },
+      data: {
+        lastActiveAt: new Date(),
+        ipAddress: info.ipAddress,
+        deviceInfo: info.deviceInfo,
+        expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
+      },
+    }),
+    db.refreshToken.create({
+      data: {
+        userId: info.userId,
+        sessionId: info.sessionId,
+        tokenHash: hashToken(newRefreshToken),
+        parentId: info.oldRefreshTokenId,
+        deviceInfo: info.deviceInfo,
+        ipAddress: info.ipAddress,
+        expiresAt: new Date(Date.now() + TOKEN.REFRESH_TOKEN_EXPIRY * 1000),
+      },
+    }),
+  ]);
 
   void populateSessionGeo(info.sessionId, info.ipAddress);
-
-  const accessToken = await signAccessToken(
-    { sub: info.userId, email: info.email, role: info.role },
-    info.sessionId,
-  );
-
-  const idToken = await signIdToken({
-    sub: info.userId,
-    email: info.email,
-    role: info.role,
-  });
-
-  const newRefreshToken = generateToken(TOKEN.REFRESH_TOKEN_LENGTH);
-  await db.refreshToken.create({
-    data: {
-      userId: info.userId,
-      sessionId: info.sessionId,
-      tokenHash: hashToken(newRefreshToken),
-      parentId: info.oldRefreshTokenId,
-      deviceInfo: info.deviceInfo,
-      ipAddress: info.ipAddress,
-      expiresAt: new Date(Date.now() + TOKEN.REFRESH_TOKEN_EXPIRY * 1000),
-    },
-  });
 
   return { accessToken, refreshToken: newRefreshToken, idToken, sessionId: info.sessionId };
 }

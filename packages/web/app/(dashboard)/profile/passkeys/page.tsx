@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
 import { Icon } from "@/components/ui/Icon";
+import { ListPageSkeleton } from "@/components/ui/Skeleton";
 import { useI18n } from "@/lib/i18n/context";
 import { toast } from "sonner";
 import { usePageTitle } from "@/lib/use-page-title";
@@ -124,15 +125,16 @@ export default function PasskeysPage() {
   };
 
   if (loading) {
-    return <div className="loading"><div className="loading__spinner" /></div>;
+    return <ListPageSkeleton rows={2} />;
   }
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <BackButton href="/profile" label={t.profile.backToProfile} />
-        <h1 className="page-title">{t.profile.passkeys}</h1>
-        <p className="page-subtitle">{t.profile.passkeysSubtitle}</p>
+    <div className="page profile-page">
+      <BackButton href="/profile" label={t.profile.backToProfile} />
+
+      <div className="page-intro">
+        <h1 className="page-intro__title">{t.profile.passkeys}</h1>
+        <p className="page-intro__desc">{t.profile.passkeysSubtitle}</p>
       </div>
 
       <Card className="p-6">
@@ -167,14 +169,16 @@ export default function PasskeysPage() {
                     )}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  className="text-danger"
-                  loading={actionLoading}
+                <button
+                  type="button"
+                  className="row-icon-btn row-icon-btn--danger"
+                  aria-label={t.common.delete}
+                  title={t.common.delete}
+                  disabled={actionLoading}
                   onClick={() => handleDelete(passkey.id)}
                 >
-                  {t.common.delete}
-                </Button>
+                  <Icon name="trash" size={16} />
+                </button>
               </div>
             ))}
           </div>

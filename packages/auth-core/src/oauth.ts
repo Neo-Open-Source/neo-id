@@ -9,6 +9,7 @@ export interface OAuthProviderConfig {
 export interface OAuthUserInfo {
   id: string;
   email: string;
+  emailVerified: boolean;
   name?: string;
   picture?: string;
   provider: string;
@@ -83,6 +84,7 @@ export async function exchangeCode(
 interface GoogleUser {
   sub: string;
   email: string;
+  email_verified?: boolean;
   name: string;
   picture: string;
 }
@@ -103,6 +105,7 @@ export async function getGoogleUserInfo(accessToken: string): Promise<OAuthUserI
   return {
     id: data.sub,
     email: data.email,
+    emailVerified: data.email_verified === true,
     name: data.name,
     picture: data.picture,
     provider: "google",
@@ -128,16 +131,24 @@ export async function getGithubUserInfo(accessToken: string): Promise<OAuthUserI
 
   const userData = (await userRes.json()) as GitHubUser;
   let email = userData.email ?? "";
+  let emailVerified = false;
 
-  if (!email && emailsRes.ok) {
+  if (emailsRes.ok) {
     const emails = (await emailsRes.json()) as GitHubEmail[];
     const primary = emails.find((e) => e.primary);
-    if (primary) email = primary.email;
+    if (primary) {
+      email = primary.email;
+      emailVerified = primary.verified === true;
+    } else if (email) {
+      const match = emails.find((e) => e.email === email);
+      if (match) emailVerified = match.verified === true;
+    }
   }
 
   return {
     id: String(userData.id),
     email,
+    emailVerified,
     name: userData.name ?? undefined,
     picture: userData.avatar_url,
     provider: "github",

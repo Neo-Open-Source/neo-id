@@ -13,7 +13,9 @@ import { EmailChangeModal } from "@/components/features/profile/EmailChangeModal
 import { NameChangeModal } from "@/components/features/profile/NameChangeModal";
 import { DeleteAccountModal } from "@/components/features/profile/DeleteAccountModal";
 import { ProfileSkeleton } from "@/components/ui/Skeleton";
+import { Switch } from "@/components/ui/Switch";
 import { useCachedQuery } from "@/hooks/useCachedQuery";
+import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
 import { localeNames } from "@/lib/i18n";
@@ -28,8 +30,13 @@ interface Profile {
   identities: Array<{ id: string; provider: string; createdAt: string }>;
 }
 
-export default function ProfilePage() {
-  const { t, locale } = useI18n();
+function ThemeSwitch() {
+  const { dark, setTheme } = useTheme();
+  const { t } = useI18n();
+  return <Switch checked={dark} onChange={setTheme} label={t.profile.darkMode} />;
+}
+
+export default function ProfilePage() {  const { t, locale } = useI18n();
   usePageTitle(t.pages.profile);
   const router = useRouter();
   const { data: profile, error: loadError, mutate, refresh } = useCachedQuery<Profile>("/user/profile");
@@ -123,7 +130,7 @@ export default function ProfilePage() {
       </section>
 
       <div className="profile-group">
-        <SettingsRow icon="user" label={t.profile.fullName} value={nameValue} onClick={() => setModal("name")} />
+        <SettingsRow icon="circle-user" label={t.profile.fullName} value={nameValue} onClick={() => setModal("name")} />
         <SettingsRow icon="envelope" label={t.profile.emailAddress} value={profile.email} onClick={() => setModal("email")} />
         <SettingsRow icon="at" label={t.profile.username} value={profile.username || t.common.notSet} onClick={() => setModal("username")} />
       </div>
@@ -131,22 +138,28 @@ export default function ProfilePage() {
       <div className="profile-group">
         <SettingsRow icon="apps" label={t.profile.appsAndAgents} value={profile.connectionCount > 0 ? String(profile.connectionCount) : undefined} href="/connected" />
         <SettingsRow icon="fingerprint" label={t.profile.passkeys} value={profile.passkeyCount > 0 ? String(profile.passkeyCount) : undefined} href="/profile/passkeys" />
-        <SettingsRow icon="shield" label={t.profile.twoFactor} value={securityStatus ? t.common.enabled : t.common.notEnabled} href="/profile/mfa" />
-        <SettingsRow icon="lock" label={t.profile.password} value={profile.hasPassword ? "••••••••" : t.common.notSet} onClick={() => setModal("password")} />
+        <SettingsRow icon="shield-check" label={t.profile.twoFactor} value={securityStatus ? t.common.enabled : t.common.notEnabled} href="/profile/mfa" />
+        <SettingsRow icon="password" label={t.profile.password} value={profile.hasPassword ? "••••••••" : t.common.notSet} onClick={() => setModal("password")} />
         <LoginMethodRows identities={profile.identities ?? []} onChanged={refresh} />
       </div>
 
       <div className="profile-group">
-        <SettingsRow icon="globe" label={t.profile.language} value={localeNames[locale]} href="/profile/language" className="md:hidden" />
+        <SettingsRow icon="globe-alt" label={t.profile.language} value={localeNames[locale]} href="/profile/language" className="mobile-only" />
+        <SettingsRow
+          icon="moon-star"
+          label={t.profile.darkMode}
+          value={<ThemeSwitch />}
+          className="mobile-only"
+        />
       </div>
 
-      <div className="profile-group">
+      <div className="profile-group mobile-only">
         <SettingsRow icon="document-signed" label={t.profile.terms} href="/terms" />
         <SettingsRow icon="lock" label={t.profile.privacy} href="/privacy" />
       </div>
 
       <div className="profile-actions">
-        <button type="button" className="profile-logout-btn" onClick={handleLogout} disabled={loggingOut}>{t.nav.logout}</button>
+        <button type="button" className="profile-logout-btn mobile-only" onClick={handleLogout} disabled={loggingOut}>{t.nav.logout}</button>
         <button type="button" className="profile-delete-link" onClick={handleExportAction}>{t.profile.exportData}</button>
         <button type="button" className="profile-delete-link" onClick={() => setModal("delete")}>{t.profile.deleteAccount}</button>
       </div>

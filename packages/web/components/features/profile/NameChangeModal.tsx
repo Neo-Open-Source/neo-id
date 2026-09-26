@@ -56,11 +56,15 @@ export function NameChangeModal({ open, initial, onClose, onSaved }: NameChangeM
       title={t.profile.updateName}
       description={t.profile.updateNameDesc}
       size="sm"
-      footerLayout="stacked"
       footer={
-        <Button className="modal-footer__primary" onClick={handleSave} loading={saving} disabled={!hasChanges}>
-          {t.profile.updateName}
-        </Button>
+        <>
+          <Button variant="ghost" onClick={() => onClose()} disabled={saving}>
+            {t.common.cancel}
+          </Button>
+          <Button onClick={handleSave} loading={saving} disabled={!hasChanges}>
+            {t.profile.updateName}
+          </Button>
+        </>
       }
     >
       <div className="modal-form">

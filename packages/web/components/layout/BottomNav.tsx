@@ -4,16 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { AvatarImage } from "@/components/ui/AvatarImage";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/cn";
 
 interface BottomNavProps {
   user?: { avatar?: string; email?: string; displayName?: string; role?: string } | null;
-  onLogout?: () => void | Promise<void>;
 }
 
-export function BottomNav({ user, onLogout }: BottomNavProps) {
+export function BottomNav({ user }: BottomNavProps) {
   const pathname = usePathname();
   const { t } = useI18n();
   const isAdmin = user?.role === "admin";
@@ -44,7 +42,7 @@ export function BottomNav({ user, onLogout }: BottomNavProps) {
           aria-current={isActive("/sessions") ? "page" : undefined}
           aria-label={t.nav.sessions}
         >
-          <Icon name="laptop" size={20} />
+          <Icon name="devices" size={20} />
         </Link>
 
         <Link
@@ -53,7 +51,7 @@ export function BottomNav({ user, onLogout }: BottomNavProps) {
           aria-current={isActive("/connected") ? "page" : undefined}
           aria-label={t.nav.connected}
         >
-          <Icon name="link" size={20} />
+          <Icon name="grid" size={20} />
         </Link>
 
         {isDev && (
@@ -63,7 +61,7 @@ export function BottomNav({ user, onLogout }: BottomNavProps) {
             aria-current={isActive("/developer") ? "page" : undefined}
             aria-label={t.nav.developer}
           >
-            <Icon name="terminal" size={20} />
+            <Icon name="square-terminal" size={20} />
           </Link>
         )}
 
@@ -74,23 +72,8 @@ export function BottomNav({ user, onLogout }: BottomNavProps) {
             aria-current={isActive("/admin") ? "page" : undefined}
             aria-label={t.nav.admin}
           >
-            <Icon name="shield" size={20} />
+            <Icon name="user-shield" size={20} />
           </Link>
-        )}
-
-        <div className="mobile-nav__item">
-          <ThemeToggle className="w-9 h-9" iconSize={18} showTooltip={false} />
-        </div>
-
-        {onLogout && (
-          <button
-            type="button"
-            onClick={onLogout}
-            className="mobile-nav__item mobile-nav__item--danger"
-            aria-label={t.nav.logout}
-          >
-            <Icon name="sign-out-alt" size={20} />
-          </button>
         )}
       </div>
     </nav>

@@ -7,7 +7,6 @@ function NeoLogo() {
   return (
     <svg
       viewBox="10 4 306 119"
-      width="auto"
       height="24"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
@@ -59,12 +58,17 @@ interface FooterLink {
 const ECOSYSTEM_LINKS: FooterLink[] = [
   { labelKey: "blog", href: "https://blog.neome.uk" },
   { labelKey: "api", href: "https://api.neome.uk" },
-  { labelKey: "neoid", href: "/" },
+  { labelKey: "neowatch", href: "https://watch.neome.uk" },
 ];
 
 const COMMUNITY_LINKS: FooterLink[] = [
   { labelKey: "telegram", href: "https://t.me/neomovies_news" },
   { labelKey: "github", href: "https://github.com/Neo-Open-Source" },
+];
+
+const LEGAL_LINKS: FooterLink[] = [
+  { labelKey: "tos", href: "/terms" },
+  { labelKey: "privacy", href: "/privacy" },
 ];
 
 export function Footer() {
@@ -77,11 +81,15 @@ export function Footer() {
       ? footer.blog
       : key === "api"
         ? footer.api
-        : key === "neoid"
-          ? footer.neoid
+        : key === "neowatch"
+          ? footer.neowatch
           : key === "telegram"
             ? footer.telegram
-            : footer.github;
+            : key === "tos"
+              ? footer.tos
+              : key === "privacy"
+                ? footer.privacy
+                : footer.github;
 
   const renderLink = (link: FooterLink) => {
     if (link.href.startsWith("/")) {
@@ -127,16 +135,18 @@ export function Footer() {
                 ))}
               </ul>
             </div>
+            <div className="footer__col">
+              <h3 className="footer__heading">{footer.legal}</h3>
+              <ul className="footer__list">
+                {LEGAL_LINKS.map((l) => (
+                  <li key={l.href}>{renderLink(l)}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
         <div className="footer__bottom">
           <span className="footer__copyright">{footer.copyright.replace("{{year}}", String(currentYear))}</span>
-          <Link href="/terms" className="footer__link">
-            {footer.tos}
-          </Link>
-          <Link href="/privacy" className="footer__link">
-            {footer.privacy}
-          </Link>
         </div>
       </div>
     </footer>

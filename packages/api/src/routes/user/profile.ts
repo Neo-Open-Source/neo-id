@@ -14,6 +14,7 @@ export async function getProfile(c: Context) {
         id: true,
         email: true,
         emailVerified: true,
+        ageVerified: true,
         username: true,
         displayName: true,
         firstName: true,
@@ -134,4 +135,17 @@ export async function updateProfile(c: Context) {
   });
 
   return success(c, updated);
+}
+
+export async function confirmAge(c: Context) {
+  const user = c.get("user");
+  const body = await c.req.json().catch(() => ({}));
+  if (body?.confirmed !== true) {
+    return error(c, "INVALID_REQUEST", "confirmed must be true");
+  }
+  await db.user.update({
+    where: { id: user.sub },
+    data: { ageVerified: true },
+  });
+  return success(c, { ageVerified: true });
 }

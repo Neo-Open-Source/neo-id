@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./flaticon.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -168,6 +167,48 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+}
+
+@utility panel-page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+@utility panel-page--narrow {
+  max-width: 28rem;
+}
+
+@utility docs-page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--color-app);
+}
+
+@utility docs-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  align-self: flex-start;
+  margin: 1rem 1.25rem 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 150ms;
+  &:hover {
+    color: var(--color-content);
+  }
+}
+
+@utility docs-page__frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: var(--color-app);
 }
 
 @utility spinner {

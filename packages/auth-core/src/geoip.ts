@@ -16,15 +16,32 @@ function isLocalIp(ip: string): boolean {
   return LOCAL_RANGES.some((re) => re.test(ip));
 }
 
+type GeoIpLookup = {
+  lookup: (ip: string) => { city?: string; country?: string; region?: string; timezone?: string; ll?: [number, number] } | null;
+};
+
+let geoipPromise: Promise<GeoIpLookup> | null = null;
+
+async function loadGeoip(): Promise<GeoIpLookup> {
+  if (!geoipPromise) {
+    geoipPromise = (async () => {
+      // @ts-expect-error — geoip-lite has no type declarations
+      const geoipLite = await import("geoip-lite");
+      return (geoipLite.default || geoipLite) as GeoIpLookup;
+    })();
+  }
+  return geoipPromise;
+}
+
+export function warmGeoIp(): void {
+  void loadGeoip().catch(() => {});
+}
+
 export async function lookupIp(ip: string): Promise<GeoLocation | null> {
   if (isLocalIp(ip)) return null;
 
   try {
-    // @ts-expect-error — geoip-lite has no type declarations
-    const geoipLite = await import("geoip-lite");
-    const geoip = (geoipLite.default || geoipLite) as {
-      lookup: (ip: string) => { city?: string; country?: string; region?: string; timezone?: string; ll?: [number, number] } | null;
-    };
+    const geoip = await loadGeoip();
     const geo = geoip.lookup(ip);
     if (!geo) return null;
 

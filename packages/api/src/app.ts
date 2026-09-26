@@ -4,6 +4,9 @@ import { requestIdMiddleware } from "./middleware/request-id";
 import { requireAuth } from "./middleware/auth";
 import { rateLimit } from "./middleware/rate-limit";
 import { startCleanup } from "./helpers/cleanup";
+import { warmGeoIp } from "@neo-id/auth-core";
+
+warmGeoIp();
 
 // Auth Routes
 import { register } from "./routes/auth/register";
@@ -14,8 +17,8 @@ import { startSocialOAuth, socialOAuthCallback, completeSocialOAuth, startSocial
 import { verifyEmail, verifyEmailByToken } from "./routes/auth/verify-email";
 
 // User Routes
-import { getProfile, updateProfile, checkUsername } from "./routes/user/profile";
-import { changePassword, requestProfilePasswordReset, verifyProfilePasswordReset, startProfilePasskeyResetChallenge } from "./routes/user/password";
+import { getProfile, updateProfile, checkUsername, confirmAge } from "./routes/user/profile";
+import { changePassword, requestProfilePasswordReset, verifyProfilePasswordReset, startProfilePasskeyResetChallenge, sendPasswordResetCode } from "./routes/user/password";
 import { uploadAvatar, deleteAvatar, setStockAvatar } from "./routes/user/avatar";
 import { getAvatarImage } from "./routes/user/avatar-image";
 import { deleteAccount, deleteChallenge, startDeletePasskey, sendDeleteCode } from "./routes/user/delete";
@@ -26,6 +29,7 @@ import { requestEmailChange, confirmEmailChange } from "./routes/user/email";
 
 // MFA Routes
 import { setupTotp, enableTotp, disableTotp } from "./routes/mfa/totp";
+import { mfaDisableChallenge, sendMfaDisableCode, startMfaDisablePasskey } from "./routes/mfa/disable";
 import { setupEmailMfa, enableEmailMfa, disableEmailMfa, resendLoginEmailMfa } from "./routes/mfa/email";
 import { verifyMfa } from "./routes/mfa/verify";
 
@@ -136,10 +140,12 @@ app.post("/api/v1/auth/oauth/complete", completeSocialOAuth);
 app.get("/api/v1/user/profile", requireAuth, getProfile);
 app.put("/api/v1/user/profile", requireAuth, updateProfile);
 app.get("/api/v1/user/username/check", requireAuth, checkUsername);
+app.post("/api/v1/user/age-consent", requireAuth, confirmAge);
 app.put("/api/v1/user/password", requireAuth, changePassword);
 app.post("/api/v1/user/password/reset", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), requestProfilePasswordReset);
 app.post("/api/v1/user/password/reset/verify", requireAuth, rateLimit("PROFILE_PASSWORD_RESET_MFA"), verifyProfilePasswordReset);
 app.post("/api/v1/user/password/reset/passkey/start", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), startProfilePasskeyResetChallenge);
+app.post("/api/v1/user/password/reset/send-code", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), sendPasswordResetCode);
 app.post("/api/v1/user/avatar", requireAuth, uploadAvatar);
 app.put("/api/v1/user/avatar/stock", requireAuth, setStockAvatar);
 app.get("/api/v1/user/avatar/image", requireAuth, getAvatarImage);
@@ -169,6 +175,9 @@ app.post("/api/v1/mfa/email/enable", requireAuth, enableEmailMfa);
 app.post("/api/v1/mfa/email/disable", requireAuth, disableEmailMfa);
 app.post("/api/v1/mfa/email/resend", resendLoginEmailMfa);
 app.post("/api/v1/mfa/verify", rateLimit("MFA"), verifyMfa);
+app.post("/api/v1/mfa/disable/challenge", requireAuth, mfaDisableChallenge);
+app.post("/api/v1/mfa/disable/send-code", requireAuth, sendMfaDisableCode);
+app.post("/api/v1/mfa/disable/passkey/start", requireAuth, startMfaDisablePasskey);
 
 // ─── Passkey Routes ──────────────────────────────────────────────────────────
 

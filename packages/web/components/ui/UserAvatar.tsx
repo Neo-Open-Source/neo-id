@@ -53,7 +53,7 @@ export function UserAvatar({ src, name, size = 32, className }: UserAvatarProps)
       className={cn("user-avatar user-avatar--fallback", className)}
       style={{ width: size, height: size, fontSize: size * 0.34 }}
     >
-      {initials || <Icon name="user" size={Math.round(size * 0.45)} />}
+      {initials || <Icon name="circle-user" size={Math.round(size * 0.45)} />}
     </div>
   );
 }

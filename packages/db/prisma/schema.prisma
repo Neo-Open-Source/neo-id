@@ -13,6 +13,7 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   emailVerified Boolean   @default(false)
+  ageVerified   Boolean   @default(false)
   username      String?
   passwordHash  String?
   displayName   String?

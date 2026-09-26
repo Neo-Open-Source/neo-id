@@ -90,20 +90,37 @@ export async function requestProfilePasswordReset(c: Context) {
     return error(c, "INVALID_REQUEST", "No 2FA methods enabled. Use current password to change it.");
   }
 
-  if (user.emailMfaEnabled) {
-    await createAndSendMfaCode(
-      user.id,
-      "profile_password_reset",
-      sendEmailCode,
-      user.email,
-    );
-  }
-
   return success(c, {
     mfaRequired: true,
     mfaMethods,
+    email: user.email,
     emailHint: user.emailMfaEnabled ? maskEmail(user.email) : undefined,
   });
+}
+
+export async function sendPasswordResetCode(c: Context) {
+  const authUser = c.get("user");
+
+  const user = await db.user.findUnique({
+    where: { id: authUser.sub },
+    select: { id: true, email: true, passwordHash: true, emailMfaEnabled: true },
+  });
+
+  if (!user?.passwordHash) {
+    return error(c, "INVALID_REQUEST", "No password set. Use a connected account.");
+  }
+  if (!user.emailMfaEnabled) {
+    return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
+  }
+
+  await createAndSendMfaCode(
+    user.id,
+    "profile_password_reset",
+    sendEmailCode,
+    user.email,
+  );
+
+  return success(c, { sent: true });
 }
 
 export async function verifyProfilePasswordReset(c: Context) {

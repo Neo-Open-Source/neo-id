@@ -12,6 +12,7 @@ import {
   verifyAndUseMfaCode,
   invalidatePendingCodes,
 } from "../../helpers/mfa-code";
+import { verifyActionByMethod } from "../../helpers/action-challenge";
 
 export async function setupEmailMfa(c: Context) {
   const user = c.get("user");
@@ -91,6 +92,17 @@ export async function disableEmailMfa(c: Context) {
   });
 
   if (!existing?.emailMfaEnabled) return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
+
+  const body = await c.req.json().catch(() => ({}));
+  const verified = await verifyActionByMethod(
+    user.sub,
+    String(body.method || ""),
+    body,
+    "mfa_disable",
+  );
+  if (!verified.ok) {
+    return error(c, verified.code, verified.message);
+  }
 
   await db.user.update({
     where: { id: user.sub },

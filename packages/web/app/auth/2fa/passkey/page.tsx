@@ -4,6 +4,7 @@ import { useCallback, useEffect, Suspense, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { setSessionTokens, getStoredRefreshToken, logoutSession } from "@/lib/api";
+import { clearAllCaches } from "@/lib/cache";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
@@ -34,6 +35,9 @@ function PasskeyContent() {
   const purpose = searchParams.get("purpose");
   const isExport = purpose === "export";
   const isDelete = purpose === "delete";
+  const isPasswordReset = purpose === "password-reset";
+  const isMfaDisable = purpose === "mfa-disable";
+  const disableTarget = searchParams.get("target") === "email" ? "email" : "totp";
   const redirect = resolveAuthRedirect(searchParams.get("redirect"));
   const redirectParam = redirect !== "/profile" ? `&redirect=${encodeURIComponent(redirect)}` : "";
   const [status, setStatus] = useState<"pending" | "failed">("pending");
@@ -66,9 +70,10 @@ function PasskeyContent() {
   }
 
   const authenticate = useCallback(async () => {
-    // Email is only needed for sign-in; export/delete identify the user by session.
-    if ((!email && !isExport && !isDelete) || !window.PublicKeyCredential || authenticatingRef.current) {
-      if ((!email && !isExport && !isDelete) || !window.PublicKeyCredential) setStatus("failed");
+    // Email is only needed for sign-in; export/delete/password-reset/mfa-disable identify the user by session.
+    const sessionAuthed = isExport || isDelete || isPasswordReset || isMfaDisable;
+    if ((!email && !sessionAuthed) || !window.PublicKeyCredential || authenticatingRef.current) {
+      if ((!email && !sessionAuthed) || !window.PublicKeyCredential) setStatus("failed");
       return;
     }
 
@@ -79,12 +84,16 @@ function PasskeyContent() {
         ? "/api/v1/user/export/passkey/start"
         : isDelete
           ? "/api/v1/user/delete/passkey/start"
-          : "/api/v1/passkeys/authenticate/start";
+          : isPasswordReset
+            ? "/api/v1/user/password/reset/passkey/start"
+            : isMfaDisable
+              ? "/api/v1/mfa/disable/passkey/start"
+              : "/api/v1/passkeys/authenticate/start";
       const start = await fetch(startPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(isExport || isDelete ? {} : { email }),
+        body: JSON.stringify(sessionAuthed ? {} : { email }),
       });
       const startPayload = await start.json();
       const options = startPayload.data;
@@ -104,6 +113,57 @@ function PasskeyContent() {
       if (!credential) throw new Error("credential unavailable");
 
       const assertion = buildAssertion(credential);
+
+      if (isMfaDisable) {
+        const finish = await fetch(
+          disableTarget === "email" ? "/api/v1/mfa/email/disable" : "/api/v1/mfa/totp/disable",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              method: "passkey",
+              expectedChallenge: options.challenge,
+              response: assertion,
+            }),
+          },
+        );
+        const result = await finish.json();
+        if (!finish.ok || !result.ok) throw new Error("passkey verification failed");
+        clearAllCaches();
+        router.replace("/profile/mfa");
+        return;
+      }
+
+      if (isPasswordReset) {
+        let pending: string | null = null;
+        try {
+          pending = sessionStorage.getItem("neo_id_pending_password_reset");
+        } catch {
+          pending = null;
+        }
+        if (!pending) throw new Error("password reset expired");
+        const finish = await fetch("/api/v1/user/password/reset/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            method: "passkey",
+            expectedChallenge: options.challenge,
+            response: assertion,
+            newPassword: pending,
+          }),
+        });
+        const result = await finish.json();
+        if (!finish.ok || !result.ok) throw new Error("passkey verification failed");
+        try {
+          sessionStorage.removeItem("neo_id_pending_password_reset");
+        } catch {
+          // ignore
+        }
+        router.replace("/profile/password");
+        return;
+      }
 
       if (isExport || isDelete) {
         const finish = await fetch(isExport ? "/api/v1/user/export" : "/api/v1/user", {
@@ -159,7 +219,7 @@ function PasskeyContent() {
     } finally {
       authenticatingRef.current = false;
     }
-  }, [email, isExport, isDelete, router, redirect]);
+  }, [email, isExport, isDelete, isPasswordReset, isMfaDisable, disableTarget, router, redirect]);
 
   useEffect(() => { authenticate(); }, [authenticate]);
 

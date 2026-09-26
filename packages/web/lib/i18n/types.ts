@@ -45,6 +45,10 @@ export interface Translations {
       ageConfirm: string;
       success: string;
     };
+    age: {
+      title: string;
+      subtitle: string;
+    };
     mfa: {
       title: string;
       subtitle: string;
@@ -93,6 +97,7 @@ export interface Translations {
     save: string;
     cancel: string;
     delete: string;
+    disable: string;
     edit: string;
     back: string;
     next: string;
@@ -148,9 +153,10 @@ export interface Translations {
   footer: {
     ecosystem: string;
     community: string;
+    legal: string;
     blog: string;
     api: string;
-    neoid: string;
+    neowatch: string;
     telegram: string;
     github: string;
     tos: string;
@@ -180,6 +186,12 @@ export interface Translations {
     exportDesc: string;
 
     deleteAccountDesc: string;
+    under16Instead: string;
+    under16Title: string;
+    under16Desc: string;
+    sendCode: string;
+    codeSent: string;
+    confirmDeleteAccount: string;
     editDisplayName: string;
     editUsername: string;
     editUsernameDesc: string;
@@ -273,6 +285,8 @@ export interface Translations {
     terms: string;
     privacy: string;
     language: string;
+    appearance: string;
+    darkMode: string;
     uploadPhotoHint: string;
     orChooseAvatar: string;
     cropPhoto: string;

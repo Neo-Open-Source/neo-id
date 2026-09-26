@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center font-medium rounded-button border-none cursor-pointer transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center font-medium rounded-full border-none cursor-pointer transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed",
   {
     variants: {
       variant: {
@@ -16,7 +16,7 @@ const buttonVariants = cva(
       },
       size: {
         sm: "px-3 py-1.5 text-xs gap-1.5",
-        md: "px-5 py-2.5 text-sm gap-2",
+        md: "px-4 py-1.5 text-[13px] gap-2",
         lg: "px-6 py-3 text-base gap-2",
       },
     },

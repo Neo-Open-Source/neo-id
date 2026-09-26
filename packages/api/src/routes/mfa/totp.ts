@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { generateTotpSecret, verifyTotp } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
+import { verifyActionByMethod } from "../../helpers/action-challenge";
 
 export async function setupTotp(c: Context) {
   const user = c.get("user");
@@ -83,6 +84,17 @@ export async function disableTotp(c: Context) {
 
   if (!dbUser?.totpEnabled) {
     return error(c, "MFA_NOT_ENABLED", "TOTP is not enabled");
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const verified = await verifyActionByMethod(
+    user.sub,
+    String(body.method || ""),
+    body,
+    "mfa_disable",
+  );
+  if (!verified.ok) {
+    return error(c, verified.code, verified.message);
   }
 
   await db.user.update({

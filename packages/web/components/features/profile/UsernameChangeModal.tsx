@@ -127,16 +127,19 @@ export function UsernameChangeModal({
       title={t.profile.editUsername}
       description={t.profile.editUsernameDesc}
       size="sm"
-      footerLayout="stacked"
       footer={
-        <Button
-          className="modal-footer__primary"
-          onClick={handleSave}
-          loading={saving}
-          disabled={availability !== "available" || saving}
-        >
-          {t.common.save}
-        </Button>
+        <>
+          <Button variant="ghost" onClick={() => onClose()} disabled={saving}>
+            {t.common.cancel}
+          </Button>
+          <Button
+            onClick={handleSave}
+            loading={saving}
+            disabled={availability !== "available" || saving}
+          >
+            {t.common.save}
+          </Button>
+        </>
       }
     >
       <div className="modal-form">

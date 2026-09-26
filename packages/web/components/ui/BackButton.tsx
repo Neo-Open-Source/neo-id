@@ -16,7 +16,7 @@ export function BackButton({ href, onClick, label = "Back", className }: BackBut
 
   const content = (
     <>
-      <Icon name="arrow-left" size={14} />
+      <Icon name="arrow-left" size={16} />
       <span>{label}</span>
     </>
   );
