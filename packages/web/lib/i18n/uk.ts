@@ -36,6 +36,8 @@ const uk: Translations = {
       success: "Пароль успішно скинуто",
       successDesc: "Ваш пароль оновлено. Тепер можна увійти з новим паролем.",
       passwordsMismatch: "Паролі не збігаються",
+      linkExpiredTitle: "Термін дії посилання минув",
+      linkExpiredDesc: "Посилання дійсні 15 хвилин. Запросіть нове, щоб продовжити.",
       passwordTooShort: "Пароль повинен містити щонайменше 8 символів",
     },
     register: {

@@ -36,6 +36,8 @@ const ru: Translations = {
       success: "Пароль успешно сброшен",
       successDesc: "Ваш пароль обновлен. Теперь можно войти с новым паролем.",
       passwordsMismatch: "Пароли не совпадают",
+      linkExpiredTitle: "Срок действия ссылки истёк",
+      linkExpiredDesc: "Ссылки действительны 15 минут. Запросите новую, чтобы продолжить.",
       passwordTooShort: "Пароль должен содержать не менее 8 символов",
     },
     register: {

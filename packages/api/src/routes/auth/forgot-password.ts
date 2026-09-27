@@ -183,6 +183,29 @@ export async function startPasskeyResetChallenge(c: Context) {
   return success(c, options);
 }
 
+export async function checkResetToken(c: Context) {
+  const token = String(c.req.query("token") || "").trim();
+  if (!token) return success(c, { valid: false });
+
+  const users = await db.user.findMany({
+    where: {
+      userMetadata: {
+        path: ["passwordResetToken"],
+        equals: token,
+      },
+    },
+    select: { id: true, userMetadata: true },
+  });
+
+  const user = users[0];
+  const meta = user?.userMetadata as Record<string, unknown> | undefined;
+  const expiresRaw = meta?.passwordResetExpires;
+  const expiresAt = typeof expiresRaw === "string" ? new Date(expiresRaw) : null;
+  const valid = Boolean(user) && expiresAt !== null && expiresAt > new Date();
+
+  return success(c, { valid });
+}
+
 export async function resetPassword(c: Context) {
   const body = await c.req.json();
   const token = String(body.token || "").trim();

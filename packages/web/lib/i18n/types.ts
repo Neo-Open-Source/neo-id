@@ -35,6 +35,8 @@ export interface Translations {
       successDesc: string;
       passwordsMismatch: string;
       passwordTooShort: string;
+      linkExpiredTitle: string;
+      linkExpiredDesc: string;
     };
     register: {
       title: string;

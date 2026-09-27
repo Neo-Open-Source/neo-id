@@ -36,6 +36,8 @@ const ro = {
       success: "Parola a fost resetată cu succes",
       successDesc: "Parola ta a fost actualizată. Acum te poți autentifica cu parola nouă.",
       passwordsMismatch: " parolele nu coincid",
+      linkExpiredTitle: "Linkul a expirat",
+      linkExpiredDesc: "Linkurile sunt valabile 15 minute. Solicită unul nou pentru a continua.",
       passwordTooShort: "Parola trebuie să aibă cel puțin 8 caractere",
     },
     register: {

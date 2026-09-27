@@ -36,6 +36,8 @@ const en = {
       success: "Password reset successfully",
       successDesc: "Your password has been updated. You can now sign in with your new password.",
       passwordsMismatch: "Passwords do not match",
+      linkExpiredTitle: "This link has expired",
+      linkExpiredDesc: "Reset links are valid for 15 minutes. Request a new one to continue.",
       passwordTooShort: "Password must be at least 8 characters",
     },
     register: {

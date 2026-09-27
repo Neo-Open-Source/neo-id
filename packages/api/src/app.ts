@@ -93,7 +93,7 @@ import {
 } from "./routes/device/verify";
 
 // Password Reset
-import { requestPasswordReset, verifyForgotPasswordMfa, startPasskeyResetChallenge, resetPassword } from "./routes/auth/forgot-password";
+import { requestPasswordReset, verifyForgotPasswordMfa, startPasskeyResetChallenge, checkResetToken, resetPassword } from "./routes/auth/forgot-password";
 
 const app = new Hono();
 
@@ -129,6 +129,7 @@ app.post("/api/v1/auth/forgot-password", rateLimit("FORGOT_PASSWORD"), requestPa
 app.post("/api/v1/auth/forgot-password/verify", rateLimit("FORGOT_PASSWORD_MFA"), verifyForgotPasswordMfa);
 app.post("/api/v1/auth/forgot-password/passkey/start", rateLimit("FORGOT_PASSWORD"), startPasskeyResetChallenge);
 app.post("/api/v1/auth/reset-password", rateLimit("RESET_PASSWORD"), resetPassword);
+app.get("/api/v1/auth/reset-password/validate", rateLimit("RESET_PASSWORD"), checkResetToken);
 
 app.get("/api/v1/auth/oauth/:provider", startSocialOAuth);
 app.post("/api/v1/auth/oauth/:provider/link", requireAuth, startSocialOAuthLink);

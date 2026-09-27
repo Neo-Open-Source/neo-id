@@ -21,11 +21,29 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tokenState, setTokenState] = useState<"checking" | "valid" | "invalid">("checking");
 
   useEffect(() => {
     const t = searchParams.get("token") || "";
     setToken(t);
-    if (!t) setError("Invalid or missing reset link");
+    if (!t) {
+      setTokenState("invalid");
+      return;
+    }
+    let cancelled = false;
+    api<{ valid?: boolean }>(`/auth/reset-password/validate?token=${encodeURIComponent(t)}`, {
+      method: "GET",
+      token: false,
+    })
+      .then((res) => {
+        if (!cancelled) setTokenState(res?.valid ? "valid" : "invalid");
+      })
+      .catch(() => {
+        if (!cancelled) setTokenState("invalid");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,6 +78,38 @@ export default function ResetPasswordPage() {
       setLoading(false);
     }
   };
+
+  if (tokenState === "checking") {
+    return (
+      <AuthLayout
+        title={t.auth.resetPassword.title}
+        subtitle={t.auth.resetPassword.subtitle}
+      >
+        <div className="flex flex-col items-center gap-5 py-8">
+          <div className="loading__spinner" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (tokenState === "invalid") {
+    return (
+      <AuthLayout
+        title={t.auth.resetPassword.linkExpiredTitle}
+        subtitle={t.auth.resetPassword.linkExpiredDesc}
+        onBack={() => router.push("/auth/forgot-password")}
+        backLabel={t.auth.forgotPassword.backToLogin}
+      >
+        <Button
+          type="button"
+          onClick={() => router.push("/auth/forgot-password")}
+          className="w-full"
+        >
+          {t.auth.forgotPassword.button}
+        </Button>
+      </AuthLayout>
+    );
+  }
 
   if (success) {
     return (
