@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
-import { hash, verify, verifyTotp } from "@neo-id/auth-core";
+import { hash, verify, verifyTotp, generateToken, hashToken } from "@neo-id/auth-core";
 import { changePasswordSchema } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
 import { validate } from "../../helpers/request";
@@ -93,7 +93,6 @@ export async function requestProfilePasswordReset(c: Context) {
   return success(c, {
     mfaRequired: true,
     mfaMethods,
-    email: user.email,
     emailHint: user.emailMfaEnabled ? maskEmail(user.email) : undefined,
   });
 }
@@ -130,14 +129,9 @@ export async function verifyProfilePasswordReset(c: Context) {
   const code = String(body.code || "").trim();
   const response = body.response;
   const expectedChallenge = body.expectedChallenge as string;
-  const newPassword = body.newPassword as string | undefined;
 
-  if (!method || !newPassword) {
-    return error(c, "INVALID_REQUEST", "method and newPassword are required");
-  }
-
-  if (newPassword.length < 8) {
-    return error(c, "INVALID_REQUEST", "Password must be at least 8 characters");
+  if (!method) {
+    return error(c, "INVALID_REQUEST", "method is required");
   }
 
   const user = await db.user.findUnique({
@@ -202,6 +196,59 @@ export async function verifyProfilePasswordReset(c: Context) {
     });
   } else {
     return error(c, "INVALID_REQUEST", "Invalid method. Use 'totp', 'email', or 'passkey'.");
+  }
+
+  const resetTicket = generateToken(32);
+  await db.oAuthState.create({
+    data: {
+      state: hashToken(resetTicket),
+      mode: "password_reset_ticket",
+      userId: user.id,
+      sessionId: authUser.session_id ?? null,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    },
+  });
+
+  return success(c, { ok: true, resetTicket });
+}
+
+export async function confirmProfilePasswordReset(c: Context) {
+  const authUser = c.get("user");
+  const body = await c.req.json();
+  const resetTicket = String(body.resetTicket || "").trim();
+  const newPassword = body.newPassword as string | undefined;
+
+  if (!resetTicket || !newPassword) {
+    return error(c, "INVALID_REQUEST", "resetTicket and newPassword are required");
+  }
+
+  if (newPassword.length < 8) {
+    return error(c, "INVALID_REQUEST", "Password must be at least 8 characters");
+  }
+
+  const ticket = await db.oAuthState.findUnique({
+    where: { state: hashToken(resetTicket) },
+  });
+
+  if (
+    !ticket ||
+    ticket.mode !== "password_reset_ticket" ||
+    ticket.userId !== authUser.sub ||
+    ticket.expiresAt < new Date() ||
+    (ticket.sessionId && authUser.session_id && ticket.sessionId !== authUser.session_id)
+  ) {
+    return error(c, "INVALID_REQUEST", "Invalid or expired reset ticket");
+  }
+
+  await db.oAuthState.delete({ where: { id: ticket.id } });
+
+  const user = await db.user.findUnique({
+    where: { id: authUser.sub },
+    select: { id: true, email: true, passwordHash: true },
+  });
+
+  if (!user?.passwordHash) {
+    return error(c, "INVALID_REQUEST", "No password set. Use a connected account.");
   }
 
   const newHash = await hash(newPassword);

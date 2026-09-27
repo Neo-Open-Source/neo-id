@@ -96,6 +96,7 @@ const ru: Translations = {
   },
   common: {
     loading: "Загрузка...",
+    skipToContent: "Перейти к основному содержимому",
     save: "Сохранить",
     cancel: "Отмена",
     delete: "Удалить",
@@ -235,6 +236,7 @@ const ru: Translations = {
     updateEmailAddress: "Обновите ваш email",
     currentEmail: "Текущий email",
     newEmail: "Новый email",
+    sameEmail: "Введите адрес, отличный от текущего email.",
     confirmWithPassword: "Подтвердите паролем",
     updateEmail: "Обновить email",
     linkedProviders: "Подключённые провайдеры",

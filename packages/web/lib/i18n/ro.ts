@@ -96,6 +96,7 @@ const ro = {
   },
   common: {
     loading: "Se încarcă...",
+    skipToContent: "Sari la conținutul principal",
     save: "Salvează",
     cancel: "Anulează",
     delete: "Șterge",
@@ -241,6 +242,7 @@ const ro = {
     updateEmailAddress: "Actualizează-ți adresa de email",
     currentEmail: "Emailul actual",
     newEmail: "Email nou",
+    sameEmail: "Introduceți o adresă diferită de emailul actual.",
     confirmWithPassword: "Confirmă cu parola",
     updateEmail: "Actualizează emailul",
     linkedProviders: "Furnizori conectați",

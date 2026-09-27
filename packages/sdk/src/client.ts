@@ -221,14 +221,20 @@ export class NeoIdClient {
     code?: string;
     response?: Record<string, unknown>;
     expectedChallenge?: string;
-    newPassword: string;
   }) {
+    return this.request<{
+      ok: boolean;
+      resetTicket: string;
+    }>("POST", "/api/v1/user/password/reset/verify", data);
+  }
+
+  async confirmProfilePasswordReset(data: { resetTicket: string; newPassword: string }) {
     return this.request<{
       ok: boolean;
       accessToken?: string;
       refreshToken?: string;
       idToken?: string;
-    }>("POST", "/api/v1/user/password/reset/verify", data);
+    }>("POST", "/api/v1/user/password/reset/confirm", data);
   }
 
   async startProfilePasskeyResetChallenge() {

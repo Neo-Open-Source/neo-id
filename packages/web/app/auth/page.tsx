@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthForm } from "@/components/features/auth/AuthForm";
-import { ensureSession } from "@/lib/api";
+import { ensureSession, hasSessionHint } from "@/lib/api";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 
 function AuthPageContent() {
@@ -14,9 +14,12 @@ function AuthPageContent() {
   const password = searchParams.get("password") === "true";
   const [checking, setChecking] = useState(true);
 
-  // Rehydrate session from cookie / localStorage so a closed tab doesn't
-  // leave the user stuck on /auth while a valid refresh token still exists.
+  // Skip the session check for logged-out visitors (no session hint → no refresh).
   useEffect(() => {
+    if (!hasSessionHint()) {
+      setChecking(false);
+      return;
+    }
     let cancelled = false;
     ensureSession()
       .then((ok) => {

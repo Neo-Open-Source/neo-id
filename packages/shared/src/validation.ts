@@ -89,6 +89,10 @@ export const verifyProfilePasswordResetSchema = z.object({
   code: z.string().min(1).optional(),
   response: z.any().optional(),
   expectedChallenge: z.string().optional(),
+});
+
+export const confirmProfilePasswordResetSchema = z.object({
+  resetTicket: z.string().min(1),
   newPassword: z
     .string()
     .min(PASSWORD.MIN_LENGTH, `Password must be at least ${PASSWORD.MIN_LENGTH} characters`)
@@ -145,6 +149,7 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type RequestProfilePasswordResetInput = z.infer<typeof requestProfilePasswordResetSchema>;
 export type VerifyProfilePasswordResetInput = z.infer<typeof verifyProfilePasswordResetSchema>;
+export type ConfirmProfilePasswordResetInput = z.infer<typeof confirmProfilePasswordResetSchema>;
 export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type CreateServiceAppInput = z.infer<typeof createServiceAppSchema>;

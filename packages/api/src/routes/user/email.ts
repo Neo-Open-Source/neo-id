@@ -6,8 +6,23 @@ import { sendEmailCode } from "../../helpers/email";
 import { error, success } from "../../helpers/response";
 import { validate } from "../../helpers/request";
 import { normalizeEmail, maskEmail, verifyAndUseMfaCode } from "../../helpers/mfa-code";
+import { getAvailableMethods } from "../../helpers/action-challenge";
 
 const EMAIL_CHANGE_PURPOSE = "email_change";
+
+export async function emailChangeChallenge(c: Context) {
+  const user = c.get("user");
+
+  const dbUser = await db.user.findUnique({
+    where: { id: user.sub },
+    select: { email: true },
+  });
+
+  if (!dbUser) return error(c, "USER_NOT_FOUND", "User not found", 404);
+
+  const methods = await getAvailableMethods(user.sub);
+  return success(c, { mfaRequired: true, methods, emailHint: dbUser.email });
+}
 
 export async function requestEmailChange(c: Context) {
   const user = c.get("user");
@@ -18,7 +33,7 @@ export async function requestEmailChange(c: Context) {
   const newEmail = normalizeEmail(parsed.data.newEmail);
   const current = await db.user.findUnique({ where: { id: user.sub }, select: { email: true } });
   if (!current) return error(c, "USER_NOT_FOUND", "User not found", 404);
-  if (current.email === newEmail) return error(c, "INVALID_REQUEST", "New email must be different");
+  if (current.email === newEmail) return error(c, "SAME_EMAIL", "New email must be different");
 
   const taken = await db.user.findUnique({ where: { email: newEmail }, select: { id: true } });
   if (taken) return error(c, "EMAIL_ALREADY_EXISTS", "Email is already registered", 409);

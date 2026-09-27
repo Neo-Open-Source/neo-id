@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { verify } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
+import { maskEmail } from "../../helpers/mfa-code";
 import {
   getAvailableMethods,
   sendActionCode,
@@ -26,7 +27,7 @@ export async function deleteChallenge(c: Context) {
   if (!dbUser) return error(c, "USER_NOT_FOUND", "User not found", 404);
 
   const methods = await getAvailableMethods(user.sub);
-  return success(c, { mfaRequired: true, methods, emailHint: dbUser.email });
+  return success(c, { mfaRequired: true, methods, emailHint: maskEmail(dbUser.email) });
 }
 
 /** WebAuthn assertion options for verifying account deletion with a passkey. */

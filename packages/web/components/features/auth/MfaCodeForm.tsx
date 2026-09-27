@@ -48,6 +48,7 @@ export function MfaCodeForm({
   const isPasswordReset = purpose === "password-reset";
   const isMfaDisable = purpose === "mfa-disable";
   const disableTarget = searchParams.get("target") === "email" ? "email" : "totp";
+  const emailHint = searchParams.get("emailHint") || "";
   const iconName = method === "totp" ? "shield" : "envelope";
   const title = isExport || isDelete
     ? (isExport ? t.profile.exportData : t.profile.deleteAccount)
@@ -70,7 +71,7 @@ export function MfaCodeForm({
       ? `${t.auth.mfa.verifyEmailSubtitle} ${email}`.trim()
       : (method === "totp"
         ? t.auth.mfa.totpSubtitle
-        : `${t.auth.mfa.emailSubtitle} ${email}`.trim()));
+        : `${t.auth.mfa.emailSubtitle} ${emailHint || email}`.trim()));
   const label = method === "totp" ? t.auth.mfa.totp : t.auth.mfa.emailCode;
 
   useEffect(() => {
@@ -129,28 +130,23 @@ export function MfaCodeForm({
       }
 
       if (isPasswordReset) {
-        let pending: string | null = null;
-        try {
-          pending = sessionStorage.getItem("neo_id_pending_password_reset");
-        } catch {
-          pending = null;
-        }
-        if (!pending) {
+        const res = await api<{ resetTicket?: string }>("/user/password/reset/verify", {
+          method: "POST",
+          body: { method, code },
+        });
+        if (!res?.resetTicket) {
           toast.error(t.common.error);
           router.push("/profile/password");
           return;
         }
-        await api("/user/password/reset/verify", {
-          method: "POST",
-          body: { method, code, newPassword: pending },
-        });
         try {
-          sessionStorage.removeItem("neo_id_pending_password_reset");
+          sessionStorage.setItem("neo_id_password_reset_ticket", res.resetTicket);
         } catch {
-          // ignore
+          toast.error(t.common.error);
+          router.push("/profile/password");
+          return;
         }
-        toast.success(t.profile.resetPasswordSuccess);
-        router.push("/profile/password");
+        router.push("/profile/password/reset");
         return;
       }
 

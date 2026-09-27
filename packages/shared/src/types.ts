@@ -173,6 +173,7 @@ export type ErrorCode =
   | "USER_NOT_FOUND"
   | "USER_BANNED"
   | "EMAIL_ALREADY_EXISTS"
+  | "SAME_EMAIL"
   | "USERNAME_TAKEN"
   | "PASSWORD_TOO_WEAK"
   | "RATE_LIMITED"

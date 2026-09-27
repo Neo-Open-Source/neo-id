@@ -18,14 +18,14 @@ import { verifyEmail, verifyEmailByToken } from "./routes/auth/verify-email";
 
 // User Routes
 import { getProfile, updateProfile, checkUsername, confirmAge } from "./routes/user/profile";
-import { changePassword, requestProfilePasswordReset, verifyProfilePasswordReset, startProfilePasskeyResetChallenge, sendPasswordResetCode } from "./routes/user/password";
+import { changePassword, requestProfilePasswordReset, verifyProfilePasswordReset, confirmProfilePasswordReset, startProfilePasskeyResetChallenge, sendPasswordResetCode } from "./routes/user/password";
 import { uploadAvatar, deleteAvatar, setStockAvatar } from "./routes/user/avatar";
 import { getAvatarImage } from "./routes/user/avatar-image";
 import { deleteAccount, deleteChallenge, startDeletePasskey, sendDeleteCode } from "./routes/user/delete";
 import { exportUserData, exportChallenge, startExportPasskey, sendExportCode } from "./routes/user/export";
 import { listIdentities, disconnectIdentity } from "./routes/user/identities";
 import { listConnections, revokeConnection } from "./routes/user/connections";
-import { requestEmailChange, confirmEmailChange } from "./routes/user/email";
+import { requestEmailChange, confirmEmailChange, emailChangeChallenge } from "./routes/user/email";
 
 // MFA Routes
 import { setupTotp, enableTotp, disableTotp } from "./routes/mfa/totp";
@@ -144,6 +144,7 @@ app.post("/api/v1/user/age-consent", requireAuth, confirmAge);
 app.put("/api/v1/user/password", requireAuth, changePassword);
 app.post("/api/v1/user/password/reset", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), requestProfilePasswordReset);
 app.post("/api/v1/user/password/reset/verify", requireAuth, rateLimit("PROFILE_PASSWORD_RESET_MFA"), verifyProfilePasswordReset);
+app.post("/api/v1/user/password/reset/confirm", requireAuth, rateLimit("PROFILE_PASSWORD_RESET_MFA"), confirmProfilePasswordReset);
 app.post("/api/v1/user/password/reset/passkey/start", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), startProfilePasskeyResetChallenge);
 app.post("/api/v1/user/password/reset/send-code", requireAuth, rateLimit("PROFILE_PASSWORD_RESET"), sendPasswordResetCode);
 app.post("/api/v1/user/avatar", requireAuth, uploadAvatar);
@@ -159,6 +160,7 @@ app.post("/api/v1/user/export/challenge", requireAuth, exportChallenge);
 app.post("/api/v1/user/export/passkey/start", requireAuth, startExportPasskey);
 app.post("/api/v1/user/export/send-code", requireAuth, sendExportCode);
 app.post("/api/v1/user/email/change/request", requireAuth, requestEmailChange);
+app.post("/api/v1/user/email/change/challenge", requireAuth, emailChangeChallenge);
 app.post("/api/v1/user/email/change/confirm", requireAuth, confirmEmailChange);
 app.get("/api/v1/user/identities", requireAuth, listIdentities);
 app.delete("/api/v1/user/identities/:provider", requireAuth, disconnectIdentity);

@@ -96,6 +96,7 @@ const en = {
   },
   common: {
     loading: "Loading...",
+    skipToContent: "Skip to main content",
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
@@ -235,6 +236,7 @@ const en = {
     updateEmailAddress: "Update your email address",
     currentEmail: "Current email",
     newEmail: "New email",
+    sameEmail: "Enter an email address different from your current email.",
     confirmWithPassword: "Confirm with password",
     updateEmail: "Update email",
     linkedProviders: "Linked providers",

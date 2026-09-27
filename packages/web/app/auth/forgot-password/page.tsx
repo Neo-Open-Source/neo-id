@@ -57,8 +57,6 @@ export default function ForgotPasswordPage() {
       <AuthLayout
         title={t.auth.forgotPassword.success}
         subtitle={t.auth.forgotPassword.sentTo.replace("{{email}}", email)}
-        onBack={backToLogin}
-        backLabel={t.auth.forgotPassword.backToLogin}
       >
         <div className="flex flex-col gap-5">
           <div className="flex items-center justify-center w-16 h-16 mx-auto rounded-full bg-success/12">

@@ -16,9 +16,12 @@ const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 function createPrismaClient() {
   const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 5,
+    // Serverless: one instance serves one request at a time; keep the pool
+    // small so concurrent cold starts don't exhaust Neon connections.
+    max: 3,
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
+    // Neon scale-to-zero wake-ups can take several seconds on first touch.
+    connectionTimeoutMillis: 30_000,
   });
 
   pool.on("error", (err) => {
@@ -31,7 +34,7 @@ function createPrismaClient() {
 
 export const db = globalForPrisma.prisma || createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+globalForPrisma.prisma = db;
 
 // ─── User Helpers ────────────────────────────────────────────────────────────
 

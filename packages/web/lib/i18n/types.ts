@@ -94,6 +94,7 @@ export interface Translations {
   };
   common: {
     loading: string;
+    skipToContent: string;
     save: string;
     cancel: string;
     delete: string;
@@ -242,6 +243,7 @@ export interface Translations {
     updateEmailAddress: string;
     currentEmail: string;
     newEmail: string;
+    sameEmail: string;
     confirmWithPassword: string;
     updateEmail: string;
     linkedProviders: string;

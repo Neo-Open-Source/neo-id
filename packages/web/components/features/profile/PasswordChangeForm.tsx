@@ -13,13 +13,14 @@ interface PasswordChangeFormProps {
   onCancel?: () => void;
   compact?: boolean;
   hasPassword?: boolean;
+  resetMode?: boolean;
 }
 
-export const PENDING_PASSWORD_RESET_KEY = "neo_id_pending_password_reset";
+export const PASSWORD_RESET_TICKET_KEY = "neo_id_password_reset_ticket";
 
 type MfaMethod = "totp" | "email" | "passkey";
 
-export function PasswordChangeForm({ onSuccess, onCancel, compact, hasPassword: initialHasPassword }: PasswordChangeFormProps) {
+export function PasswordChangeForm({ onSuccess, onCancel, compact, hasPassword: initialHasPassword, resetMode = false }: PasswordChangeFormProps) {
   const { t } = useI18n();
   const router = useRouter();
   const [hasPassword] = useState(initialHasPassword ?? true);
@@ -31,35 +32,19 @@ export function PasswordChangeForm({ onSuccess, onCancel, compact, hasPassword: 
   const [formError, setFormError] = useState<string | null>(null);
 
   const requestMfaReset = async () => {
-    if (newPassword !== confirmPassword) {
-      setFormError(t.profile.passwordsMismatch);
-      return;
-    }
-    if (!newPassword || newPassword.length < 8) {
-      setFormError(t.auth.resetPassword.passwordTooShort);
-      return;
-    }
     setSaving(true);
     setFormError(null);
     try {
-      const res = await api<{ mfa_required: boolean; mfa_methods: MfaMethod[]; email?: string; email_hint?: string }>(
+      const res = await api<{ mfaRequired: boolean; mfaMethods: MfaMethod[]; emailHint?: string }>(
         "/user/password/reset",
         { method: "POST" }
       );
-      if (res.mfa_required) {
-        try {
-          sessionStorage.setItem(PENDING_PASSWORD_RESET_KEY, newPassword);
-        } catch {
-          setFormError(t.common.error);
-          setSaving(false);
-          return;
-        }
+      if (res.mfaRequired) {
         const params = new URLSearchParams({
           purpose: "password-reset",
-          email: res.email || "",
-          methods: (res.mfa_methods || []).join(","),
+          methods: (res.mfaMethods || []).join(","),
         });
-        if (res.email_hint) params.set("emailHint", res.email_hint);
+        if (res.emailHint) params.set("emailHint", res.emailHint);
         router.push(`/auth/2fa?${params.toString()}`);
       }
     } catch (e) {
@@ -76,6 +61,46 @@ export function PasswordChangeForm({ onSuccess, onCancel, compact, hasPassword: 
     if (saving) return;
     if (newPassword !== confirmPassword) {
       setFormError(t.profile.passwordsMismatch);
+      return;
+    }
+    if (resetMode) {
+      if (!newPassword || newPassword.length < 8) {
+        setFormError(t.auth.resetPassword.passwordTooShort);
+        return;
+      }
+      let resetTicket: string | null = null;
+      try {
+        resetTicket = sessionStorage.getItem(PASSWORD_RESET_TICKET_KEY);
+      } catch {
+        resetTicket = null;
+      }
+      if (!resetTicket) {
+        setFormError(t.common.error);
+        return;
+      }
+      setSaving(true);
+      setFormError(null);
+      try {
+        await api("/user/password/reset/confirm", {
+          method: "POST",
+          body: { resetTicket, newPassword },
+        });
+        try {
+          sessionStorage.removeItem(PASSWORD_RESET_TICKET_KEY);
+        } catch {
+          // ignore
+        }
+        setNewPassword("");
+        setConfirmPassword("");
+        toast.success(t.profile.resetPasswordSuccess);
+        onSuccess?.();
+      } catch (err) {
+        const msg = err instanceof ApiError ? err.message : t.common.error;
+        setFormError(msg);
+        toast.error(msg);
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     setSaving(true);
@@ -96,12 +121,16 @@ export function PasswordChangeForm({ onSuccess, onCancel, compact, hasPassword: 
     }
   };
 
-  const canSubmit = newPassword && confirmPassword && (!hasPassword || currentPassword);
-  const submitLabel = hasPassword ? t.profile.updatePassword : t.profile.setPassword;
+  const canSubmit = resetMode
+    ? newPassword && confirmPassword
+    : newPassword && confirmPassword && (!hasPassword || currentPassword);
+  const submitLabel = resetMode
+    ? t.profile.resetPassword
+    : hasPassword ? t.profile.updatePassword : t.profile.setPassword;
 
   return (
     <form onSubmit={handleSubmit} className="password-form">
-      {hasPassword && (
+      {hasPassword && !resetMode && (
         <Input
           label={t.profile.currentPassword}
           type="password"
@@ -152,7 +181,7 @@ export function PasswordChangeForm({ onSuccess, onCancel, compact, hasPassword: 
         </Button>
       </div>
 
-      {hasPassword && (
+      {hasPassword && !resetMode && (
         <button
           type="button"
           className="password-form__forgot-link"

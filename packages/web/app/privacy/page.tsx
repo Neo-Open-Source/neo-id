@@ -1,10 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
-import { BackButton } from "@/components/ui/BackButton";
+import { LegalNav } from "@/components/layout/LegalNav";
 import { Footer } from "@/components/layout/Footer";
-import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
 import { usePageTitle } from "@/lib/use-page-title";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -61,15 +59,11 @@ function Section({ title, body }: { title: string; body: string }) {
 }
 
 export default function PrivacyPage() {
-  const router = useRouter();
   const { t } = useI18n();
   usePageTitle(t.pages.privacy);
   return (
     <div className="legal-root">
-      <nav className="legal-nav">
-        <BackButton onClick={() => { if (window.history.length > 1) router.back(); else router.push("/profile"); }} label={t.legal.back} className="legal-back" />
-        <LanguagePicker />
-      </nav>
+      <LegalNav />
 
       <main className="legal-main">
         <header className="legal-header">

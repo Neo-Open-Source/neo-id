@@ -2,12 +2,10 @@ import type { Context } from "hono";
 import { db } from "@neo-id/db";
 import { hash, verifyTotp } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
-import { sendPasswordResetEmail, sendEmailCode } from "../../helpers/email";
+import { sendPasswordResetEmail } from "../../helpers/email";
 import { generateAuthenticationOpts, verifyAuthentication } from "@neo-id/auth-core";
 import {
-  createAndSendMfaCode,
   verifyAndUseMfaCode,
-  maskEmail,
 } from "../../helpers/mfa-code";
 import crypto from "node:crypto";
 
@@ -37,36 +35,7 @@ export async function requestPasswordReset(c: Context) {
     return success(c, { sent: true });
   }
 
-  const hasMfa = user.totpEnabled || user.emailMfaEnabled;
-
-  if (!hasMfa) {
-    return sendResetLink(c, user.id, user.email);
-  }
-
-  const mfaMethods: string[] = [];
-  if (user.totpEnabled) mfaMethods.push("totp");
-  if (user.emailMfaEnabled) mfaMethods.push("email");
-
-  const passkeys = await db.passkey.findMany({
-    where: { userId: user.id },
-    select: { id: true },
-  });
-  if (passkeys.length > 0) mfaMethods.push("passkey");
-
-  if (user.emailMfaEnabled) {
-    await createAndSendMfaCode(
-      user.id,
-      "forgot_password",
-      sendEmailCode,
-      user.email,
-    );
-  }
-
-  return success(c, {
-    mfaRequired: true,
-    mfaMethods,
-    emailHint: user.emailMfaEnabled ? maskEmail(user.email) : undefined,
-  });
+  return sendResetLink(c, user.id, user.email);
 }
 
 async function sendResetLink(c: Context, userId: string, email: string) {

@@ -53,7 +53,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="hidden md:block">
         <Header user={user ?? null} onLogout={handleLogout} />
       </div>
-      <main className="dashboard-main flex-1 md:pt-[52px]">
+      <main id="main-content" className="dashboard-main flex-1 md:pt-[52px]">
         <div className="dashboard-content w-full max-w-272 mx-auto px-10 py-14 max-md:px-4 max-md:pt-6 max-md:pb-10">
           {children}
         </div>

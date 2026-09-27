@@ -136,13 +136,6 @@ function PasskeyContent() {
       }
 
       if (isPasswordReset) {
-        let pending: string | null = null;
-        try {
-          pending = sessionStorage.getItem("neo_id_pending_password_reset");
-        } catch {
-          pending = null;
-        }
-        if (!pending) throw new Error("password reset expired");
         const finish = await fetch("/api/v1/user/password/reset/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -151,17 +144,18 @@ function PasskeyContent() {
             method: "passkey",
             expectedChallenge: options.challenge,
             response: assertion,
-            newPassword: pending,
           }),
         });
         const result = await finish.json();
-        if (!finish.ok || !result.ok) throw new Error("passkey verification failed");
-        try {
-          sessionStorage.removeItem("neo_id_pending_password_reset");
-        } catch {
-          // ignore
+        if (!finish.ok || !result.ok || !result.data?.resetTicket) {
+          throw new Error("passkey verification failed");
         }
-        router.replace("/profile/password");
+        try {
+          sessionStorage.setItem("neo_id_password_reset_ticket", result.data.resetTicket);
+        } catch {
+          throw new Error("password reset expired");
+        }
+        router.replace("/profile/password/reset");
         return;
       }
 

@@ -40,7 +40,10 @@ export function startCleanup() {
   if (started) return;
   started = true;
 
-  runCleanup().catch((err) => console.error("[cleanup] error:", err));
+  // Deferred so it never competes with the cold-start request for connections.
+  setTimeout(() => {
+    runCleanup().catch((err) => console.error("[cleanup] error:", err));
+  }, 60_000);
 
   setInterval(() => {
     runCleanup().catch((err) => console.error("[cleanup] error:", err));

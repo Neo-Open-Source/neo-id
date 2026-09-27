@@ -46,15 +46,26 @@ export default function ProfilePage() {  const { t, locale } = useI18n();
   const [exportRedirecting, setExportRedirecting] = useState(false);
 
   const [modal, setModal] = useState<"name" | "username" | "email" | "password" | "delete" | null>(null);
+  const [passwordResetArmed, setPasswordResetArmed] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const linked = params.get("oauth_linked");
-    if (!linked) return;
-    refresh();
-    params.delete("oauth_linked");
-    const next = params.toString();
-    window.history.replaceState({}, "", next ? `?${next}` : window.location.pathname);
+    let changed = false;
+    if (params.get("oauth_linked")) {
+      refresh();
+      params.delete("oauth_linked");
+      changed = true;
+    }
+    if (params.get("reset") === "1") {
+      params.delete("reset");
+      setPasswordResetArmed(true);
+      setModal("password");
+      changed = true;
+    }
+    if (changed) {
+      const next = params.toString();
+      window.history.replaceState({}, "", next ? `?${next}` : window.location.pathname);
+    }
   }, [refresh]);
 
   const handleAvatarUpload = useCallback(async (file: File) => {
@@ -186,15 +197,16 @@ export default function ProfilePage() {  const { t, locale } = useI18n();
 
       <Modal
         open={modal === "password"}
-        onClose={() => setModal(null)}
+        onClose={() => { setModal(null); setPasswordResetArmed(false); }}
         title={t.profile.changePassword}
         description={profile.hasPassword ? t.profile.updateYourPassword : t.profile.setPasswordForAccount}
         size="sm"
       >
         <PasswordChangeForm
           compact
-          onCancel={() => setModal(null)}
-          onSuccess={() => { refresh(); setModal(null); }}
+          resetMode={passwordResetArmed}
+          onCancel={() => { setModal(null); setPasswordResetArmed(false); }}
+          onSuccess={() => { refresh(); setModal(null); setPasswordResetArmed(false); }}
         />
       </Modal>
 

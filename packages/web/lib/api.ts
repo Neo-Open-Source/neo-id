@@ -17,8 +17,6 @@ let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 let pendingRefreshToken: string | null = null;
 
-let _bootPromise: Promise<boolean> | null = null;
-
 function readStoredRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -39,6 +37,33 @@ function writeStoredRefreshToken(token: string | null) {
   } catch {
     // private mode / blocked storage — memory fallback only
   }
+}
+
+const SESSION_HINT_COOKIE = "neo_id_session";
+
+function readSessionHintCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    return document.cookie
+      .split(";")
+      .some((part) => part.trim().startsWith(`${SESSION_HINT_COOKIE}=`));
+  } catch {
+    return false;
+  }
+}
+
+function clearSessionHintCookie() {
+  if (typeof document === "undefined") return;
+  try {
+    document.cookie = `${SESSION_HINT_COOKIE}=; Max-Age=0; path=/`;
+  } catch {
+    // ignore
+  }
+}
+
+/** True when a session might exist (marker cookie or stored refresh token). */
+export function hasSessionHint(): boolean {
+  return readSessionHintCookie() || readStoredRefreshToken() !== null;
 }
 
 function getJwtExpiry(token: string): number | null {
@@ -164,6 +189,7 @@ async function refreshSession(): Promise<string | null> {
           // the fresher token instead of giving up the whole session.
           if (pendingRefreshToken !== readStoredRefreshToken()) continue;
           writeStoredRefreshToken(null);
+          clearSessionHintCookie();
           return null;
         }
         // Server error (5xx) or network issue — retry
@@ -199,6 +225,7 @@ export async function logoutSession(): Promise<void> {
   accessToken = null;
   writeStoredAccessToken(null);
   writeStoredRefreshToken(null);
+  clearSessionHintCookie();
   try {
     await fetch(`${API_BASE}/auth/logout`, {
       method: "POST",
@@ -211,8 +238,6 @@ export async function logoutSession(): Promise<void> {
 }
 
 async function fetchWithRetry<T>(path: string, init: RequestInit, token: boolean): Promise<T> {
-  void (_bootPromise ?? Promise.resolve(false));
-
   const headers = new Headers(init.headers);
   if (token && accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
@@ -294,7 +319,7 @@ export async function hasSession(): Promise<boolean> {
   }
 }
 
-// Rehydrate the access token in the background at import time.
-if (typeof window !== "undefined") {
-  _bootPromise = ensureSession();
+// Background rehydration, skipped entirely when logged out (no session hint).
+if (typeof window !== "undefined" && hasSessionHint()) {
+  void ensureSession();
 }

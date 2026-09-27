@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
-import { AvatarImage, DEFAULT_AVATAR } from "./AvatarImage";
+import { AvatarImage } from "./AvatarImage";
 import { AvatarCrop } from "./AvatarCrop";
 import { useI18n } from "@/lib/i18n/context";
 import { api, apiUpload, ApiError } from "@/lib/api";
@@ -50,7 +50,7 @@ export function AvatarUpload({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currentSrc = src || DEFAULT_AVATAR;
+  const currentSrc = src ?? null;
   const displayPreview = preview || selected || currentSrc;
 
   const reset = () => {
@@ -123,7 +123,7 @@ export function AvatarUpload({
     }
   };
 
-  const avatarInner = <AvatarImage src={currentSrc} name={name} size={size} />;
+  const avatarInner = <AvatarImage src={currentSrc} name={name} size={size} fallbackSrc={null} />;
 
   if (!menuStyle) {
     return (
@@ -163,6 +163,7 @@ export function AvatarUpload({
           setModalOpen(false);
         }}
         title={step === "crop" ? t.profile.cropPhoto : t.profile.changePhoto}
+        size="sm"
         footer={
           step === "crop" ? undefined : (
             <>
@@ -204,7 +205,11 @@ export function AvatarUpload({
               aria-label={t.profile.uploadPhoto}
             >
               <div className="avatar avatar--md">
-                <Image src={displayPreview} alt="" width={96} height={96} className="avatar__image" unoptimized />
+                {displayPreview ? (
+                  <Image src={displayPreview} alt="" width={96} height={96} className="avatar__image" unoptimized />
+                ) : (
+                  <div className="avatar avatar--md skeleton" aria-hidden="true" />
+                )}
               </div>
             </button>
             <p className="avatar-picker__hint">{t.profile.uploadPhotoHint}</p>

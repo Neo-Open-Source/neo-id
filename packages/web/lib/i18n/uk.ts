@@ -96,6 +96,7 @@ const uk: Translations = {
   },
   common: {
     loading: "Завантаження...",
+    skipToContent: "Перейти до основного вмісту",
     save: "Зберегти",
     cancel: "Скасувати",
     delete: "Видалити",
@@ -235,6 +236,7 @@ const uk: Translations = {
     updateEmailAddress: "Оновіть ваш email",
     currentEmail: "Поточний email",
     newEmail: "Новий email",
+    sameEmail: "Введіть адресу, яка відрізняється від поточного email.",
     confirmWithPassword: "Підтвердіть паролем",
     updateEmail: "Оновити email",
     linkedProviders: "Підключені провайдери",

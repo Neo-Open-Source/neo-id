@@ -4,6 +4,8 @@ import { TOKEN } from "@neo-id/shared";
 
 export const ACCESS_COOKIE = "neo_id_access";
 export const REFRESH_COOKIE = "neo_id_refresh";
+// Readable marker (no sensitive data): lets the client skip refresh when logged out.
+export const SESSION_HINT_COOKIE = "neo_id_session";
 
 function baseCookieOpts() {
   // Always Secure on HTTPS production hosts; NODE_ENV alone can lag behind
@@ -32,6 +34,12 @@ export function setAuthCookies(
 
   setCookie(c, ACCESS_COOKIE, tokens.accessToken, { ...opts, maxAge });
   setCookie(c, REFRESH_COOKIE, tokens.refreshToken, { ...opts, maxAge });
+  setCookie(c, SESSION_HINT_COOKIE, "1", {
+    secure: opts.secure,
+    sameSite: opts.sameSite,
+    path: "/",
+    maxAge,
+  });
 }
 
 export function clearAuthCookies(c: Context) {
@@ -39,6 +47,7 @@ export function clearAuthCookies(c: Context) {
   // Match attributes used when setting, otherwise some browsers keep the cookie.
   deleteCookie(c, ACCESS_COOKIE, { path: "/", secure: opts.secure, sameSite: opts.sameSite });
   deleteCookie(c, REFRESH_COOKIE, { path: "/", secure: opts.secure, sameSite: opts.sameSite });
+  deleteCookie(c, SESSION_HINT_COOKIE, { path: "/", secure: opts.secure, sameSite: opts.sameSite });
 }
 
 export function getAccessTokenFromRequest(c: Context): string | null {

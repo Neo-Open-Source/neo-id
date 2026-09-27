@@ -14,6 +14,8 @@ interface AvatarImageProps {
   className?: string;
   imageClassName?: string;
   proxy?: boolean;
+  fallbackSrc?: string | null;
+  loading?: boolean;
 }
 
 const iconSizeMap = { sm: 20, md: 28, lg: 36 };
@@ -39,11 +41,13 @@ export function AvatarImage({
   className,
   imageClassName,
   proxy = false,
+  fallbackSrc = DEFAULT_AVATAR,
+  loading = false,
 }: AvatarImageProps) {
   const [displaySrc, setDisplaySrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
-  const resolvedSrc = src || DEFAULT_AVATAR;
+  const resolvedSrc = src ?? fallbackSrc;
   const initials = getInitials(name);
   const remote = Boolean(resolvedSrc && /^https?:\/\//i.test(resolvedSrc));
   const useProxy = proxy && remote && Boolean(src);
@@ -83,6 +87,15 @@ export function AvatarImage({
     };
   }, [resolvedSrc, useProxy, remote]);
 
+  if (loading || (src && !displaySrc && !failed)) {
+    return (
+      <div
+        className={cn("avatar", `avatar--${size}`, "skeleton", className)}
+        aria-hidden="true"
+      />
+    );
+  }
+
   if (displaySrc && !failed) {
     return (
       <Image
@@ -92,8 +105,8 @@ export function AvatarImage({
         height={80}
         className={cn("avatar__image", imageClassName)}
         onError={() => {
-          if (displaySrc !== DEFAULT_AVATAR) {
-            setDisplaySrc(DEFAULT_AVATAR);
+          if (fallbackSrc && displaySrc !== fallbackSrc) {
+            setDisplaySrc(fallbackSrc);
           } else {
             setFailed(true);
           }

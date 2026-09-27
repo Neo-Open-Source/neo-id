@@ -5,11 +5,11 @@ import { cn } from "@/lib/cn";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center font-medium rounded-full border-none cursor-pointer transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center font-medium rounded-full border-none cursor-pointer transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed",
   {
     variants: {
       variant: {
-        primary: "bg-accent text-white hover:bg-accent-hover",
+        primary: "bg-accent-strong text-white hover:bg-accent-strong-hover active:bg-accent-strong-active",
         secondary: "bg-surface text-content border border-border hover:bg-surface-hover",
         ghost: "bg-transparent text-muted hover:text-content hover:bg-surface-hover",
         danger: "bg-danger text-white hover:bg-danger-hover",

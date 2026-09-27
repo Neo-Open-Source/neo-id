@@ -170,6 +170,7 @@ export default function MfaSettingsPage() {
         onClose={() => { setTotpSetup(null); setTotpCode(""); }}
         title={t.profile.authenticatorApp}
         description={t.profile.enterCodeFromApp}
+        size="sm"
         footer={
           <>
             <Button

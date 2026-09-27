@@ -41,6 +41,7 @@ export function CodeInput({
         autoFocus={autoFocus}
         disabled={disabled}
         className={cn(
+          "code-input",
           "w-full px-4 py-4 text-lg font-semibold tracking-widest text-center text-content",
           "bg-app border border-border rounded-input",
           "outline-none transition-[border-color,box-shadow,background] duration-150",

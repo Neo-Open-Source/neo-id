@@ -49,6 +49,7 @@ export function DeleteAccountModal({ open, email, onClose }: DeleteAccountModalP
       open={open}
       onClose={onClose}
       title={t.profile.deleteAccount}
+      size="sm"
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={onClose} disabled={starting}>

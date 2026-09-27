@@ -64,7 +64,7 @@ function PickerContent() {
           return;
         }
         if (purpose === "password-reset") {
-          router.push("/profile/password");
+          router.push("/profile");
           return;
         }
         if (purpose === "mfa-disable") {

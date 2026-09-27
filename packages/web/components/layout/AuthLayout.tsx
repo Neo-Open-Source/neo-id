@@ -29,7 +29,7 @@ export function AuthLayout({ title, subtitle, children, onBack, backLabel }: Aut
     }}>
 
       {/* Everything in one centred 340px column */}
-      <div style={{
+      <main id="main-content" style={{
         width: "100%",
         maxWidth: "340px",
         display: "flex",
@@ -86,7 +86,7 @@ export function AuthLayout({ title, subtitle, children, onBack, backLabel }: Aut
           padding: "20px 0",
           textAlign: "center",
         }}>
-          <p style={{ margin: 0, fontSize: "12px", color: "var(--color-dim)", lineHeight: 1.5 }}>
+          <p style={{ margin: 0, fontSize: "12px", color: "var(--color-muted)", lineHeight: 1.5 }}>
             {t.auth.legal.agreePrefix}{" "}
             <Link href="/terms" style={{ color: "var(--color-accent)" }}>{t.auth.legal.terms}</Link>{" "}
             {t.auth.legal.agreeSuffix}{" "}
@@ -94,7 +94,7 @@ export function AuthLayout({ title, subtitle, children, onBack, backLabel }: Aut
           </p>
         </div>
 
-      </div>
+      </main>
     </div>
   );
 }

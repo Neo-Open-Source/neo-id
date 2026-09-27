@@ -5,6 +5,7 @@ import "@/styles/components.css";
 import "@/styles/sections.css";
 import "@/styles/mobile.css";
 import { Providers } from "@/components/providers/Providers";
+import { getTranslations, type Locale, locales } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: {
@@ -53,6 +54,10 @@ export default async function RootLayout({
 }) {
   const headersList = await headers();
   const serverLocale = headersList.get("x-locale") || "en";
+  const locale: Locale = locales.includes(serverLocale as Locale)
+    ? (serverLocale as Locale)
+    : "en";
+  const t = getTranslations(locale);
 
   return (
     <html lang={serverLocale} suppressHydrationWarning>
@@ -62,6 +67,9 @@ export default async function RootLayout({
         <link rel="icon" href="/favicon.png" type="image/png" />
       </head>
       <body>
+        <a href="#main-content" className="skip-link">
+          {t.common.skipToContent}
+        </a>
         <Providers initialLocale={serverLocale}>{children}</Providers>
       </body>
     </html>

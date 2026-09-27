@@ -11,11 +11,14 @@
   --color-accent: #0060DF;
   --color-accent-hover: #0250BB;
   --color-accent-active: #073072;
+  --color-accent-strong: #0060DF;
+  --color-accent-strong-hover: #0250BB;
+  --color-accent-strong-active: #073072;
 
   --color-danger: #E22850;
   --color-danger-hover: #C41E3A;
-  --color-success: #16A34A;
-  --color-warning: #F59E0B;
+  --color-success: #15803D;
+  --color-warning: #B45309;
 
   --color-app: #F5F5F7;
   --color-surface: #FFFFFF;
@@ -24,8 +27,8 @@
   --color-surface-overlay: rgba(0, 0, 0, 0.4);
 
   --color-content: #1A1A2E;
-  --color-muted: #6B7280;
-  --color-dim: #9CA3AF;
+  --color-muted: #646B77;
+  --color-dim: #6E7581;
   --color-very-dim: #D1D5DB;
 
   --color-border: #E5E7EB;
@@ -244,7 +247,7 @@
   --color-surface-overlay: rgba(0, 0, 0, 0.7);
   --color-content: #EEEEF0;
   --color-muted: #8E8E93;
-  --color-dim: #636366;
+  --color-dim: #8A8A91;
   --color-very-dim: #3A3A3C;
   --color-border: #2A2A2E;
   --color-border-hover: #3A3A3C;
@@ -252,6 +255,13 @@
   --color-accent: #5B8DEF;
   --color-accent-hover: #4A7DE8;
   --color-accent-active: #3A6DD8;
+  --color-accent-strong: #2F6BDE;
+  --color-accent-strong-hover: #2A5FC6;
+  --color-accent-strong-active: #2453AC;
+  --color-danger: #F2556E;
+  --color-danger-hover: #D93A55;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
   --color-brand: #5B8DEF;
   --color-brand-hover: #4A7DE8;
   --color-brand-active: #3A6DD8;
@@ -277,7 +287,7 @@
   }
 
   ::selection {
-    background-color: var(--color-accent);
+    background-color: var(--color-accent-strong);
     color: var(--color-white);
   }
 }

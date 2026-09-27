@@ -27,8 +27,16 @@ export function EmailChangeModal({ open, onClose, currentEmail }: EmailChangeMod
     onClose();
   };
 
+  const normalizedCurrentEmail = currentEmail.trim().toLowerCase();
+  const normalizedNewEmail = newEmail.trim().toLowerCase();
+  const isSameEmail = normalizedNewEmail.length > 0 && normalizedNewEmail === normalizedCurrentEmail;
+
   const handleSubmit = async () => {
     if (!newEmail || loading) return;
+    if (isSameEmail) {
+      setMessage(t.profile.sameEmail);
+      return;
+    }
     setLoading(true);
     setMessage(null);
     try {
@@ -48,7 +56,11 @@ export function EmailChangeModal({ open, onClose, currentEmail }: EmailChangeMod
       onClose();
       router.push(`/auth/2fa?${params.toString()}`);
     } catch (error) {
-      setMessage(error instanceof ApiError ? error.message : t.common.error);
+      const localizedMessage =
+        error instanceof ApiError && error.code === "SAME_EMAIL"
+          ? t.profile.sameEmail
+          : null;
+      setMessage(localizedMessage ?? (error instanceof ApiError ? error.message : t.common.error));
     } finally {
       setLoading(false);
     }
@@ -60,10 +72,11 @@ export function EmailChangeModal({ open, onClose, currentEmail }: EmailChangeMod
       onClose={handleClose}
       title={t.profile.changeEmailTitle}
       description={t.profile.changeEmailDesc}
+      size="sm"
       footer={
         <Button
           loading={loading}
-          disabled={!newEmail}
+          disabled={!newEmail || isSameEmail}
           onClick={handleSubmit}
         >
           {t.profile.verifyEmail}
@@ -88,7 +101,11 @@ export function EmailChangeModal({ open, onClose, currentEmail }: EmailChangeMod
           autoFocus
         />
 
-        {message && <div className="alert alert--error">{message}</div>}
+        {(isSameEmail ? t.profile.sameEmail : message) && (
+          <div className="alert alert--error" role="alert">
+            {isSameEmail ? t.profile.sameEmail : message}
+          </div>
+        )}
       </div>
     </Modal>
   );
