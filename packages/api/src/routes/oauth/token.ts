@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context } from "hono";
 import { db } from "@neo-id/db";
-import { verify } from "@neo-id/auth-core";
+import { verify, hashToken, constantTimeEqual } from "@neo-id/auth-core";
 import { TOKEN } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
 import { issueTokens, verifyAndRotateRefreshToken } from "../../helpers/tokens";
@@ -40,7 +40,11 @@ export async function token(c: Context) {
     }
 
     if (serviceApp.clientSecretHash && client_secret) {
-      const valid = await verify(client_secret, serviceApp.clientSecretHash);
+      const stored = serviceApp.clientSecretHash;
+      // Secrets are stored as SHA-256 (hashToken); legacy rows may still be bcrypt.
+      const valid = stored.startsWith("$2")
+        ? await verify(client_secret, stored)
+        : constantTimeEqual(hashToken(client_secret), stored);
       if (!valid) {
         return error(c, "INVALID_REQUEST", "Invalid client_secret");
       }
@@ -112,6 +116,7 @@ export async function token(c: Context) {
     const tokens = await issueTokens(
       { userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress },
       oauthState.sessionId || undefined,
+      client_id,
     );
 
     return success(c, {
@@ -129,7 +134,7 @@ export async function token(c: Context) {
       return error(c, "INVALID_REQUEST", "refresh_token and client_id are required");
     }
 
-    const result = await verifyAndRotateRefreshToken(refresh_token as string, deviceInfo, ipAddress);
+    const result = await verifyAndRotateRefreshToken(refresh_token as string, deviceInfo, ipAddress, client_id);
 
     if (!result.ok) {
       return error(c, "INVALID_REQUEST", result.message);

@@ -61,10 +61,10 @@ export async function signAccessToken(
     .sign(privateKey);
 }
 
-export async function signIdToken(payload: JwtPayload): Promise<string> {
+export async function signIdToken(payload: JwtPayload, audience?: string): Promise<string> {
   const { privateKey } = await getKeys();
 
-  return new SignJWT({
+  const jwt = new SignJWT({
     sub: payload.sub,
     email: payload.email,
     name: payload.email,
@@ -73,8 +73,12 @@ export async function signIdToken(payload: JwtPayload): Promise<string> {
     .setIssuedAt()
     .setIssuer(ISSUER())
     .setExpirationTime(`${TOKEN.ID_TOKEN_EXPIRY}s`)
-    .setJti(randomUUID())
-    .sign(privateKey);
+    .setJti(randomUUID());
+
+  // OIDC id_tokens must carry aud = the OAuth client_id they were issued for.
+  if (audience) jwt.setAudience(audience);
+
+  return jwt.sign(privateKey);
 }
 
 export async function verifyAccessToken(token: string): Promise<JwtPayload> {

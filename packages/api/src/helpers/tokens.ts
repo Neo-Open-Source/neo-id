@@ -31,7 +31,7 @@ async function populateSessionGeo(sessionId: string, ipAddress?: string) {
   }).catch(() => {});
 }
 
-export async function issueTokens(info: SessionInfo, reuseSessionId?: string): Promise<TokenResult> {
+export async function issueTokens(info: SessionInfo, reuseSessionId?: string, audience?: string): Promise<TokenResult> {
   let session: { id: string } | undefined;
 
   // Reuse the browser's existing session when possible instead of minting a new one.
@@ -68,11 +68,14 @@ export async function issueTokens(info: SessionInfo, reuseSessionId?: string): P
     session.id,
   );
 
-  const idToken = await signIdToken({
-    sub: info.userId,
-    email: info.email,
-    role: info.role,
-  });
+  const idToken = await signIdToken(
+    {
+      sub: info.userId,
+      email: info.email,
+      role: info.role,
+    },
+    audience,
+  );
 
   const refreshToken = generateToken(TOKEN.REFRESH_TOKEN_LENGTH);
   await db.refreshToken.create({
@@ -141,6 +144,7 @@ export async function verifyAndRotateRefreshToken(
   rawToken: string,
   deviceInfo?: string,
   ipAddress?: string,
+  audience?: string,
 ): Promise<RefreshError | RefreshSuccess> {
   const tokenHash = hashToken(rawToken);
   const storedToken = await db.refreshToken.findUnique({
@@ -181,6 +185,7 @@ export async function verifyAndRotateRefreshToken(
       oldRefreshTokenId: storedToken.id,
       deviceInfo: deviceInfo ?? storedToken.deviceInfo ?? undefined,
       ipAddress,
+      audience,
     });
 
     return { ok: true, tokens, user };
@@ -217,6 +222,7 @@ export async function verifyAndRotateRefreshToken(
     oldRefreshTokenId: storedToken.id,
     deviceInfo: deviceInfo ?? storedToken.deviceInfo ?? undefined,
     ipAddress,
+    audience,
   });
 
   return { ok: true, tokens, user };
@@ -230,6 +236,7 @@ export async function rotateSessionTokens(info: {
   oldRefreshTokenId: string;
   deviceInfo?: string;
   ipAddress?: string;
+  audience?: string;
 }): Promise<TokenResult> {
   const newRefreshToken = generateToken(TOKEN.REFRESH_TOKEN_LENGTH);
 
@@ -238,11 +245,14 @@ export async function rotateSessionTokens(info: {
       { sub: info.userId, email: info.email, role: info.role },
       info.sessionId,
     ),
-    signIdToken({
-      sub: info.userId,
-      email: info.email,
-      role: info.role,
-    }),
+    signIdToken(
+      {
+        sub: info.userId,
+        email: info.email,
+        role: info.role,
+      },
+      info.audience,
+    ),
     db.session.update({
       where: { id: info.sessionId },
       data: {
