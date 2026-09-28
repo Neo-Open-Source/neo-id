@@ -204,6 +204,7 @@ export default function ProfilePage() {  const { t, locale } = useI18n();
       >
         <PasswordChangeForm
           compact
+          hasPassword={profile.hasPassword}
           resetMode={passwordResetArmed}
           onCancel={() => { setModal(null); setPasswordResetArmed(false); }}
           onSuccess={() => { refresh(); setModal(null); setPasswordResetArmed(false); }}
