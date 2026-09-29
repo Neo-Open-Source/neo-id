@@ -106,7 +106,10 @@ export function PasswordChangeForm({ onSuccess, onCancel, compact, hasPassword: 
     setSaving(true);
     setFormError(null);
     try {
-      await api("/user/password", { method: "PUT", body: { currentPassword, newPassword } });
+      await api("/user/password", {
+        method: "PUT",
+        body: hasPassword ? { currentPassword, newPassword } : { newPassword },
+      });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
