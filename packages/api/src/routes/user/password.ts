@@ -31,13 +31,14 @@ export async function changePassword(c: Context) {
     select: { passwordHash: true },
   });
 
-  if (!currentUser?.passwordHash) {
-    return error(c, "INVALID_REQUEST", "No password set. Use a connected account.");
-  }
-
-  const valid = await verify(currentPassword, currentUser.passwordHash);
-  if (!valid) {
-    return error(c, "INVALID_CREDENTIALS", "Current password is incorrect");
+  if (currentUser?.passwordHash) {
+    if (!currentPassword) {
+      return error(c, "INVALID_REQUEST", "Current password is required");
+    }
+    const valid = await verify(currentPassword, currentUser.passwordHash);
+    if (!valid) {
+      return error(c, "INVALID_CREDENTIALS", "Current password is incorrect");
+    }
   }
 
   const newHash = await hash(newPassword);
