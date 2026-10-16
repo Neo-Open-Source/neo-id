@@ -1,0 +1,25 @@
+[package]
+name = "auth-accounts"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+auth-core = { version = "0.1.0", path = "../auth-core", default-features = false }
+auth-db = { version = "0.1.0", path = "../auth-db" }
+auth-proto = { version = "0.1.0", path = "../auth-proto" }
+base64 = "0.22"
+serde_json = "1"
+rand = { version = "0.8", default-features = false }
+
+[dev-dependencies]
+futures = "0.3"
+rand_chacha = "0.3"
+
+[features]
+default = ["passkeys"]
+passkeys = ["auth-core/webauthn"]
+
+[lints]
+workspace = true

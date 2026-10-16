@@ -18,3 +18,10 @@ enum UserRole {
   USER_ROLE_USER = 1;
   USER_ROLE_ADMIN = 2;
 }
+
+// OPAQUE envelope record. The envelope is opaque bytes: the server stores
+// the blob and hands it back at login without inspecting the inside.
+message OpaqueRecord {
+  string user_id = 1;
+  bytes envelope = 2;
+}

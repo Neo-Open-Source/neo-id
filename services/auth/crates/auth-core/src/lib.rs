@@ -13,6 +13,7 @@ mod pkce;
 mod session;
 mod setup;
 mod totp;
+#[cfg(feature = "webauthn")]
 mod webauthn;
 
 pub use ciphersuite::NeoSuite;
@@ -23,21 +24,22 @@ pub use email::{
 };
 pub use error::AuthError;
 pub use jwt::{
-    ACCESS_TOKEN_TTL, AccessClaims, AccessInput, ID_TOKEN_TTL, IdClaims, IdInput, sign_access,
-    sign_id, verify_access,
+    ACCESS_TOKEN_TTL, AccessInput, ID_TOKEN_TTL, IdInput, sign_access, sign_id, verify_access,
 };
 pub use opaque::{CredentialId, Envelope, LoginState, SessionKey};
 pub use opaque::{login_finish, login_response, register_response, register_store};
 pub use pkce::{enforce_pkce, generate_verifier, pkce_challenge, verify_pkce};
 pub use session::{
-    AUTHCODE_EXPIRY, INACTIVITY_TIMEOUT, REFRESH_EXPIRY, REUSE_WINDOW, RefreshDecision,
-    SecretCheck, StoredRefresh, TICKET_EXPIRY, authcode_expiry, client_secret_check, encode_error,
-    redirect_matches, refresh_decision, refresh_expiry, session_expiry, ticket_expiry,
+    AUTHCODE_EXPIRY, INACTIVITY_TIMEOUT, REFRESH_EXPIRY, REFRESH_TOKEN_BYTES, RESET_TOKEN_EXPIRY,
+    REUSE_WINDOW, RefreshDecision, SecretCheck, TICKET_EXPIRY, authcode_expiry,
+    client_secret_check, encode_error, redirect_matches, refresh_decision, refresh_expiry,
+    session_expiry, ticket_expiry,
 };
 pub use setup::OpaqueSetup;
 pub use totp::{generate_secret, setup_uri, verify_totp};
+#[cfg(feature = "webauthn")]
 pub use webauthn::{
     AuthenticationState, CreationChallengeResponse, PasskeyRp, RegistrationState,
     RequestChallengeResponse, StoredCredential, VerifiedAuthentication, authentication_options,
-    registration_options, verify_authentication, verify_registration,
+    registration_options, user_uuid, verify_authentication, verify_registration,
 };

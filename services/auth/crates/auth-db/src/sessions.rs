@@ -54,3 +54,11 @@ pub fn deactivate_user_sessions(user_id: &str) -> Query {
         params: vec![text(user_id)],
     }
 }
+
+#[must_use]
+pub fn sessions_by_user(user_id: &str) -> Query {
+    Query {
+        sql: r#"SELECT "id","deviceInfo","ipAddress","location","isActive","lastActiveAt",extract(epoch from "expiresAt")::bigint AS "expiresAt" FROM "sessions" WHERE "userId"=$1 ORDER BY "lastActiveAt" DESC"#,
+        params: vec![text(user_id)],
+    }
+}

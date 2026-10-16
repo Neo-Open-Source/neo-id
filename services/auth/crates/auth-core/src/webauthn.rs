@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use serde_cbor_2::Value;
-use uuid::Uuid;
+use sha2::{Digest, Sha256};
 use webauthn_rs::prelude::{
-    Passkey, PasskeyAuthentication, PasskeyRegistration, Url, Webauthn, WebauthnBuilder,
+    Passkey, PasskeyAuthentication, PasskeyRegistration, Url, Uuid, Webauthn, WebauthnBuilder,
     WebauthnError,
 };
 use webauthn_rs_core::proto::{
@@ -33,11 +33,45 @@ impl PasskeyRp {
     }
 }
 
+#[must_use]
+pub fn user_uuid(user_id: &str) -> Uuid {
+    let hash = Sha256::digest(user_id.as_bytes());
+    let mut bytes = [0u8; 16];
+    for (dst, src) in bytes.iter_mut().zip(hash.iter()) {
+        *dst = *src;
+    }
+    Uuid::from_bytes(bytes)
+}
+
 #[derive(Debug, Clone)]
 pub struct RegistrationState(PasskeyRegistration);
 
 #[derive(Debug, Clone)]
 pub struct AuthenticationState(PasskeyAuthentication);
+
+impl RegistrationState {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, AuthError> {
+        serde_json::to_vec(&self.0).map_err(|_| AuthError::Internal)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AuthError> {
+        serde_json::from_slice(bytes)
+            .map(Self)
+            .map_err(|_| AuthError::MalformedMessage)
+    }
+}
+
+impl AuthenticationState {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, AuthError> {
+        serde_json::to_vec(&self.0).map_err(|_| AuthError::Internal)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AuthError> {
+        serde_json::from_slice(bytes)
+            .map(Self)
+            .map_err(|_| AuthError::MalformedMessage)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredCredential {

@@ -28,6 +28,20 @@ apps/auth-web/                      # SvelteKit (planned)
 Library crates hold logic; the worker crate only wires. One domain concept
 per file. `lib.rs` is a facade: docs + `mod` + `pub use`, nothing else.
 
+## Models live in proto/
+
+- Every persisted / wire / storage shape is a `proto/auth/v1/*.proto`
+  message; Rust consumes the generated `auth-proto` types. No hand-written
+  mirror models, no duplicated field lists.
+- JSON wire names that must match external contracts (JWT reserved claims,
+  previous-service parity) are pinned in `auth-proto/build.rs` via
+  `field_attribute` renames — never by renaming proto fields.
+- Hand-written types allowed only for: security newtypes (invariants the
+  type system enforces: `Envelope`, `SessionKey`), control-flow outcome
+  enums, partial-row projections (never default-fill unloaded fields),
+  redacting wrappers around secrets.
+- New shape? Add the message to proto first, regenerate, then use it.
+
 ## Workflow
 
 - Goal + non-goals + testable acceptance criteria before code. Smallest
@@ -40,6 +54,10 @@ per file. `lib.rs` is a facade: docs + `mod` + `pub use`, nothing else.
 - Rule of three: no new abstraction without 3 uses. No new file for <50
   lines of shared logic. No new dependency without justification in the
   change (audit status, MSRV fit, wasm32 build, maintenance signs).
+- wasm32 closure stays native-free: crates in the worker build use
+  `default-features = false` on workspace deps; non-portable code
+  (webauthn/openssl) behind opt-in features. Verify with
+  `cargo check -p auth-worker --target wasm32-unknown-unknown`.
 - Ubiquitous language, no synonyms: OP (our server), RP (external app),
   envelope (OPAQUE server record — never "hash"), OPRF key (service secret),
   KSF (client Argon2id), kid, re-enrollment (bcrypt → OPAQUE via email

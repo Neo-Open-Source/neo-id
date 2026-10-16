@@ -6,7 +6,8 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-auth-core = { version = "0.1.0", path = "../auth-core" }
+auth-core = { version = "0.1.0", path = "../auth-core", default-features = false }
+auth-proto = { version = "0.1.0", path = "../auth-proto" }
 serde_json = "1"
 
 [lints]

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// Token issuance response (OAuth2 + password login share the shape).
+message TokenPair {
+  string access_token = 1;
+  string refresh_token = 2;
+  string id_token = 3;
+  string session_id = 4;
+  uint64 expires_in = 5;
+}

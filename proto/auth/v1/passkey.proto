@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// Stored passkey credential. Public key is canonical COSE bytes, the same
+// format authenticators produce and the old service stored.
+message PasskeyCredential {
+  string user_id = 1;
+  bytes credential_id = 2;
+  bytes public_key = 3;
+  uint32 counter = 4;
+  repeated string transports = 5;
+  bool backup_eligible = 6;
+  bool backup_state = 7;
+}

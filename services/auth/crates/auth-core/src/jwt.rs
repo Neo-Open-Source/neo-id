@@ -1,36 +1,11 @@
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use serde::{Deserialize, Serialize};
+
+use auth_proto::auth::v1::{AccessClaims, IdTokenClaims};
 
 use crate::error::AuthError;
 
 pub const ACCESS_TOKEN_TTL: u64 = 900;
 pub const ID_TOKEN_TTL: u64 = 3600;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccessClaims {
-    pub sub: String,
-    pub email: String,
-    pub role: String,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub session_id: Option<String>,
-    pub iss: String,
-    pub iat: u64,
-    pub exp: u64,
-    pub jti: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IdClaims {
-    pub sub: String,
-    pub email: String,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub aud: Option<String>,
-    pub iss: String,
-    pub iat: u64,
-    pub exp: u64,
-    pub jti: String,
-}
 
 pub struct AccessInput {
     pub sub: String,
@@ -63,8 +38,9 @@ pub fn sign_access(private_pem: &[u8], input: &AccessInput) -> Result<String, Au
         role: input.role.clone(),
         session_id: input.session_id.clone(),
         iss: input.issuer.clone(),
-        iat: input.issued_at,
-        exp: input.issued_at + ACCESS_TOKEN_TTL,
+        iat_unix: i64::try_from(input.issued_at).unwrap_or(0),
+        exp_unix: i64::try_from(input.issued_at.saturating_add(ACCESS_TOKEN_TTL))
+            .unwrap_or(i64::MAX),
         jti: input.jti.clone(),
     };
     encode(&header(), &claims, &key).map_err(|_| AuthError::Internal)
@@ -72,14 +48,14 @@ pub fn sign_access(private_pem: &[u8], input: &AccessInput) -> Result<String, Au
 
 pub fn sign_id(private_pem: &[u8], input: &IdInput) -> Result<String, AuthError> {
     let key = EncodingKey::from_rsa_pem(private_pem).map_err(|_| AuthError::Internal)?;
-    let claims = IdClaims {
+    let claims = IdTokenClaims {
         sub: input.sub.clone(),
         email: input.email.clone(),
         name: input.email.clone(),
         aud: input.audience.clone(),
         iss: input.issuer.clone(),
-        iat: input.issued_at,
-        exp: input.issued_at + ID_TOKEN_TTL,
+        iat_unix: i64::try_from(input.issued_at).unwrap_or(0),
+        exp_unix: i64::try_from(input.issued_at.saturating_add(ID_TOKEN_TTL)).unwrap_or(i64::MAX),
         jti: input.jti.clone(),
     };
     encode(&header(), &claims, &key).map_err(|_| AuthError::Internal)
@@ -99,7 +75,7 @@ pub fn verify_access(
     let claims = decode::<AccessClaims>(token, &key, &validation)
         .map(|data| data.claims)
         .map_err(map_jwt_error)?;
-    if claims.exp <= now {
+    if claims.exp_unix <= i64::try_from(now).unwrap_or(i64::MAX) {
         return Err(AuthError::InvalidCredentials);
     }
     Ok(claims)

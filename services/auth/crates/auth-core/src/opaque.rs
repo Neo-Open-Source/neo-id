@@ -45,6 +45,22 @@ impl LoginState {
     fn new(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
+
+    #[must_use]
+    pub fn into_bytes(self) -> Vec<u8> {
+        let LoginState(bytes) = self;
+        bytes
+    }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, AuthError> {
+        let state =
+            ServerLogin::<NeoSuite>::deserialize(bytes.as_slice()).map_err(AuthError::from)?;
+        if state.serialize().len() == bytes.len() {
+            Ok(Self(bytes))
+        } else {
+            Err(AuthError::MalformedMessage)
+        }
+    }
 }
 
 pub struct SessionKey(Zeroizing<Vec<u8>>);

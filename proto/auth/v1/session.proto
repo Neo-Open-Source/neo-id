@@ -11,3 +11,17 @@ message Session {
   string ip = 5;
   string user_agent = 6;
 }
+
+// Refresh-token lookup result (token hash itself never enters models).
+// Combines the token row with the joined user/session state the rotation
+// decision needs.
+message RefreshToken {
+  string user_id = 1;
+  optional string session_id = 2;
+  int64 expires_at_unix = 3;
+  optional int64 revoked_at_unix = 4;
+  optional string revoke_reason = 5;
+  bool user_banned = 6;
+  bool session_active = 7;
+  bool has_session = 8;
+}

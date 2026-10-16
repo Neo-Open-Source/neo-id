@@ -1,8 +1,8 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand::{CryptoRng, Rng, RngCore};
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 use subtle::ConstantTimeEq;
-use uuid::Builder;
 
 pub fn generate_token<R: RngCore + CryptoRng>(rng: &mut R, byte_len: usize) -> String {
     let mut bytes = vec![0u8; byte_len];
@@ -19,7 +19,21 @@ pub fn hash_token(token: &str) -> String {
 pub fn generate_id<R: RngCore + CryptoRng>(rng: &mut R) -> String {
     let mut bytes = [0u8; 16];
     rng.fill_bytes(&mut bytes);
-    Builder::from_random_bytes(bytes).into_uuid().to_string()
+    let mut id = String::with_capacity(36);
+    for (i, byte) in bytes.iter().enumerate() {
+        let mut byte = *byte;
+        if i == 6 {
+            byte = byte & 0x0f | 0x40;
+        }
+        if i == 8 {
+            byte = byte & 0x3f | 0x80;
+        }
+        if i == 4 || i == 6 || i == 8 || i == 10 {
+            id.push('-');
+        }
+        let _ = write!(id, "{byte:02x}");
+    }
+    id
 }
 
 #[must_use]

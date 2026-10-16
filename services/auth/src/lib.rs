@@ -1,4 +1,17 @@
-//! Worker entry point: `#[event(fetch)]` wiring lives here (phase 4).
-//!
-//! All logic stays in `crates/*`. This crate only adapts Workers requests
-//! to crate calls and maps typed errors to HTTP responses.
+#![allow(
+    clippy::missing_errors_doc,
+    reason = "AuthError variants are the single source; per-fn sections would duplicate and drift"
+)]
+
+mod env;
+mod kv;
+mod neon;
+mod respond;
+mod routes;
+
+use worker::{Context, Env, Request, Response, Result};
+
+#[worker::event(fetch)]
+pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
+    routes::router().run(req, env).await
+}

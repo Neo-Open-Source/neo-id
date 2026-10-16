@@ -1,10 +1,13 @@
 use crate::codes::{constant_time_equal, hash_token};
+use auth_proto::auth::v1::RefreshToken;
 
 pub const REFRESH_EXPIRY: u64 = 2_592_000;
 pub const INACTIVITY_TIMEOUT: u64 = 2_592_000;
 pub const AUTHCODE_EXPIRY: u64 = 600;
 pub const TICKET_EXPIRY: u64 = 60;
 pub const REUSE_WINDOW: u64 = 60;
+pub const REFRESH_TOKEN_BYTES: usize = 64;
+pub const RESET_TOKEN_EXPIRY: u64 = 3600;
 
 #[must_use]
 pub fn refresh_expiry(now: u64) -> u64 {
@@ -37,28 +40,20 @@ pub enum RefreshDecision {
     TokenInvalid,
 }
 
-pub struct StoredRefresh<'a> {
-    pub revoked_at: Option<u64>,
-    pub revoke_reason: Option<&'a str>,
-    pub expires_at: u64,
-    pub banned: bool,
-    pub session_active: bool,
-    pub has_session: bool,
-}
-
 #[must_use]
-pub fn refresh_decision(stored: &StoredRefresh<'_>, now: u64) -> RefreshDecision {
-    if let Some(revoked_at) = stored.revoked_at {
-        let rotated = stored.revoke_reason == Some("rotated");
-        if rotated && stored.has_session && now.saturating_sub(revoked_at) < REUSE_WINDOW {
+pub fn refresh_decision(stored: &RefreshToken, now: u64) -> RefreshDecision {
+    if let Some(revoked_at) = stored.revoked_at_unix {
+        let rotated = stored.revoke_reason.as_deref() == Some("rotated");
+        let revoked: u64 = revoked_at.try_into().unwrap_or(0);
+        if rotated && stored.has_session && now.saturating_sub(revoked) < REUSE_WINDOW {
             return RefreshDecision::GraceReissue;
         }
         return RefreshDecision::TokenInvalid;
     }
-    if stored.expires_at <= now {
+    if stored.expires_at_unix <= i64::try_from(now).unwrap_or(i64::MAX) {
         return RefreshDecision::Expired;
     }
-    if stored.banned {
+    if stored.user_banned {
         return RefreshDecision::UserBanned;
     }
     if !stored.has_session {

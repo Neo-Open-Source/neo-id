@@ -28,7 +28,10 @@ fn access_roundtrip_checks_claims() {
     assert_eq!(claims.email, "alice@example.com");
     assert_eq!(claims.role, "user");
     assert_eq!(claims.session_id.as_deref(), Some("sess-1"));
-    assert_eq!(claims.exp - claims.iat, ACCESS_TOKEN_TTL);
+    assert_eq!(
+        u64::try_from(claims.exp_unix - claims.iat_unix).unwrap_or(0),
+        ACCESS_TOKEN_TTL
+    );
 }
 
 #[test]
@@ -105,7 +108,8 @@ fn id_token_carries_audience_and_name() {
     assert_eq!(payload["aud"], "client-9");
     assert_eq!(payload["name"], "alice@example.com");
     assert_eq!(
-        payload["exp"].as_u64().unwrap() - payload["iat"].as_u64().unwrap(),
+        u64::try_from(payload["exp"].as_i64().unwrap() - payload["iat"].as_i64().unwrap())
+            .unwrap_or(0),
         ID_TOKEN_TTL
     );
 

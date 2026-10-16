@@ -1,17 +1,20 @@
 use auth_core::{
-    RefreshDecision, SecretCheck, StoredRefresh, authcode_expiry, client_secret_check,
-    encode_error, enforce_pkce, generate_verifier, pkce_challenge, redirect_matches,
-    refresh_decision, refresh_expiry, session_expiry, ticket_expiry,
+    RefreshDecision, SecretCheck, authcode_expiry, client_secret_check, encode_error, enforce_pkce,
+    generate_verifier, pkce_challenge, redirect_matches, refresh_decision, refresh_expiry,
+    session_expiry, ticket_expiry,
 };
+use auth_proto::auth::v1::RefreshToken;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
-fn stored() -> StoredRefresh<'static> {
-    StoredRefresh {
-        revoked_at: None,
+fn stored() -> RefreshToken {
+    RefreshToken {
+        user_id: String::new(),
+        session_id: None,
+        revoked_at_unix: None,
         revoke_reason: None,
-        expires_at: 2000,
-        banned: false,
+        expires_at_unix: 2000,
+        user_banned: false,
         session_active: true,
         has_session: true,
     }
@@ -22,8 +25,8 @@ fn refresh_decision_tree() {
     assert_eq!(refresh_decision(&stored(), 1000), RefreshDecision::Reissue);
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
-                expires_at: 1000,
+            &RefreshToken {
+                expires_at_unix: 1000,
                 ..stored()
             },
             1000
@@ -32,8 +35,8 @@ fn refresh_decision_tree() {
     );
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
-                banned: true,
+            &RefreshToken {
+                user_banned: true,
                 ..stored()
             },
             500
@@ -42,7 +45,7 @@ fn refresh_decision_tree() {
     );
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
+            &RefreshToken {
                 has_session: false,
                 ..stored()
             },
@@ -52,7 +55,7 @@ fn refresh_decision_tree() {
     );
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
+            &RefreshToken {
                 session_active: false,
                 ..stored()
             },
@@ -62,9 +65,9 @@ fn refresh_decision_tree() {
     );
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
-                revoked_at: Some(900),
-                revoke_reason: Some("logout"),
+            &RefreshToken {
+                revoked_at_unix: Some(900),
+                revoke_reason: Some(String::from("logout")),
                 ..stored()
             },
             950
@@ -73,9 +76,9 @@ fn refresh_decision_tree() {
     );
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
-                revoked_at: Some(900),
-                revoke_reason: Some("rotated"),
+            &RefreshToken {
+                revoked_at_unix: Some(900),
+                revoke_reason: Some(String::from("rotated")),
                 ..stored()
             },
             950
@@ -84,9 +87,9 @@ fn refresh_decision_tree() {
     );
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
-                revoked_at: Some(900),
-                revoke_reason: Some("rotated"),
+            &RefreshToken {
+                revoked_at_unix: Some(900),
+                revoke_reason: Some(String::from("rotated")),
                 ..stored()
             },
             960
@@ -95,9 +98,9 @@ fn refresh_decision_tree() {
     );
     assert_eq!(
         refresh_decision(
-            &StoredRefresh {
-                revoked_at: Some(900),
-                revoke_reason: Some("rotated"),
+            &RefreshToken {
+                revoked_at_unix: Some(900),
+                revoke_reason: Some(String::from("rotated")),
                 ..stored()
             },
             961

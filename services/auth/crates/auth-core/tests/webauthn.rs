@@ -1,13 +1,15 @@
+#![cfg(feature = "webauthn")]
+
 use auth_core::{
     AuthError, PasskeyRp, StoredCredential, authentication_options, registration_options,
     verify_authentication, verify_registration,
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
-use uuid::Uuid;
 use webauthn_authenticator_rs::AuthenticatorBackendHashedClientData;
 use webauthn_authenticator_rs::prelude::{Url, WebauthnAuthenticator};
 use webauthn_authenticator_rs::softpasskey::SoftPasskey;
+use webauthn_rs::prelude::Uuid;
 use webauthn_rs_core::error::WebauthnError;
 
 const RP_ID: &str = "id.neome.uk";

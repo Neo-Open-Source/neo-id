@@ -9,7 +9,19 @@ license.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-auth-core = { version = "0.1.0", path = "crates/auth-core" }
+auth-accounts = { version = "0.1.0", path = "crates/auth-accounts", default-features = false }
+auth-core = { version = "0.1.0", path = "crates/auth-core", default-features = false }
+auth-db = { version = "0.1.0", path = "crates/auth-db" }
+base64 = "0.22"
+getrandom = "0.3"
+rand_chacha = "0.3"
+rand_core = "0.6"
+rsa = "0.9"
+serde_json = "1"
+worker = "0.8"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [lints]
 workspace = true
