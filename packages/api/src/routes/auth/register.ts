@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { hash, generateToken, generateCode } from "@neo-id/auth-core";
 import { registerSchema, EMAIL } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
@@ -27,7 +26,7 @@ export async function register(c: Context) {
     }
   }
 
-  const existing = await db.user.findUnique({
+  const existing = await c.get("db").user.findUnique({
     where: { email },
     include: { identities: { take: 1 } },
   });
@@ -36,17 +35,17 @@ export async function register(c: Context) {
     if (existing.emailVerified || existing.identities.length > 0) {
       return error(c, "EMAIL_ALREADY_EXISTS", "Email is already registered");
     }
-    await db.user.delete({ where: { id: existing.id } });
+    await c.get("db").user.delete({ where: { id: existing.id } });
   }
 
   if (username) {
-    const existingUsername = await db.user.findFirst({
+    const existingUsername = await c.get("db").user.findFirst({
       where: { username },
       include: { identities: { take: 1 } },
     });
     if (existingUsername) {
       if (!existingUsername.emailVerified && existingUsername.identities.length === 0) {
-        await db.user.delete({ where: { id: existingUsername.id } });
+        await c.get("db").user.delete({ where: { id: existingUsername.id } });
       } else {
         return error(c, "USERNAME_TAKEN", "Username is already taken");
       }
@@ -55,7 +54,7 @@ export async function register(c: Context) {
 
   const passwordHash = await hash(password);
 
-  const userCount = await db.user.count();
+  const userCount = await c.get("db").user.count();
   const isFirstUser = userCount === 0;
 
   const ip = c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP") || "";
@@ -63,7 +62,7 @@ export async function register(c: Context) {
   const isDev = process.env.NODE_ENV !== "production";
   const isAutoAdmin = isFirstUser && (isLocalhost || isDev);
 
-  const user = await db.user.create({
+  const user = await c.get("db").user.create({
     data: {
       email,
       username,
@@ -81,7 +80,7 @@ export async function register(c: Context) {
     const webUrl = process.env.WEB_URL || "http://localhost:3001";
     const verifyLink = `${webUrl}/auth/verify-email?token=${verifyToken}`;
 
-    await db.mfaCode.create({
+    await c.get("db").mfaCode.create({
       data: {
         userId: user.id,
         code: verifyToken,
@@ -91,7 +90,7 @@ export async function register(c: Context) {
       },
     });
 
-    await db.mfaCode.create({
+    await c.get("db").mfaCode.create({
       data: {
         userId: user.id,
         code: verifyCode,

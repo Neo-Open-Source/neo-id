@@ -3,6 +3,7 @@ dist/
 .next/
 *.tsbuildinfo
 .env
+.env.prod
 .env.local
 .env.*.local
 .env.test
@@ -15,5 +16,7 @@ coverage/
 # JWT keys (sensitive)
 *.pem
 .vercel
+.dev.vars
+.wrangler/
 .env*
 !.envrc

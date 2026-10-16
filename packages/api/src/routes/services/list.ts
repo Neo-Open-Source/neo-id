@@ -1,12 +1,11 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { generateToken, hashToken } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 
 export async function listServices(c: Context) {
   const user = c.get("user");
 
-  const services = await db.serviceApp.findMany({
+  const services = await c.get("db").serviceApp.findMany({
     where: { ownerId: user.sub },
     select: {
       id: true,
@@ -33,7 +32,7 @@ export async function getService(c: Context) {
   const user = c.get("user");
   const { id } = c.req.param();
 
-  const service = await db.serviceApp.findFirst({
+  const service = await c.get("db").serviceApp.findFirst({
     where: { id, ownerId: user.sub },
     select: {
       id: true,
@@ -75,7 +74,7 @@ export async function createService(c: Context) {
   const clientSecret = generateToken(40);
   const clientSecretHash = await hashToken(clientSecret);
 
-  const service = await db.serviceApp.create({
+  const service = await c.get("db").serviceApp.create({
     data: {
       ownerId: user.sub,
       clientId,
@@ -107,7 +106,7 @@ export async function updateService(c: Context) {
   const body = await c.req.json();
   const { displayName, description, logoUrl, website, redirectUris } = body;
 
-  const service = await db.serviceApp.findFirst({
+  const service = await c.get("db").serviceApp.findFirst({
     where: { id, ownerId: user.sub },
   });
 
@@ -115,7 +114,7 @@ export async function updateService(c: Context) {
     return error(c, "NOT_FOUND", "Service not found", 404);
   }
 
-  const updated = await db.serviceApp.update({
+  const updated = await c.get("db").serviceApp.update({
     where: { id },
     data: {
       ...(displayName !== undefined && { displayName }),
@@ -145,7 +144,7 @@ export async function deleteService(c: Context) {
   const user = c.get("user");
   const { id } = c.req.param();
 
-  const service = await db.serviceApp.findFirst({
+  const service = await c.get("db").serviceApp.findFirst({
     where: { id, ownerId: user.sub },
   });
 
@@ -153,7 +152,7 @@ export async function deleteService(c: Context) {
     return error(c, "NOT_FOUND", "Service not found", 404);
   }
 
-  await db.serviceApp.delete({ where: { id } });
+  await c.get("db").serviceApp.delete({ where: { id } });
 
   return success(c, { ok: true });
 }
@@ -162,7 +161,7 @@ export async function rotateSecret(c: Context) {
   const user = c.get("user");
   const { id } = c.req.param();
 
-  const service = await db.serviceApp.findFirst({
+  const service = await c.get("db").serviceApp.findFirst({
     where: { id, ownerId: user.sub },
   });
 
@@ -173,7 +172,7 @@ export async function rotateSecret(c: Context) {
   const newSecret = generateToken(40);
   const newHash = await hashToken(newSecret);
 
-  await db.serviceApp.update({
+  await c.get("db").serviceApp.update({
     where: { id },
     data: { clientSecretHash: newHash },
   });

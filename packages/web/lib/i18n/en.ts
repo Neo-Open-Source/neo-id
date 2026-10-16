@@ -289,6 +289,8 @@ const en = {
     cropPhoto: "Crop photo",
     cropApply: "Apply",
     cropBack: "Back",
+    cropCancel: "Cancel",
+    cropDone: "Done",
   },
   language: {
     title: "Language",

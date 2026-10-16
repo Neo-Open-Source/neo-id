@@ -34,13 +34,16 @@
             curl
             jq
             just
+            wrangler
           ];
 
           shellHook = ''
             export NODE_OPTIONS="--max-old-space-size=4096"
+            export WRANGLER_SEND_METRICS="false"
             echo ""
-            echo "  neo-id  |  node $(node -v)  |  pnpm $(pnpm --version)"
+            echo "  neo-id  |  node $(node -v)  |  pnpm $(pnpm --version)  |  wrangler $(wrangler --version 2>/dev/null)"
             echo "  just --list  for available commands"
+            echo "  node scripts/sync-dev-vars.mjs  # .env -> .dev.vars for wrangler dev"
           '';
         };
 

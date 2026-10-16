@@ -1,6 +1,6 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
-import { db } from "@neo-id/db";
+import type { PrismaClient } from "@neo-id/db";
 
 const STATIC_ORIGINS = (process.env.CORS_ORIGIN || "")
   .split(",")
@@ -11,12 +11,12 @@ let registeredOrigins = new Set<string>();
 let registeredLoadedAt = 0;
 const REFRESH_TTL_MS = 60_000;
 
-async function refreshRegisteredOrigins(): Promise<void> {
+async function refreshRegisteredOrigins(client: PrismaClient): Promise<void> {
   const now = Date.now();
   if (registeredLoadedAt && now - registeredLoadedAt < REFRESH_TTL_MS) return;
   registeredLoadedAt = now;
   try {
-    const apps = await db.serviceApp.findMany({
+    const apps = await client.serviceApp.findMany({
       where: { isActive: true },
       select: { redirectUris: true },
     });
@@ -39,9 +39,9 @@ async function refreshRegisteredOrigins(): Promise<void> {
 }
 
 export const corsMiddleware: MiddlewareHandler = cors({
-  origin: async (origin) => {
+  origin: async (origin, c: Context) => {
     if (!origin || STATIC_ORIGINS.includes(origin)) return origin || null;
-    await refreshRegisteredOrigins();
+    await refreshRegisteredOrigins(c.get("db") as PrismaClient);
     return registeredOrigins.has(origin) ? origin : null;
   },
   allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

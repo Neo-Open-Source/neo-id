@@ -1,6 +1,5 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { verify, hashToken, constantTimeEqual } from "@neo-id/auth-core";
 import { TOKEN } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
@@ -14,15 +13,13 @@ function pkceChallenge(verifier: string): string {
 
 /** Constant-time comparison for the fixed-length SHA-256 challenge digests. */
 function safeEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
+  return constantTimeEqual(a, b);
 }
 
 export async function token(c: Context) {
   const body = await c.req.json();
   const { grant_type, code, redirect_uri, client_id, client_secret, refresh_token, code_verifier } = body;
-  const { deviceInfo, ipAddress } = getRequestInfo(c);
+  const { deviceInfo, ipAddress, country } = getRequestInfo(c);
 
   // ─── Authorization Code Grant ─────────────────────────────────────────────
   if (grant_type === "authorization_code") {
@@ -30,7 +27,7 @@ export async function token(c: Context) {
       return error(c, "INVALID_REQUEST", "code, redirect_uri, and client_id are required");
     }
 
-    const serviceApp = await db.serviceApp.findUnique({
+    const serviceApp = await c.get("db").serviceApp.findUnique({
       where: { clientId: client_id },
       select: { id: true, clientSecretHash: true, isActive: true },
     });
@@ -50,7 +47,7 @@ export async function token(c: Context) {
       }
     }
 
-    const oauthState = await db.oAuthState.findFirst({
+    const oauthState = await c.get("db").oAuthState.findFirst({
       where: {
         code,
         serviceAppId: serviceApp.id,
@@ -85,26 +82,32 @@ export async function token(c: Context) {
       }
     }
 
-    await db.oAuthState.delete({ where: { id: oauthState.id } });
+    await c.get("db").oAuthState.delete({ where: { id: oauthState.id } });
 
-    await db.authorizedConnection.upsert({
+    const existingGrant = await c.get("db").authorizedConnection.findUnique({
       where: {
         userId_serviceAppId: {
           userId: oauthState.userId,
           serviceAppId: serviceApp.id,
         },
       },
-      create: {
-        userId: oauthState.userId,
-        serviceAppId: serviceApp.id,
-        scopes: ["openid", "profile", "email"],
-      },
-      update: {
-        lastUsedAt: new Date(),
-      },
     });
+    if (existingGrant) {
+      await c.get("db").authorizedConnection.update({
+        where: { id: existingGrant.id },
+        data: { lastUsedAt: new Date() },
+      });
+    } else {
+      await c.get("db").authorizedConnection.create({
+        data: {
+          userId: oauthState.userId,
+          serviceAppId: serviceApp.id,
+          scopes: ["openid", "profile", "email"],
+        },
+      });
+    }
 
-    const user = await db.user.findUnique({
+    const user = await c.get("db").user.findUnique({
       where: { id: oauthState.userId },
       select: { id: true, email: true, role: true, status: true },
     });
@@ -113,8 +116,8 @@ export async function token(c: Context) {
       return error(c, "INVALID_REQUEST", "User not found or banned");
     }
 
-    const tokens = await issueTokens(
-      { userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress },
+    const tokens = await issueTokens(c.get("db"), 
+      { userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress, country },
       oauthState.sessionId || undefined,
       client_id,
     );
@@ -134,7 +137,7 @@ export async function token(c: Context) {
       return error(c, "INVALID_REQUEST", "refresh_token and client_id are required");
     }
 
-    const result = await verifyAndRotateRefreshToken(refresh_token as string, deviceInfo, ipAddress, client_id);
+    const result = await verifyAndRotateRefreshToken(c.get("db"), refresh_token as string, deviceInfo, ipAddress, client_id, country);
 
     if (!result.ok) {
       return error(c, "INVALID_REQUEST", result.message);

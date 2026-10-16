@@ -35,7 +35,7 @@ export function rateLimit(limitKey: LimitKey) {
     const config = RATE_LIMITS[limitKey];
     if (!config) return next();
 
-    const ip = c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP") || "unknown";
+    const ip = c.req.header("CF-Connecting-IP") || c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP") || "unknown";
     const bucket = getBucket(limitKey);
     const now = Date.now();
     const entry = bucket.get(ip);

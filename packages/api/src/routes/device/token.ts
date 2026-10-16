@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { TOKEN } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
 import { issueTokens } from "../../helpers/tokens";
@@ -16,7 +15,7 @@ export async function pollDeviceToken(c: Context) {
     return error(c, "INVALID_REQUEST", "client_id and device_code are required");
   }
 
-  const stored = await db.deviceCode.findUnique({
+  const stored = await c.get("db").deviceCode.findUnique({
     where: { deviceCode: device_code },
   });
 
@@ -25,7 +24,7 @@ export async function pollDeviceToken(c: Context) {
   }
 
   if (stored.expiresAt < new Date()) {
-    await db.deviceCode.update({ where: { id: stored.id }, data: { status: "expired" } });
+    await c.get("db").deviceCode.update({ where: { id: stored.id }, data: { status: "expired" } });
     return error(c, "INVALID_REQUEST", "expired_token");
   }
 
@@ -37,7 +36,7 @@ export async function pollDeviceToken(c: Context) {
     return error(c, "INVALID_REQUEST", "authorization_pending");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id: stored.userId },
     select: { id: true, email: true, role: true, status: true },
   });
@@ -46,14 +45,15 @@ export async function pollDeviceToken(c: Context) {
     return error(c, "INVALID_REQUEST", "access_denied");
   }
 
-  await db.deviceCode.delete({ where: { id: stored.id } });
+  await c.get("db").deviceCode.delete({ where: { id: stored.id } });
 
-  const tokens = await issueTokens({
+  const tokens = await issueTokens(c.get("db"), {
     userId: user.id,
     email: user.email,
     role: user.role,
     deviceInfo: stored.location || "Device Code Flow",
     ipAddress: c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP"),
+    country: c.req.header("CF-IPCountry") || undefined,
   });
 
   return success(c, {

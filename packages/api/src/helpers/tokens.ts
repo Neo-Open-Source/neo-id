@@ -1,6 +1,6 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
-import { signAccessToken, signIdToken, generateToken, hashToken, verifyAccessToken, lookupIp, formatLocation } from "@neo-id/auth-core";
+import type { PrismaClient } from "@neo-id/db";
+import { signAccessToken, signIdToken, generateToken, hashToken, verifyAccessToken } from "@neo-id/auth-core";
 import { TOKEN, SESSION } from "@neo-id/shared";
 import { getAccessTokenFromRequest, getRefreshTokenFromRequest } from "./auth-cookies";
 
@@ -10,6 +10,7 @@ interface SessionInfo {
   role: string;
   deviceInfo?: string;
   ipAddress?: string;
+  country?: string;
 }
 
 interface TokenResult {
@@ -19,26 +20,22 @@ interface TokenResult {
   sessionId: string;
 }
 
-async function populateSessionGeo(sessionId: string, ipAddress?: string) {
-  if (!ipAddress) return;
-  const geo = await lookupIp(ipAddress);
-  if (!geo) return;
-  const location = formatLocation(geo);
-  if (location === "Unknown") return;
-  await db.session.update({
+async function populateSessionGeo(client: PrismaClient, sessionId: string, country?: string) {
+  if (!country) return;
+  await client.session.update({
     where: { id: sessionId },
-    data: { location },
+    data: { location: country },
   }).catch(() => {});
 }
 
-export async function issueTokens(info: SessionInfo, reuseSessionId?: string, audience?: string): Promise<TokenResult> {
+export async function issueTokens(client: PrismaClient, info: SessionInfo, reuseSessionId?: string, audience?: string): Promise<TokenResult> {
   let session: { id: string } | undefined;
 
   // Reuse the browser's existing session when possible instead of minting a new one.
   if (reuseSessionId) {
-    const existing = await db.session.findUnique({ where: { id: reuseSessionId } });
+    const existing = await client.session.findUnique({ where: { id: reuseSessionId } });
     if (existing?.isActive && existing.userId === info.userId) {
-      session = await db.session.update({
+      session = await client.session.update({
         where: { id: existing.id },
         data: {
           lastActiveAt: new Date(),
@@ -51,7 +48,7 @@ export async function issueTokens(info: SessionInfo, reuseSessionId?: string, au
   }
 
   if (!session) {
-    session = await db.session.create({
+    session = await client.session.create({
       data: {
         userId: info.userId,
         deviceInfo: info.deviceInfo,
@@ -61,7 +58,7 @@ export async function issueTokens(info: SessionInfo, reuseSessionId?: string, au
     });
   }
 
-  void populateSessionGeo(session.id, info.ipAddress);
+  void populateSessionGeo(client, session.id, info.country);
 
   const accessToken = await signAccessToken(
     { sub: info.userId, email: info.email, role: info.role },
@@ -78,7 +75,7 @@ export async function issueTokens(info: SessionInfo, reuseSessionId?: string, au
   );
 
   const refreshToken = generateToken(TOKEN.REFRESH_TOKEN_LENGTH);
-  await db.refreshToken.create({
+  await client.refreshToken.create({
     data: {
       userId: info.userId,
       sessionId: session.id,
@@ -89,7 +86,7 @@ export async function issueTokens(info: SessionInfo, reuseSessionId?: string, au
     },
   });
 
-  await db.user.update({
+  await client.user.update({
     where: { id: info.userId },
     data: { lastLoginAt: new Date(), lastLoginIp: info.ipAddress },
   });
@@ -102,6 +99,7 @@ export async function getReusableSessionId(
   c: Context,
   userId: string,
 ): Promise<string | undefined> {
+  const client = c.get("db") as PrismaClient;
   // 1) Access token (already validated by requireAuth where applicable)
   const accessToken = getAccessTokenFromRequest(c);
   if (accessToken) {
@@ -124,12 +122,12 @@ export async function getReusableSessionId(
   }
   const refreshToken = getRefreshTokenFromRequest(c, bodyToken);
   if (refreshToken) {
-    const stored = await db.refreshToken.findUnique({
+    const stored = await client.refreshToken.findUnique({
       where: { tokenHash: hashToken(refreshToken) },
       select: { sessionId: true, userId: true },
     });
     if (stored?.sessionId && stored.userId === userId) {
-      const session = await db.session.findUnique({ where: { id: stored.sessionId } });
+      const session = await client.session.findUnique({ where: { id: stored.sessionId } });
       if (session?.isActive) return session.id;
     }
   }
@@ -141,13 +139,15 @@ type RefreshError = { ok: false; error: string; message: string };
 type RefreshSuccess = { ok: true; tokens: TokenResult; user: { id: string; email: string; role: string } };
 
 export async function verifyAndRotateRefreshToken(
+  client: PrismaClient,
   rawToken: string,
   deviceInfo?: string,
   ipAddress?: string,
   audience?: string,
+  country?: string,
 ): Promise<RefreshError | RefreshSuccess> {
   const tokenHash = hashToken(rawToken);
-  const storedToken = await db.refreshToken.findUnique({
+  const storedToken = await client.refreshToken.findUnique({
     where: { tokenHash },
     include: { user: true },
   });
@@ -172,12 +172,12 @@ export async function verifyAndRotateRefreshToken(
       return { ok: false, error: "USER_BANNED", message: "Your account has been banned" };
     }
 
-    const session = await db.session.findUnique({ where: { id: storedToken.sessionId } });
+    const session = await client.session.findUnique({ where: { id: storedToken.sessionId } });
     if (!session || !session.isActive) {
       return { ok: false, error: "TOKEN_INVALID", message: "Session is no longer active" };
     }
 
-    const tokens = await rotateSessionTokens({
+    const tokens = await rotateSessionTokens(client, {
       userId: user.id,
       email: user.email,
       role: user.role,
@@ -186,6 +186,7 @@ export async function verifyAndRotateRefreshToken(
       deviceInfo: deviceInfo ?? storedToken.deviceInfo ?? undefined,
       ipAddress,
       audience,
+      country,
     });
 
     return { ok: true, tokens, user };
@@ -204,17 +205,17 @@ export async function verifyAndRotateRefreshToken(
     return { ok: false, error: "INVALID_REQUEST", message: "Invalid session" };
   }
 
-  const session = await db.session.findUnique({ where: { id: storedToken.sessionId } });
+  const session = await client.session.findUnique({ where: { id: storedToken.sessionId } });
   if (!session || !session.isActive) {
     return { ok: false, error: "TOKEN_INVALID", message: "Session is no longer active" };
   }
 
-  await db.refreshToken.update({
+  await client.refreshToken.update({
     where: { id: storedToken.id },
     data: { revokedAt: new Date(), revokeReason: "rotated" },
   });
 
-  const tokens = await rotateSessionTokens({
+  const tokens = await rotateSessionTokens(client, {
     userId: user.id,
     email: user.email,
     role: user.role,
@@ -223,12 +224,13 @@ export async function verifyAndRotateRefreshToken(
     deviceInfo: deviceInfo ?? storedToken.deviceInfo ?? undefined,
     ipAddress,
     audience,
+    country,
   });
 
   return { ok: true, tokens, user };
 }
 
-export async function rotateSessionTokens(info: {
+export async function rotateSessionTokens(client: PrismaClient, info: {
   userId: string;
   email: string;
   role: string;
@@ -237,6 +239,7 @@ export async function rotateSessionTokens(info: {
   deviceInfo?: string;
   ipAddress?: string;
   audience?: string;
+  country?: string;
 }): Promise<TokenResult> {
   const newRefreshToken = generateToken(TOKEN.REFRESH_TOKEN_LENGTH);
 
@@ -253,7 +256,7 @@ export async function rotateSessionTokens(info: {
       },
       info.audience,
     ),
-    db.session.update({
+    client.session.update({
       where: { id: info.sessionId },
       data: {
         lastActiveAt: new Date(),
@@ -262,7 +265,7 @@ export async function rotateSessionTokens(info: {
         expiresAt: new Date(Date.now() + SESSION.INACTIVITY_TIMEOUT * 1000),
       },
     }),
-    db.refreshToken.create({
+    client.refreshToken.create({
       data: {
         userId: info.userId,
         sessionId: info.sessionId,
@@ -275,7 +278,7 @@ export async function rotateSessionTokens(info: {
     }),
   ]);
 
-  void populateSessionGeo(info.sessionId, info.ipAddress);
+  void populateSessionGeo(client, info.sessionId, info.country);
 
   return { accessToken, refreshToken: newRefreshToken, idToken, sessionId: info.sessionId };
 }

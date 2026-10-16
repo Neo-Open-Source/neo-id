@@ -84,6 +84,12 @@ pg-start:
 pg-stop:
     pg_ctl -D .pgdata stop -m fast 2>/dev/null || true
 
+# Upload stock avatars to R2 (shared neome-storage bucket, avatars/stock/)
+upload-stock:
+    for f in packages/web/public/avatars/*.jpg; do \
+      wrangler r2 object put --remote "neome-storage/avatars/stock/$(basename $f)" --file "$f" --content-type image/jpeg; \
+    done
+
 # Wipe everything (WARNING: deletes all data)
 reset:
     @just pg-stop 2>/dev/null || true

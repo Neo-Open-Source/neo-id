@@ -1,11 +1,10 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 
 export async function listPasskeys(c: Context) {
   const user = c.get("user");
 
-  const passkeys = await db.passkey.findMany({
+  const passkeys = await c.get("db").passkey.findMany({
     where: { userId: user.sub },
     select: {
       id: true,
@@ -28,7 +27,7 @@ export async function deletePasskey(c: Context) {
     return error(c, "INVALID_REQUEST", "Passkey ID is required");
   }
 
-  const passkey = await db.passkey.findFirst({
+  const passkey = await c.get("db").passkey.findFirst({
     where: { id, userId: user.sub },
   });
 
@@ -36,7 +35,7 @@ export async function deletePasskey(c: Context) {
     return error(c, "NOT_FOUND", "Passkey not found", 404);
   }
 
-  await db.passkey.delete({ where: { id } });
+  await c.get("db").passkey.delete({ where: { id } });
 
   return success(c, { ok: true });
 }

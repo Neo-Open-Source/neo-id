@@ -570,6 +570,76 @@
   border-radius: 999px;
 }
 
+.neo-logo {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  user-select: none;
+}
+
+.neo-logo-img {
+  display: block;
+  height: auto;
+}
+
+.neo-logo-img--dark {
+  display: none;
+}
+
+.dark .neo-logo-img--dark {
+  display: block;
+}
+
+.dark .neo-logo-img--light {
+  display: none;
+}
+
+.splash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  min-height: 60vh;
+  width: 100%;
+  background: var(--color-app);
+}
+
+.splash--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+.splash--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  min-height: 100%;
+}
+
+.splash__logo {
+  animation: splashAppear 450ms ease-out both;
+  filter: drop-shadow(0 8px 32px color-mix(in srgb, var(--color-accent) 25%, transparent));
+}
+
+.splash__label {
+  font-size: 13px;
+  color: var(--color-muted);
+  letter-spacing: 0.01em;
+}
+
+@keyframes splashAppear {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash__logo { animation: none; }
+}
+
 /* ─── Alert ────────────────────────────────────────────────────────────────── */
 
 .alert {

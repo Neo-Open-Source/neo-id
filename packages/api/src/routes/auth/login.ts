@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { verify } from "@neo-id/auth-core";
 import { loginSchema } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
@@ -24,9 +23,9 @@ export async function login(c: Context) {
       return error(c, "RATE_LIMITED", "Security check failed", 429);
     }
   }
-  const { deviceInfo, ipAddress } = getRequestInfo(c);
+  const { deviceInfo, ipAddress, country } = getRequestInfo(c);
 
-  const user = await db.user.findUnique({ where: { email } });
+  const user = await c.get("db").user.findUnique({ where: { email } });
   if (!user) {
     return error(c, "INVALID_CREDENTIALS", "Email or password is incorrect");
   }
@@ -45,7 +44,7 @@ export async function login(c: Context) {
   }
 
   // Check MFA
-  const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
+  const passkeyCount = await c.get("db").passkey.count({ where: { userId: user.id } });
   const hasMfa = user.totpEnabled || user.emailMfaEnabled;
 
   if (hasMfa) {
@@ -64,13 +63,14 @@ export async function login(c: Context) {
 
   // Reuse the browser's existing active session on re-login instead of
   // accumulating a new Session row per login.
-  const tokens = await issueTokens(
+  const tokens = await issueTokens(c.get("db"), 
     {
       userId: user.id,
       email: user.email,
       role: user.role,
       deviceInfo,
       ipAddress,
+      country,
     },
     await getReusableSessionId(c, user.id),
   );

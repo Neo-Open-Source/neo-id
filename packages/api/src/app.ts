@@ -1,12 +1,11 @@
 import { Hono, type Context } from "hono";
+import { db, getWorkersDb, type PrismaClient } from "@neo-id/db";
+import { isWorkersRuntime } from "@neo-id/shared";
 import { corsMiddleware } from "./middleware/cors";
 import { requestIdMiddleware } from "./middleware/request-id";
 import { requireAuth } from "./middleware/auth";
 import { rateLimit } from "./middleware/rate-limit";
-import { startCleanup } from "./helpers/cleanup";
-import { warmGeoIp } from "@neo-id/auth-core";
-
-warmGeoIp();
+import { startCleanup, scheduled as cleanupScheduled } from "./helpers/cleanup";
 
 // Auth Routes
 import { register } from "./routes/auth/register";
@@ -21,6 +20,7 @@ import { getProfile, updateProfile, checkUsername, confirmAge } from "./routes/u
 import { changePassword, requestProfilePasswordReset, verifyProfilePasswordReset, confirmProfilePasswordReset, startProfilePasskeyResetChallenge, sendPasswordResetCode } from "./routes/user/password";
 import { uploadAvatar, deleteAvatar, setStockAvatar } from "./routes/user/avatar";
 import { getAvatarImage } from "./routes/user/avatar-image";
+import { cdnRoutes } from "./routes/cdn";
 import { deleteAccount, deleteChallenge, startDeletePasskey, sendDeleteCode } from "./routes/user/delete";
 import { exportUserData, exportChallenge, startExportPasskey, sendExportCode } from "./routes/user/export";
 import { listIdentities, disconnectIdentity } from "./routes/user/identities";
@@ -95,16 +95,40 @@ import {
 // Password Reset
 import { requestPasswordReset, verifyForgotPasswordMfa, startPasskeyResetChallenge, checkResetToken, resetPassword } from "./routes/auth/forgot-password";
 
-const app = new Hono();
+const app = new Hono<{ Bindings: Env; Variables: { db: PrismaClient } }>();
+
+declare module "hono" {
+  interface ContextVariableMap {
+    db: PrismaClient;
+  }
+}
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
 
+let envSynced = false;
+app.use("*", async (c, next) => {
+  if (!envSynced && c.env) {
+    for (const [k, v] of Object.entries(c.env)) {
+      if (typeof v === "string" && process.env[k] === undefined) process.env[k] = v;
+    }
+    envSynced = true;
+  }
+  await next();
+});
+
+// Request-scoped Prisma client: Workers use an isolate-cached Neon HTTP client
+// (pg TCP pools cannot run on Workers); Node reuses the existing singleton.
+app.use("*", async (c, next) => {
+  c.set("db", isWorkersRuntime() ? getWorkersDb(c.env.DATABASE_URL) : db);
+  await next();
+});
+
 // Lazy-start cleanup on first incoming request (avoids DB access during build)
 let cleanupStarted = false;
-app.use("*", async (_, next) => {
+app.use("*", async (c, next) => {
   if (!cleanupStarted) {
     cleanupStarted = true;
-    startCleanup();
+    startCleanup(c.get("db"));
   }
   await next();
 });
@@ -115,6 +139,10 @@ app.use("*", requestIdMiddleware);
 // ─── Health ──────────────────────────────────────────────────────────────────
 
 app.get("/health", (c) => c.json({ status: "ok", version: "4.0.0" }));
+
+// Dev-only R2 mirror. 404s in prod and when no R2 binding is mounted,
+// so Node/Vercel deployments are unaffected.
+app.route("/v1/cdn", cdnRoutes);
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
 
@@ -268,5 +296,7 @@ app.get("/.well-known/openid-configuration", oidcConfig);
 app.get("/.well-known/jwks.json", jwksHandler);
 app.get("/api/.well-known/openid-configuration", oidcConfig);
 app.get("/api/.well-known/jwks.json", jwksHandler);
+
+Object.assign(app, { scheduled: cleanupScheduled });
 
 export default app;

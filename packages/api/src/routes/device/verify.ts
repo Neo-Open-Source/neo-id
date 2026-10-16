@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 
 export async function getDeviceCodeInfo(c: Context) {
@@ -9,7 +8,7 @@ export async function getDeviceCodeInfo(c: Context) {
     return error(c, "INVALID_REQUEST", "code parameter is required");
   }
 
-  const deviceCode = await db.deviceCode.findUnique({
+  const deviceCode = await c.get("db").deviceCode.findUnique({
     where: { userCode: code.toUpperCase() },
     select: {
       userCode: true,
@@ -49,7 +48,7 @@ export async function approveDeviceCode(c: Context) {
     return error(c, "UNAUTHORIZED", "Login required", 401);
   }
 
-  const deviceCode = await db.deviceCode.findUnique({
+  const deviceCode = await c.get("db").deviceCode.findUnique({
     where: { userCode: user_code.toUpperCase() },
   });
 
@@ -66,7 +65,7 @@ export async function approveDeviceCode(c: Context) {
   }
 
   // Approve
-  await db.deviceCode.update({
+  await c.get("db").deviceCode.update({
     where: { id: deviceCode.id },
     data: {
       status: "approved",
@@ -86,7 +85,7 @@ export async function denyDeviceCode(c: Context) {
     return error(c, "INVALID_REQUEST", "user_code is required");
   }
 
-  const deviceCode = await db.deviceCode.findUnique({
+  const deviceCode = await c.get("db").deviceCode.findUnique({
     where: { userCode: user_code.toUpperCase() },
   });
 
@@ -94,7 +93,7 @@ export async function denyDeviceCode(c: Context) {
     return error(c, "NOT_FOUND", "Invalid code", 404);
   }
 
-  await db.deviceCode.update({
+  await c.get("db").deviceCode.update({
     where: { id: deviceCode.id },
     data: { status: "denied" },
   });

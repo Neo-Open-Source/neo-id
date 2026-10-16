@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { generateToken } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 import { randomBytes } from "node:crypto";
@@ -25,7 +24,7 @@ export async function requestDeviceCode(c: Context) {
   }
 
   // Verify service app exists
-  const serviceApp = await db.serviceApp.findUnique({
+  const serviceApp = await c.get("db").serviceApp.findUnique({
     where: { clientId: client_id },
     select: { id: true, isActive: true },
   });
@@ -42,7 +41,7 @@ export async function requestDeviceCode(c: Context) {
   const scopes = scope ? scope.split(" ") : ["openid", "profile", "email"];
 
   // Create device code record
-  await db.deviceCode.create({
+  await c.get("db").deviceCode.create({
     data: {
       deviceCode,
       userCode,

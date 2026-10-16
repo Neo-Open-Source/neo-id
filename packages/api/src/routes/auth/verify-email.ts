@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 import { normalizeEmail, verifyAndUseMfaCode, unusedMfaCodeWhere } from "../../helpers/mfa-code";
 
@@ -12,7 +11,7 @@ export async function verifyEmail(c: Context) {
     return error(c, "INVALID_REQUEST", "email and code are required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: { id: true, emailVerified: true },
   });
@@ -20,10 +19,10 @@ export async function verifyEmail(c: Context) {
   if (!user) return error(c, "USER_NOT_FOUND", "User not found", 404);
   if (user.emailVerified) return success(c, { verified: true });
 
-  const { valid } = await verifyAndUseMfaCode(user.id, "verify_email", code);
+  const { valid } = await verifyAndUseMfaCode(c.get("db"), user.id, "verify_email", code);
   if (!valid) return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
 
-  await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+  await c.get("db").user.update({ where: { id: user.id }, data: { emailVerified: true } });
 
   return success(c, { verified: true });
 }
@@ -36,7 +35,7 @@ export async function verifyEmailByToken(c: Context) {
     return error(c, "INVALID_REQUEST", "token is required");
   }
 
-  const record = await db.mfaCode.findFirst({
+  const record = await c.get("db").mfaCode.findFirst({
     where: {
       code: token,
       purpose: "verify_email_link",
@@ -51,14 +50,12 @@ export async function verifyEmailByToken(c: Context) {
   }
 
   if (record.user.emailVerified) {
-    await db.mfaCode.update({ where: { id: record.id }, data: { usedAt: new Date() } });
+    await c.get("db").mfaCode.update({ where: { id: record.id }, data: { usedAt: new Date() } });
     return success(c, { verified: true });
   }
 
-  await db.$transaction([
-    db.mfaCode.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
-    db.user.update({ where: { id: record.user.id }, data: { emailVerified: true } }),
-  ]);
+  await c.get("db").mfaCode.update({ where: { id: record.id }, data: { usedAt: new Date() } });
+  await c.get("db").user.update({ where: { id: record.user.id }, data: { emailVerified: true } });
 
   return success(c, { verified: true });
 }

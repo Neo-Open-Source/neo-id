@@ -7,7 +7,13 @@
     "dev": "next dev --port ${PORT:-3001}",
     "build": "pnpm --filter @neo-id/shared build && next build",
     "start": "next start",
-    "lint": "eslint --config ../../eslint.config.mjs app/ components/ hooks/ lib/"
+    "lint": "eslint --config ../../eslint.config.mjs app/ components/ hooks/ lib/",
+    "dev:vinext": "vite dev --port 3001",
+    "build:vinext": "vite build",
+    "deploy:vinext": "vinext-cloudflare deploy",
+    "preview": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "start:vinext": "wrangler dev --config dist/server/wrangler.json"
   },
   "dependencies": {
     "@flaticon/flaticon-uicons": "^3.3.1",
@@ -15,24 +21,32 @@
     "@neo-id/auth-core": "workspace:*",
     "@neo-id/db": "workspace:*",
     "@neo-id/shared": "workspace:*",
+    "@vinext/cloudflare": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jose": "^6.0.0",
     "lucide-react": "^1.48.0",
     "next": "16.2.11",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "react-easy-crop": "^6.2.2",
+    "react-server-dom-webpack": "^19.3.1",
     "sonner": "^1.7.0",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "vinext": "^1.2.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-rsc": "^0.5.38",
     "eslint": "^9",
     "tailwindcss": "^4",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vite": "^8.3.4",
+    "wrangler": "^4.151.0"
   }
 }

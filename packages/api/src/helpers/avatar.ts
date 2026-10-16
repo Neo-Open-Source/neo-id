@@ -1,4 +1,4 @@
-import { db } from "@neo-id/db";
+import type { PrismaClient } from "@neo-id/db";
 import { AVATAR } from "@neo-id/shared";
 
 const FETCH_HEADERS = {
@@ -40,6 +40,7 @@ export async function fetchExternalAvatar(url: string): Promise<{ contentType: s
 
 /** Download remote avatar and store as data URL so the browser never hits Google directly. */
 export async function cacheExternalAvatar(
+  client: PrismaClient,
   userId: string,
   avatar: string | null | undefined,
 ): Promise<string | null | undefined> {
@@ -50,7 +51,7 @@ export async function cacheExternalAvatar(
 
   const dataUrl = `data:${fetched.contentType};base64,${fetched.buffer.toString("base64")}`;
 
-  await db.user.update({
+  await client.user.update({
     where: { id: userId },
     data: { avatar: dataUrl },
   });
@@ -72,4 +73,47 @@ export async function resolveAvatarBytes(
   }
 
   return null;
+}
+
+export type AvatarExt = "png" | "jpg" | "webp" | "gif";
+
+export function sniffImageExt(buf: Uint8Array): AvatarExt | null {
+  if (buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47)
+    return "png";
+  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
+  if (
+    buf.length > 12 &&
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  )
+    return "webp";
+  if (
+    buf.length > 6 &&
+    buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38 &&
+    (buf[4] === 0x37 || buf[4] === 0x39) && buf[5] === 0x61
+  )
+    return "gif";
+  return null;
+}
+
+export function avatarContentType(ext: AvatarExt): string {
+  if (ext === "jpg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  return "image/gif";
+}
+
+export const avatarKeyFor = (hash: string, ext: string): string => `avatars/${hash}.${ext}`;
+
+export async function sha256Hex(data: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", Uint8Array.from(data));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function isAvatarKeyReferenced(client: PrismaClient, key: string): Promise<boolean> {
+  const ref = await client.user.findFirst({
+    where: { OR: [{ avatarKey: key }, { prevAvatarKey: key }] },
+    select: { id: true },
+  });
+  return !!ref;
 }

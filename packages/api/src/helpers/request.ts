@@ -3,9 +3,12 @@ import type { ZodSchema } from "zod";
 
 export function getRequestInfo(c: Context) {
   const forwarded = c.req.header("X-Forwarded-For");
+  const cf = (c.req.raw as { cf?: { country?: string } }).cf;
+  const country = c.req.header("CF-IPCountry") || cf?.country;
   return {
     deviceInfo: c.req.header("User-Agent"),
     ipAddress: forwarded?.split(",")[0]?.trim() || c.req.header("X-Real-IP") || c.req.header("CF-Connecting-IP"),
+    country: country || undefined,
   };
 }
 

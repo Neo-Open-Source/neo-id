@@ -289,6 +289,8 @@ const uk: Translations = {
     cropPhoto: "Обрізати фото",
     cropApply: "Застосувати",
     cropBack: "Назад",
+    cropCancel: "Скасувати",
+    cropDone: "Готово",
   },
   language: {
     title: "Мова",

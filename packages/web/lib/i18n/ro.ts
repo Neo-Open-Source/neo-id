@@ -308,6 +308,8 @@ const ro = {
     cropPhoto: "Decupează fotografia",
     cropApply: "Aplică",
     cropBack: "Înapoi",
+    cropCancel: "Anulează",
+    cropDone: "Gata",
   },
   language: {
     title: "Limbă",

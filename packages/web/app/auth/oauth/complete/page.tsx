@@ -1,17 +1,12 @@
 "use client";
 
 import { Suspense } from "react";
+import { SplashScreen } from "@/components/ui/SplashScreen";
 import OAuthCompletePage from "./OAuthCompleteClient";
 
 export default function Page() {
   return (
-    <Suspense
-      fallback={
-        <div className="loading">
-          <div className="loading__spinner" />
-        </div>
-      }
-    >
+    <Suspense fallback={<SplashScreen />}>
       <OAuthCompletePage />
     </Suspense>
   );

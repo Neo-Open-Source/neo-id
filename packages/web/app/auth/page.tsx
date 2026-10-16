@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthForm } from "@/components/features/auth/AuthForm";
+import { SplashScreen } from "@/components/ui/SplashScreen";
 import { ensureSession, hasSessionHint } from "@/lib/api";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 
@@ -47,11 +48,7 @@ function AuthPageContent() {
   }, [router, searchParams]);
 
   if (checking) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-app">
-        <div className="loading__spinner" />
-      </div>
-    );
+    return <SplashScreen prefetch={hasSessionHint()} />;
   }
 
   return (
@@ -66,11 +63,7 @@ function AuthPageContent() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-svh items-center justify-center bg-app">
-        <div className="loading__spinner" />
-      </div>
-    }>
+    <Suspense fallback={<SplashScreen />}>
       <AuthPageContent />
     </Suspense>
   );

@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { hashToken, verifyAccessToken } from "@neo-id/auth-core";
 import { success } from "../../helpers/response";
 import {
@@ -27,7 +26,7 @@ export async function logout(c: Context) {
   if (!userId) {
     const refreshToken = getRefreshTokenFromRequest(c);
     if (refreshToken) {
-      const stored = await db.refreshToken.findUnique({
+      const stored = await c.get("db").refreshToken.findUnique({
         where: { tokenHash: hashToken(refreshToken) },
       });
       if (stored) {
@@ -39,23 +38,21 @@ export async function logout(c: Context) {
 
   if (userId) {
     if (sessionId) {
-      await db.refreshToken.updateMany({
-        where: { sessionId, revokedAt: null },
-        data: { revokedAt: new Date(), revokeReason: "logout" },
-      });
-      await db.session.updateMany({
-        where: { id: sessionId, isActive: true },
-        data: { isActive: false },
-      });
+      await c.get("db").$executeRawUnsafe(
+        `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "sessionId" = $1 AND "revokedAt" IS NULL`,
+        sessionId,
+        new Date(),
+        "logout",
+      );
+      await c.get("db").$executeRawUnsafe(`UPDATE "sessions" SET "isActive" = false WHERE "id" = $1 AND "isActive" = true`, sessionId);
     } else {
-      await db.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date(), revokeReason: "logout" },
-      });
-      await db.session.updateMany({
-        where: { userId, isActive: true },
-        data: { isActive: false },
-      });
+      await c.get("db").$executeRawUnsafe(
+        `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "userId" = $1 AND "revokedAt" IS NULL`,
+        userId,
+        new Date(),
+        "logout",
+      );
+      await c.get("db").$executeRawUnsafe(`UPDATE "sessions" SET "isActive" = false WHERE "userId" = $1 AND "isActive" = true`, userId);
     }
   }
 

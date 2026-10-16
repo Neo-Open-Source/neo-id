@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 
 const MAX_LOGO_SIZE = 2 * 1024 * 1024; // 2MB
@@ -10,7 +9,7 @@ export async function uploadServiceLogo(c: Context) {
   const { id } = c.req.param();
 
   // Verify ownership
-  const service = await db.serviceApp.findFirst({
+  const service = await c.get("db").serviceApp.findFirst({
     where: { id, ownerId: user.sub },
     select: { id: true },
   });
@@ -40,7 +39,7 @@ export async function uploadServiceLogo(c: Context) {
   const dataUrl = `data:${file.type};base64,${base64}`;
 
   // Update database
-  await db.serviceApp.update({
+  await c.get("db").serviceApp.update({
     where: { id },
     data: { logoUrl: dataUrl },
   });

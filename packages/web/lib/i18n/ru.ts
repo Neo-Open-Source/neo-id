@@ -289,6 +289,8 @@ const ru: Translations = {
     cropPhoto: "Обрезать фото",
     cropApply: "Применить",
     cropBack: "Назад",
+    cropCancel: "Отмена",
+    cropDone: "Готово",
   },
   language: {
     title: "Язык",

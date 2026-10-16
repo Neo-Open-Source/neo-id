@@ -296,6 +296,8 @@ export interface Translations {
     cropPhoto: string;
     cropApply: string;
     cropBack: string;
+    cropCancel: string;
+    cropDone: string;
   };
   language: {
     title: string;

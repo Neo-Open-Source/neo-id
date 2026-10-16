@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { SplashScreen } from "@/components/ui/SplashScreen";
 import { GoogleIcon, GithubIcon } from "@/components/ui/ProviderIcons";
 import { Icon } from "@/components/ui/Icon";
 import { Turnstile } from "@/components/ui/Turnstile";
 import { setSessionTokens, getStoredRefreshToken } from "@/lib/api";
+import { prefetchAppBounded } from "@/lib/prefetch-app";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -26,6 +28,7 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "password">(initialLoginStep);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const afterLogin = resolveAuthRedirect(searchParams.get("redirect"));
@@ -94,6 +97,9 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
         });
       }
 
+      setRedirecting(true);
+      await prefetchAppBounded();
+
       // OAuth authorize must be a full document navigation so 302 → consent works
       if (afterLogin.startsWith("/api/")) {
         window.location.assign(afterLogin);
@@ -107,7 +113,8 @@ export function LoginForm({ initialEmail = "", initialLoginStep = "email", onTog
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5" style={{ position: "relative" }}>
+      {redirecting && <SplashScreen variant="overlay" logoSize={44} />}
       <div key={step} className="flex flex-col gap-5 animate-authSlideIn">
         <Input
           label={t.auth.email}

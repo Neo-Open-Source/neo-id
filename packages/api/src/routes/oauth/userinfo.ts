@@ -1,11 +1,10 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 
 export async function userinfo(c: Context) {
   const user = c.get("user");
 
-  const profile = await db.user.findUnique({
+  const profile = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: {
       id: true,

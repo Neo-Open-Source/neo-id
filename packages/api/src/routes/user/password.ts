@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { hash, verify, verifyTotp, generateToken, hashToken } from "@neo-id/auth-core";
 import { changePasswordSchema } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
@@ -26,7 +25,7 @@ export async function changePassword(c: Context) {
 
   const { currentPassword, newPassword } = parsed.data;
 
-  const currentUser = await db.user.findUnique({
+  const currentUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { passwordHash: true },
   });
@@ -43,18 +42,17 @@ export async function changePassword(c: Context) {
 
   const newHash = await hash(newPassword);
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.sub },
     data: { passwordHash: newHash },
   });
 
-  await db.refreshToken.updateMany({
-    where: {
-      userId: user.sub,
-      revokedAt: null,
-    },
-    data: { revokedAt: new Date(), revokeReason: "password_changed" },
-  });
+  await c.get("db").$executeRawUnsafe(
+    `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "userId" = $1 AND "revokedAt" IS NULL`,
+    user.sub,
+    new Date(),
+    "password_changed",
+  );
 
   return success(c, { ok: true });
 }
@@ -62,7 +60,7 @@ export async function changePassword(c: Context) {
 export async function requestProfilePasswordReset(c: Context) {
   const authUser = c.get("user");
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id: authUser.sub },
     select: {
       id: true,
@@ -81,7 +79,7 @@ export async function requestProfilePasswordReset(c: Context) {
   if (user.totpEnabled) mfaMethods.push("totp");
   if (user.emailMfaEnabled) mfaMethods.push("email");
 
-  const passkeys = await db.passkey.findMany({
+  const passkeys = await c.get("db").passkey.findMany({
     where: { userId: user.id },
     select: { id: true },
   });
@@ -101,7 +99,7 @@ export async function requestProfilePasswordReset(c: Context) {
 export async function sendPasswordResetCode(c: Context) {
   const authUser = c.get("user");
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id: authUser.sub },
     select: { id: true, email: true, passwordHash: true, emailMfaEnabled: true },
   });
@@ -113,7 +111,7 @@ export async function sendPasswordResetCode(c: Context) {
     return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
   }
 
-  await createAndSendMfaCode(
+  await createAndSendMfaCode(c.get("db"), 
     user.id,
     "profile_password_reset",
     sendEmailCode,
@@ -135,7 +133,7 @@ export async function verifyProfilePasswordReset(c: Context) {
     return error(c, "INVALID_REQUEST", "method is required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id: authUser.sub },
     select: {
       id: true,
@@ -169,7 +167,7 @@ export async function verifyProfilePasswordReset(c: Context) {
     if (!code) {
       return error(c, "INVALID_REQUEST", "code is required for email MFA");
     }
-    const { valid } = await verifyAndUseMfaCode(user.id, "profile_password_reset", code);
+    const { valid } = await verifyAndUseMfaCode(c.get("db"), user.id, "profile_password_reset", code);
     if (!valid) {
       return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
     }
@@ -177,7 +175,7 @@ export async function verifyProfilePasswordReset(c: Context) {
     if (!response || !expectedChallenge) {
       return error(c, "INVALID_REQUEST", "response and expectedChallenge are required for passkey");
     }
-    const passkey = await db.passkey.findFirst({
+    const passkey = await c.get("db").passkey.findFirst({
       where: { userId: user.id, credentialId: response.id },
     });
     if (!passkey) {
@@ -191,7 +189,7 @@ export async function verifyProfilePasswordReset(c: Context) {
     if (!result.verified) {
       return error(c, "MFA_INVALID_CODE", "Passkey verification failed");
     }
-    await db.passkey.update({
+    await c.get("db").passkey.update({
       where: { id: passkey.id },
       data: { counter: result.newCounter ?? passkey.counter, lastUsedAt: new Date() },
     });
@@ -200,7 +198,7 @@ export async function verifyProfilePasswordReset(c: Context) {
   }
 
   const resetTicket = generateToken(32);
-  await db.oAuthState.create({
+  await c.get("db").oAuthState.create({
     data: {
       state: hashToken(resetTicket),
       mode: "password_reset_ticket",
@@ -227,7 +225,7 @@ export async function confirmProfilePasswordReset(c: Context) {
     return error(c, "INVALID_REQUEST", "Password must be at least 8 characters");
   }
 
-  const ticket = await db.oAuthState.findUnique({
+  const ticket = await c.get("db").oAuthState.findUnique({
     where: { state: hashToken(resetTicket) },
   });
 
@@ -241,9 +239,9 @@ export async function confirmProfilePasswordReset(c: Context) {
     return error(c, "INVALID_REQUEST", "Invalid or expired reset ticket");
   }
 
-  await db.oAuthState.delete({ where: { id: ticket.id } });
+  await c.get("db").oAuthState.delete({ where: { id: ticket.id } });
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id: authUser.sub },
     select: { id: true, email: true, passwordHash: true },
   });
@@ -254,24 +252,27 @@ export async function confirmProfilePasswordReset(c: Context) {
 
   const newHash = await hash(newPassword);
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.id },
     data: { passwordHash: newHash },
   });
 
-  await db.refreshToken.updateMany({
-    where: { userId: user.id },
-    data: { revokedAt: new Date(), revokeReason: "password_reset" },
-  });
+  await c.get("db").$executeRawUnsafe(
+    `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "userId" = $1`,
+    user.id,
+    new Date(),
+    "password_reset",
+  );
 
-  const { deviceInfo, ipAddress } = getRequestInfo(c);
-  const tokens = await issueTokens(
+  const { deviceInfo, ipAddress, country } = getRequestInfo(c);
+  const tokens = await issueTokens(c.get("db"), 
     {
       userId: user.id,
       email: user.email,
       role: authUser.role,
       deviceInfo,
       ipAddress,
+      country,
     },
     await getReusableSessionId(c, user.id),
   );
@@ -289,7 +290,7 @@ export async function confirmProfilePasswordReset(c: Context) {
 export async function startProfilePasskeyResetChallenge(c: Context) {
   const authUser = c.get("user");
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id: authUser.sub },
     select: { id: true, passwordHash: true },
   });
@@ -298,7 +299,7 @@ export async function startProfilePasskeyResetChallenge(c: Context) {
     return error(c, "INVALID_REQUEST", "No password set. Use a connected account.");
   }
 
-  const passkeys = await db.passkey.findMany({
+  const passkeys = await c.get("db").passkey.findMany({
     where: { userId: user.id },
     select: { credentialId: true, transports: true },
   });

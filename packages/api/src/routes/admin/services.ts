@@ -1,10 +1,9 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 import { sendBroadcastEmail } from "../../helpers/email";
 
 export async function listAllServices(c: Context) {
-  const services = await db.serviceApp.findMany({
+  const services = await c.get("db").serviceApp.findMany({
     select: {
       id: true,
       clientId: true,
@@ -52,19 +51,19 @@ export async function setServiceActive(c: Context) {
   const body = await c.req.json();
   const isActive = body.isActive === true || body.isActive === "true";
 
-  const service = await db.serviceApp.findUnique({ where: { id } });
+  const service = await c.get("db").serviceApp.findUnique({ where: { id } });
   if (!service) {
     return error(c, "NOT_FOUND", "Service not found", 404);
   }
 
-  const updated = await db.serviceApp.update({
+  const updated = await c.get("db").serviceApp.update({
     where: { id },
     data: { isActive },
     select: { id: true, isActive: true },
   });
 
   const admin = c.get("user");
-  await db.auditLog.create({
+  await c.get("db").auditLog.create({
     data: {
       actorId: admin.sub,
       actorEmail: admin.email,
@@ -80,16 +79,16 @@ export async function setServiceActive(c: Context) {
 export async function deleteAnyService(c: Context) {
   const { id } = c.req.param();
 
-  const service = await db.serviceApp.findUnique({ where: { id } });
+  const service = await c.get("db").serviceApp.findUnique({ where: { id } });
   if (!service) {
     return error(c, "NOT_FOUND", "Service not found", 404);
   }
 
-  await db.authorizedConnection.deleteMany({ where: { serviceAppId: id } });
-  await db.serviceApp.delete({ where: { id } });
+  await c.get("db").$executeRawUnsafe(`DELETE FROM "authorized_connections" WHERE "serviceAppId" = $1`, id);
+  await c.get("db").serviceApp.delete({ where: { id } });
 
   const admin = c.get("user");
-  await db.auditLog.create({
+  await c.get("db").auditLog.create({
     data: {
       actorId: admin.sub,
       actorEmail: admin.email,
@@ -119,7 +118,7 @@ export async function sendBroadcast(c: Context) {
         ? { role: { in: ["developer", "admin"] } }
         : { status: "active" };
 
-  const users = await db.user.findMany({
+  const users = await c.get("db").user.findMany({
     where,
     select: { email: true },
   });
@@ -136,7 +135,7 @@ export async function sendBroadcast(c: Context) {
   });
 
   const admin = c.get("user");
-  await db.auditLog.create({
+  await c.get("db").auditLog.create({
     data: {
       actorId: admin.sub,
       actorEmail: admin.email,

@@ -6,4 +6,7 @@ export default defineConfig({
   dts: false, // DTS generated via tsc --build
   clean: true,
   sourcemap: true,
+  loader: {
+    ".wasm": "copy",
+  },
 });

@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { generateToken, verifyAccessToken } from "@neo-id/auth-core";
 import { error } from "../../helpers/response";
 import {
@@ -47,7 +46,7 @@ export async function authorize(c: Context) {
     return authorizeError(c, "INVALID_REQUEST", "Only response_type=code is supported");
   }
 
-  const serviceApp = await db.serviceApp.findUnique({
+  const serviceApp = await c.get("db").serviceApp.findUnique({
     where: { clientId: client_id },
     select: {
       id: true,
@@ -97,10 +96,13 @@ export async function authorize(c: Context) {
   if (!userId) {
     const refreshToken = getRefreshTokenFromRequest(c);
     if (refreshToken) {
-      const result = await verifyAndRotateRefreshToken(
+      const reqInfo = getRequestInfo(c);
+      const result = await verifyAndRotateRefreshToken(c.get("db"), 
         refreshToken,
         undefined,
-        getRequestInfo(c).ipAddress,
+        reqInfo.ipAddress,
+        undefined,
+        reqInfo.country,
       );
       if (result.ok) {
         setAuthCookies(c, result.tokens);
@@ -121,7 +123,7 @@ export async function authorize(c: Context) {
   }
 
   // Always show consent — create pending session then open the consent UI
-  const pendingState = await db.oAuthState.create({
+  const pendingState = await c.get("db").oAuthState.create({
     data: {
       state: state || generateToken(16),
       code: null,

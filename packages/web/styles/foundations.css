@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-golos), system-ui, -apple-system, sans-serif;
 
   --color-brand: #0060DF;
   --color-brand-hover: #0250BB;
@@ -319,11 +319,11 @@
 }
 
 html {
-  scrollbar-gutter: stable;
+  overflow-x: clip;
 }
 
 body {
-  scrollbar-gutter: stable;
+  overflow-x: clip;
 }
 
 /* Hide scrollbar on auth pages — applied via .auth-shell class on wrapper */

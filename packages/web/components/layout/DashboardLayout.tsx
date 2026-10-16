@@ -6,9 +6,11 @@ import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
+import { SplashScreen } from "@/components/ui/SplashScreen";
 import { useCachedQuery } from "@/hooks/useCachedQuery";
 import { readCache } from "@/lib/cache";
 import { logoutSession } from "@/lib/api";
+import { prefetchAppBounded } from "@/lib/prefetch-app";
 
 interface UserData {
   id: string;
@@ -22,7 +24,7 @@ interface UserData {
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
-  const { data: user, error } = useCachedQuery<UserData>("/user/profile");
+  const { data: user, error, isLoading } = useCachedQuery<UserData>("/user/profile");
 
   useEffect(() => {
     if (error && !user) {
@@ -46,10 +48,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     router.replace("/auth");
   };
 
-  // Render children immediately — they render their own skeletons while data
-  // loads. The header/nav gracefully handle user=null with placeholders.
+  const showSplash = !user && (isLoading || error === null);
+
+  useEffect(() => {
+    if (showSplash) void prefetchAppBounded();
+  }, [showSplash]);
+
   return (
     <div className="dashboard-shell min-h-dvh bg-app flex flex-col">
+      {showSplash && <SplashScreen logoSize={44} />}
       <div className="hidden md:block">
         <Header user={user ?? null} onLogout={handleLogout} />
       </div>

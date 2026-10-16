@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { OAUTH_PROVIDERS } from "@neo-id/shared";
 import { generateToken, verifyAccessToken } from "@neo-id/auth-core";
 import { cacheExternalAvatar } from "../../helpers/avatar";
@@ -80,7 +79,7 @@ async function beginSocialOAuth(
 
   const state = createOAuthStateToken();
 
-  await db.oAuthState.create({
+  await c.get("db").oAuthState.create({
     data: {
       state,
       provider,
@@ -114,12 +113,12 @@ export async function socialOAuthCallback(c: Context) {
     return c.redirect(redirectWithError(WEB_URL, "invalid_request"), 302);
   }
 
-  const oauthState = await db.oAuthState.findUnique({ where: { state } });
+  const oauthState = await c.get("db").oAuthState.findUnique({ where: { state } });
   if (!oauthState || oauthState.expiresAt < new Date() || oauthState.provider !== provider) {
     return c.redirect(redirectWithError(WEB_URL, "expired_state"), 302);
   }
 
-  await db.oAuthState.delete({ where: { id: oauthState.id } });
+  await c.get("db").oAuthState.delete({ where: { id: oauthState.id } });
 
   let userInfo;
   try {
@@ -132,10 +131,10 @@ export async function socialOAuthCallback(c: Context) {
     return c.redirect(redirectWithError(WEB_URL, "email_required"), 302);
   }
 
-  const { deviceInfo, ipAddress } = getRequestInfo(c);
+  const { deviceInfo, ipAddress, country } = getRequestInfo(c);
 
   if (oauthState.mode === "link" && oauthState.userId) {
-    const existing = await db.identity.findUnique({
+    const existing = await c.get("db").identity.findUnique({
       where: {
         provider_providerUserId: {
           provider,
@@ -148,30 +147,36 @@ export async function socialOAuthCallback(c: Context) {
       return c.redirect(redirectWithError(WEB_URL, "account_already_linked"), 302);
     }
 
-    await db.identity.upsert({
+    const existingIdentity = await c.get("db").identity.findUnique({
       where: {
         provider_providerUserId: {
           provider,
           providerUserId: userInfo.id,
         },
       },
-      create: {
-        userId: oauthState.userId,
-        provider,
-        providerUserId: userInfo.id,
-      },
-      update: {
-        userId: oauthState.userId,
-      },
     });
+    if (existingIdentity) {
+      await c.get("db").identity.update({
+        where: { id: existingIdentity.id },
+        data: { userId: oauthState.userId },
+      });
+    } else {
+      await c.get("db").identity.create({
+        data: {
+          userId: oauthState.userId,
+          provider,
+          providerUserId: userInfo.id,
+        },
+      });
+    }
 
     if (userInfo.picture) {
-      const user = await db.user.findUnique({
+      const user = await c.get("db").user.findUnique({
         where: { id: oauthState.userId },
         select: { avatar: true },
       });
       if (!user?.avatar) {
-        await cacheExternalAvatar(oauthState.userId, userInfo.picture);
+        await cacheExternalAvatar(c.get("db"), oauthState.userId, userInfo.picture);
       }
     }
 
@@ -181,7 +186,7 @@ export async function socialOAuthCallback(c: Context) {
     return c.redirect(url.toString(), 302);
   }
 
-  const identity = await db.identity.findUnique({
+  const identity = await c.get("db").identity.findUnique({
     where: {
       provider_providerUserId: {
         provider,
@@ -194,11 +199,11 @@ export async function socialOAuthCallback(c: Context) {
   let user = identity?.user;
 
   if (!user) {
-    const found = await db.user.findUnique({ where: { email: userInfo.email } });
+    const found = await c.get("db").user.findUnique({ where: { email: userInfo.email } });
     user = found ?? undefined;
 
     if (user) {
-      await db.identity.create({
+      await c.get("db").identity.create({
         data: {
           userId: user.id,
           provider,
@@ -207,7 +212,7 @@ export async function socialOAuthCallback(c: Context) {
       });
     } else {
       const names = userInfo.name?.split(" ") ?? [];
-      user = await db.user.create({
+      user = await c.get("db").user.create({
         data: {
           email: userInfo.email,
           emailVerified: userInfo.emailVerified,
@@ -227,7 +232,7 @@ export async function socialOAuthCallback(c: Context) {
   }
 
   if (!user.emailVerified && userInfo.emailVerified && user.email === userInfo.email) {
-    user = await db.user.update({
+    user = await c.get("db").user.update({
       where: { id: user.id },
       data: { emailVerified: true },
     });
@@ -238,10 +243,10 @@ export async function socialOAuthCallback(c: Context) {
   }
 
   if (userInfo.picture && !user.avatar) {
-    await cacheExternalAvatar(user.id, userInfo.picture);
+    await cacheExternalAvatar(c.get("db"), user.id, userInfo.picture);
   }
 
-  const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
+  const passkeyCount = await c.get("db").passkey.count({ where: { userId: user.id } });
   const hasMfa = user.totpEnabled || user.emailMfaEnabled;
 
   let returnTo = oauthState.redirectUri || `${WEB_URL}/profile`;
@@ -265,19 +270,20 @@ export async function socialOAuthCallback(c: Context) {
   }
 
   // Reuse the browser's existing active session on social re-login.
-  const tokens = await issueTokens(
+  const tokens = await issueTokens(c.get("db"), 
     {
       userId: user.id,
       email: user.email,
       role: user.role,
       deviceInfo,
       ipAddress,
+      country,
     },
     await getReusableSessionId(c, user.id),
   );
 
   const ticket = generateToken(32);
-  await db.oAuthState.create({
+  await c.get("db").oAuthState.create({
     data: {
       state: ticket,
       mode: "ticket",
@@ -304,12 +310,12 @@ export async function completeSocialOAuth(c: Context) {
     return error(c, "INVALID_REQUEST", "ticket is required");
   }
 
-  const oauthState = await db.oAuthState.findUnique({ where: { state: ticket } });
+  const oauthState = await c.get("db").oAuthState.findUnique({ where: { state: ticket } });
   if (!oauthState || oauthState.mode !== "ticket" || oauthState.expiresAt < new Date()) {
     return error(c, "INVALID_REQUEST", "Invalid or expired ticket");
   }
 
-  await db.oAuthState.delete({ where: { id: oauthState.id } });
+  await c.get("db").oAuthState.delete({ where: { id: oauthState.id } });
 
   const tokens = JSON.parse(oauthState.codeVerifier || "{}") as {
     accessToken?: string;
@@ -325,7 +331,7 @@ export async function completeSocialOAuth(c: Context) {
     refreshToken: tokens.refreshToken,
   });
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id: oauthState.userId! },
     select: { id: true, email: true, displayName: true, role: true },
   });

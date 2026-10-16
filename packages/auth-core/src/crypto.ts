@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from "crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { v4 as uuid } from "uuid";
 
 export function generateToken(length = 64): string {

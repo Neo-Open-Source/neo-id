@@ -22,10 +22,14 @@ export async function refresh(c: Context) {
     return error(c, "INVALID_REQUEST", "refresh_token is required");
   }
 
+  const reqInfo = getRequestInfo(c);
   const result = await verifyAndRotateRefreshToken(
+    c.get("db"),
     refreshToken,
     undefined,
-    getRequestInfo(c).ipAddress,
+    reqInfo.ipAddress,
+    undefined,
+    reqInfo.country,
   );
 
   if (!result.ok) {

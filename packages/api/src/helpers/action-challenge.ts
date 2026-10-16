@@ -1,4 +1,4 @@
-import { db } from "@neo-id/db";
+import type { PrismaClient } from "@neo-id/db";
 import { generateCode, generateAuthenticationOpts, verifyAuthentication, verifyTotp } from "@neo-id/auth-core";
 import { EMAIL, type ErrorCode } from "@neo-id/shared";
 import { sendEmailCode } from "./email";
@@ -6,14 +6,10 @@ import { assertResendAllowed, invalidatePendingCodes, verifyAndUseMfaCode } from
 
 export type ActionMethod = "passkey" | "totp" | "email";
 
-/**
- * Step-up methods available to a user, mirroring the login MFA picker:
- * passkey / TOTP when enabled, and email as the always-available fallback.
- */
-export async function getAvailableMethods(userId: string): Promise<ActionMethod[]> {
+export async function getAvailableMethods(client: PrismaClient, userId: string): Promise<ActionMethod[]> {
   const [user, passkeyCount] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { totpEnabled: true } }),
-    db.passkey.count({ where: { userId } }),
+    client.user.findUnique({ where: { id: userId }, select: { totpEnabled: true } }),
+    client.passkey.count({ where: { userId } }),
   ]);
 
   return [
@@ -23,27 +19,27 @@ export async function getAvailableMethods(userId: string): Promise<ActionMethod[
   ];
 }
 
-/** Issue + email a one-time code for a sensitive action (e.g. data_export). */
 export async function sendActionCode(
+  client: PrismaClient,
   userId: string,
   purpose: string,
 ): Promise<{ ok: true } | { ok: false; code: ErrorCode; message: string; retryAfter?: number }> {
-  const dbUser = await db.user.findUnique({
+  const dbUser = await client.user.findUnique({
     where: { id: userId },
     select: { email: true },
   });
 
   if (!dbUser) return { ok: false, code: "USER_NOT_FOUND", message: "User not found" };
 
-  const gate = await assertResendAllowed(userId, purpose);
+  const gate = await assertResendAllowed(client, userId, purpose);
   if (!gate.ok) {
     return { ok: false, code: "RATE_LIMITED", message: `Please wait ${gate.retryAfter}s`, retryAfter: gate.retryAfter };
   }
 
-  await invalidatePendingCodes(userId, purpose);
+  await invalidatePendingCodes(client, userId, purpose);
 
   const code = generateCode(EMAIL.CODE_LENGTH);
-  await db.mfaCode.create({
+  await client.mfaCode.create({
     data: {
       userId,
       code,
@@ -58,9 +54,8 @@ export async function sendActionCode(
   return { ok: true };
 }
 
-/** WebAuthn assertion options for verifying a sensitive action with a passkey. */
-export async function generatePasskeyAuthOptions(userId: string) {
-  const passkeys = await db.passkey.findMany({
+export async function generatePasskeyAuthOptions(client: PrismaClient, userId: string) {
+  const passkeys = await client.passkey.findMany({
     where: { userId },
     select: { credentialId: true, transports: true },
   });
@@ -73,18 +68,15 @@ export async function generatePasskeyAuthOptions(userId: string) {
   );
 }
 
-/**
- * Verify a step-up attempt by method. `purpose` is the MFA-code purpose used
- * by the email method. Returns { ok: false, code, message } on failure.
- */
 export async function verifyActionByMethod(
+  client: PrismaClient,
   userId: string,
   method: string,
   body: Record<string, unknown>,
   purpose: string,
 ): Promise<{ ok: true } | { ok: false; code: ErrorCode; message: string }> {
   if (method === "totp") {
-    const dbUser = await db.user.findUnique({
+    const dbUser = await client.user.findUnique({
       where: { id: userId },
       select: { totpEnabled: true, totpSecret: true },
     });
@@ -106,7 +98,7 @@ export async function verifyActionByMethod(
       return { ok: false, code: "INVALID_REQUEST", message: "Passkey assertion is required" };
     }
 
-    const passkey = await db.passkey.findFirst({
+    const passkey = await client.passkey.findFirst({
       where: { userId, credentialId },
     });
     if (!passkey) return { ok: false, code: "PASSKEY_NOT_FOUND", message: "Passkey not found" };
@@ -119,17 +111,16 @@ export async function verifyActionByMethod(
     if (!result.verified) {
       return { ok: false, code: "INVALID_REQUEST", message: "Passkey verification failed" };
     }
-    await db.passkey.update({
+    await client.passkey.update({
       where: { id: passkey.id },
       data: { counter: result.newCounter ?? passkey.counter, lastUsedAt: new Date() },
     }).catch(() => {});
     return { ok: true };
   }
 
-  // email (default)
   const code = String(body.code || "").trim();
   if (!code) return { ok: false, code: "CODE_REQUIRED", message: "Verification code is required" };
-  const { valid } = await verifyAndUseMfaCode(userId, purpose, code);
+  const { valid } = await verifyAndUseMfaCode(client, userId, purpose, code);
   if (!valid) return { ok: false, code: "MFA_INVALID_CODE", message: "Invalid or expired code" };
   return { ok: true };
 }

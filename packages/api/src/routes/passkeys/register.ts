@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import {
   generateRegistrationOpts,
   verifyRegistration,
@@ -9,7 +8,7 @@ import { success, error } from "../../helpers/response";
 export async function startPasskeyRegistration(c: Context) {
   const user = c.get("user");
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { email: true, id: true },
   });
@@ -19,7 +18,7 @@ export async function startPasskeyRegistration(c: Context) {
   }
 
   // Get existing passkeys
-  const existingPasskeys = await db.passkey.findMany({
+  const existingPasskeys = await c.get("db").passkey.findMany({
     where: { userId: user.sub },
     select: { credentialId: true, transports: true },
   });
@@ -54,7 +53,7 @@ export async function finishPasskeyRegistration(c: Context) {
     }
 
     // Check if credential already exists
-    const existing = await db.passkey.findUnique({
+    const existing = await c.get("db").passkey.findUnique({
       where: { credentialId: result.credentialId },
     });
 
@@ -63,7 +62,7 @@ export async function finishPasskeyRegistration(c: Context) {
     }
 
     // Save passkey
-    const passkey = await db.passkey.create({
+    const passkey = await c.get("db").passkey.create({
       data: {
         userId: user.sub,
         credentialId: result.credentialId,

@@ -1,4 +1,4 @@
-import { db } from "@neo-id/db";
+import type { PrismaClient } from "@neo-id/db";
 import { generateCode, constantTimeEqual } from "@neo-id/auth-core";
 import { EMAIL } from "@neo-id/shared";
 
@@ -14,8 +14,8 @@ export function maskEmail(email: string): string {
   return email.replace(/(.{2}).*(@.*)/, "$1***$2");
 }
 
-export async function assertResendAllowed(userId: string, purpose: string) {
-  const latest = await db.mfaCode.findFirst({
+export async function assertResendAllowed(client: PrismaClient, userId: string, purpose: string) {
+  const latest = await client.mfaCode.findFirst({
     where: { userId, purpose },
     orderBy: { createdAt: "desc" },
     select: { createdAt: true },
@@ -32,6 +32,7 @@ export async function assertResendAllowed(userId: string, purpose: string) {
 }
 
 export async function verifyAndUseMfaCode(
+  client: PrismaClient,
   userId: string,
   purpose: string,
   code: string,
@@ -41,7 +42,7 @@ export async function verifyAndUseMfaCode(
     return { valid: false as const };
   }
 
-  const mfaCode = await db.mfaCode.findFirst({
+  const mfaCode = await client.mfaCode.findFirst({
     where: {
       userId,
       purpose,
@@ -56,7 +57,7 @@ export async function verifyAndUseMfaCode(
     return { valid: false as const };
   }
 
-  await db.mfaCode.update({
+  await client.mfaCode.update({
     where: { id: mfaCode.id },
     data: { usedAt: new Date() },
   });
@@ -64,26 +65,25 @@ export async function verifyAndUseMfaCode(
   return { valid: true as const, mfaCode };
 }
 
-export async function invalidatePendingCodes(userId: string, purpose: string) {
-  await db.mfaCode.updateMany({
-    where: {
-      userId,
-      purpose,
-      ...unusedMfaCodeWhere(),
-    },
-    data: { usedAt: new Date() },
-  });
+export async function invalidatePendingCodes(client: PrismaClient, userId: string, purpose: string) {
+  await client.$executeRawUnsafe(
+    `UPDATE "mfa_codes" SET "usedAt" = $3 WHERE "userId" = $1 AND "purpose" = $2 AND "usedAt" IS NULL`,
+    userId,
+    purpose,
+    new Date(),
+  );
 }
 
 export async function createAndSendMfaCode(
+  client: PrismaClient,
   userId: string,
   purpose: string,
   sendFn: (email: string, code: string) => Promise<boolean>,
   email: string,
 ) {
-  await invalidatePendingCodes(userId, purpose);
+  await invalidatePendingCodes(client, userId, purpose);
   const code = generateCode(EMAIL.CODE_LENGTH);
-  await db.mfaCode.create({
+  await client.mfaCode.create({
     data: {
       userId,
       code,

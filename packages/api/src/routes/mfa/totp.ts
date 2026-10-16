@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { generateTotpSecret, verifyTotp } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 import { verifyActionByMethod } from "../../helpers/action-challenge";
@@ -7,7 +6,7 @@ import { verifyActionByMethod } from "../../helpers/action-challenge";
 export async function setupTotp(c: Context) {
   const user = c.get("user");
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { totpEnabled: true, email: true },
   });
@@ -23,7 +22,7 @@ export async function setupTotp(c: Context) {
   const setup = generateTotpSecret(dbUser.email, "Neo ID");
 
   // Store temporary secret (not enabled yet)
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.sub },
     data: { totpSecret: setup.secret },
   });
@@ -44,7 +43,7 @@ export async function enableTotp(c: Context) {
     return error(c, "INVALID_REQUEST", "Code must be 6 digits");
   }
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { totpSecret: true, totpEnabled: true },
   });
@@ -66,7 +65,7 @@ export async function enableTotp(c: Context) {
     return error(c, "MFA_INVALID_CODE", "Invalid TOTP code");
   }
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.sub },
     data: { totpEnabled: true },
   });
@@ -77,7 +76,7 @@ export async function enableTotp(c: Context) {
 export async function disableTotp(c: Context) {
   const user = c.get("user");
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { totpEnabled: true },
   });
@@ -87,7 +86,7 @@ export async function disableTotp(c: Context) {
   }
 
   const body = await c.req.json().catch(() => ({}));
-  const verified = await verifyActionByMethod(
+  const verified = await verifyActionByMethod(c.get("db"), 
     user.sub,
     String(body.method || ""),
     body,
@@ -97,7 +96,7 @@ export async function disableTotp(c: Context) {
     return error(c, verified.code, verified.message);
   }
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.sub },
     data: {
       totpEnabled: false,

@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { USER, updateProfileSchema } from "@neo-id/shared";
 import { success, error } from "../../helpers/response";
 import { validate } from "../../helpers/request";
@@ -8,7 +7,7 @@ export async function getProfile(c: Context) {
   const user = c.get("user");
 
   const [profile, hasPassword, passkeyCount, connectionCount] = await Promise.all([
-    db.user.findUnique({
+    c.get("db").user.findUnique({
       where: { id: user.sub },
       select: {
         id: true,
@@ -35,12 +34,12 @@ export async function getProfile(c: Context) {
         },
       },
     }),
-    db.user.findUnique({
+    c.get("db").user.findUnique({
       where: { id: user.sub },
       select: { passwordHash: true },
     }).then((u) => !!u?.passwordHash),
-    db.passkey.count({ where: { userId: user.sub } }),
-    db.authorizedConnection.count({ where: { userId: user.sub } }),
+    c.get("db").passkey.count({ where: { userId: user.sub } }),
+    c.get("db").authorizedConnection.count({ where: { userId: user.sub } }),
   ]);
 
   if (!profile) {
@@ -72,7 +71,7 @@ export async function checkUsername(c: Context) {
   }
 
   // Current username is always "available" for this user
-  const me = await db.user.findUnique({
+  const me = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { username: true },
   });
@@ -80,7 +79,7 @@ export async function checkUsername(c: Context) {
     return success(c, { available: true, reason: "ok" as const });
   }
 
-  const existing = await db.user.findFirst({
+  const existing = await c.get("db").user.findFirst({
     where: {
       username,
       NOT: { id: user.sub },
@@ -103,7 +102,7 @@ export async function updateProfile(c: Context) {
   const data = parsed.data;
 
   if (data.username) {
-    const taken = await db.user.findFirst({
+    const taken = await c.get("db").user.findFirst({
       where: {
         username: data.username,
         NOT: { id: user.sub },
@@ -115,7 +114,7 @@ export async function updateProfile(c: Context) {
     }
   }
 
-  const updated = await db.user.update({
+  const updated = await c.get("db").user.update({
     where: { id: user.sub },
     data: {
       ...(data.displayName !== undefined && { displayName: data.displayName }),
@@ -143,7 +142,7 @@ export async function confirmAge(c: Context) {
   if (body?.confirmed !== true) {
     return error(c, "INVALID_REQUEST", "confirmed must be true");
   }
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.sub },
     data: { ageVerified: true },
   });

@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/__generated__/prisma"
+  runtime  = "workerd"
 }
 
 datasource db {
@@ -20,6 +21,8 @@ model User {
   firstName     String?
   lastName      String?
   avatar        String?
+  avatarKey     String?
+  prevAvatarKey String?
 
   role          String    @default("user")
 

@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 import {
   getAvailableMethods,
@@ -14,14 +13,14 @@ const DISABLE_PURPOSE = "mfa_disable";
 export async function mfaDisableChallenge(c: Context) {
   const user = c.get("user");
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { email: true },
   });
 
   if (!dbUser) return error(c, "USER_NOT_FOUND", "User not found", 404);
 
-  const methods = await getAvailableMethods(user.sub);
+  const methods = await getAvailableMethods(c.get("db"), user.sub);
   return success(c, {
     mfaRequired: true,
     methods,
@@ -33,7 +32,7 @@ export async function mfaDisableChallenge(c: Context) {
 export async function sendMfaDisableCode(c: Context) {
   const user = c.get("user");
 
-  const result = await sendActionCode(user.sub, DISABLE_PURPOSE);
+  const result = await sendActionCode(c.get("db"), user.sub, DISABLE_PURPOSE);
   if (!result.ok) {
     return error(
       c,
@@ -49,7 +48,7 @@ export async function sendMfaDisableCode(c: Context) {
 
 /** WebAuthn assertion options for verifying MFA disable with a passkey. */
 export async function startMfaDisablePasskey(c: Context) {
-  const options = await generatePasskeyAuthOptions(c.get("user").sub);
+  const options = await generatePasskeyAuthOptions(c.get("db"), c.get("user").sub);
   if (!options.allowCredentials?.length) {
     return error(c, "PASSKEY_NOT_FOUND", "No passkeys registered", 404);
   }

@@ -1,11 +1,10 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 
 export async function listConnections(c: Context) {
   const user = c.get("user");
 
-  const connections = await db.authorizedConnection.findMany({
+  const connections = await c.get("db").authorizedConnection.findMany({
     where: { userId: user.sub },
     select: {
       id: true,
@@ -48,7 +47,7 @@ export async function revokeConnection(c: Context) {
   const user = c.get("user");
   const id = c.req.param("id");
 
-  const connection = await db.authorizedConnection.findFirst({
+  const connection = await c.get("db").authorizedConnection.findFirst({
     where: { id, userId: user.sub },
   });
 
@@ -56,7 +55,7 @@ export async function revokeConnection(c: Context) {
     return error(c, "NOT_FOUND", "Connection not found", 404);
   }
 
-  await db.authorizedConnection.delete({ where: { id: connection.id } });
+  await c.get("db").authorizedConnection.delete({ where: { id: connection.id } });
 
   return success(c, { revoked: true });
 }

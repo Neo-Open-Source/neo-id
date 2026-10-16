@@ -1,11 +1,10 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success } from "../../helpers/response";
 
 export async function listSessions(c: Context) {
   const user = c.get("user");
 
-  const sessions = await db.session.findMany({
+  const sessions = await c.get("db").session.findMany({
     where: { userId: user.sub, isActive: true },
     select: {
       id: true,
@@ -25,7 +24,7 @@ export async function deleteSession(c: Context) {
   const user = c.get("user");
   const { id } = c.req.param();
 
-  const session = await db.session.findFirst({
+  const session = await c.get("db").session.findFirst({
     where: { id, userId: user.sub },
   });
 
@@ -33,13 +32,13 @@ export async function deleteSession(c: Context) {
     return success(c, { ok: true });
   }
 
-  await db.$transaction([
-    db.refreshToken.updateMany({
-      where: { sessionId: id },
-      data: { revokedAt: new Date(), revokeReason: "session_revoked" },
-    }),
-    db.session.delete({ where: { id } }),
-  ]);
+  await c.get("db").$executeRawUnsafe(
+    `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "sessionId" = $1`,
+    id,
+    new Date(),
+    "session_revoked",
+  );
+  await c.get("db").session.delete({ where: { id } });
 
   return success(c, { ok: true });
 }
@@ -47,22 +46,22 @@ export async function deleteSession(c: Context) {
 export async function deleteAllSessions(c: Context) {
   const user = c.get("user");
 
-  const activeSessions = await db.session.findMany({
+  const activeSessions = await c.get("db").session.findMany({
     where: { userId: user.sub, isActive: true },
     select: { id: true },
   });
 
   const ids = activeSessions.map((s) => s.id);
 
-  await db.$transaction([
-    db.refreshToken.updateMany({
-      where: { userId: user.sub, revokedAt: null },
-      data: { revokedAt: new Date(), revokeReason: "all_sessions_revoked" },
-    }),
-    ...(ids.length > 0
-      ? [db.session.deleteMany({ where: { id: { in: ids } } })]
-      : []),
-  ]);
+  await c.get("db").$executeRawUnsafe(
+    `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "userId" = $1 AND "revokedAt" IS NULL`,
+    user.sub,
+    new Date(),
+    "all_sessions_revoked",
+  );
+  if (ids.length > 0) {
+    await c.get("db").$executeRawUnsafe(`DELETE FROM "sessions" WHERE "id" = ANY($1)`, ids);
+  }
 
   return success(c, { ok: true });
 }

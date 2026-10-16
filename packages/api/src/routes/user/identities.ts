@@ -1,11 +1,10 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 
 export async function listIdentities(c: Context) {
   const user = c.get("user");
 
-  const identities = await db.identity.findMany({
+  const identities = await c.get("db").identity.findMany({
     where: { userId: user.sub },
     select: {
       id: true,
@@ -24,7 +23,7 @@ export async function disconnectIdentity(c: Context) {
   const provider = c.req.param("provider");
 
   // Check if user has this identity
-  const identity = await db.identity.findFirst({
+  const identity = await c.get("db").identity.findFirst({
     where: {
       userId: user.sub,
       provider,
@@ -36,12 +35,12 @@ export async function disconnectIdentity(c: Context) {
   }
 
   // Check if user has a password or other identities (can't disconnect if it's the only login method)
-  const userRecord = await db.user.findUnique({
+  const userRecord = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { passwordHash: true },
   });
 
-  const identityCount = await db.identity.count({
+  const identityCount = await c.get("db").identity.count({
     where: { userId: user.sub },
   });
 
@@ -54,7 +53,7 @@ export async function disconnectIdentity(c: Context) {
   }
 
   // Delete the identity
-  await db.identity.delete({
+  await c.get("db").identity.delete({
     where: { id: identity.id },
   });
 

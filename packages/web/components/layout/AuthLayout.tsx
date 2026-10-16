@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { NeoLogo } from "@/components/ui/NeoLogo";
 import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
 import { BackButton } from "@/components/ui/BackButton";
 import { useI18n } from "@/lib/i18n/context";
@@ -54,10 +54,7 @@ export function AuthLayout({ title, subtitle, children, onBack, backLabel }: Aut
             marginBottom: "8px",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Image src="/splash-icon.png" alt="Neo ID" width={26} height={26} style={{ width: 26, height: 26 }} />
-              <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--color-content)", letterSpacing: "-0.02em" }}>
-                Neo ID
-              </span>
+              <NeoLogo size={22} />
             </div>
             <LanguagePicker />
           </div>

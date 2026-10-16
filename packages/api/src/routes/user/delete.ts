@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { verify } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 import { maskEmail } from "../../helpers/mfa-code";
@@ -19,14 +18,14 @@ const DELETE_PURPOSE = "account_delete";
 export async function deleteChallenge(c: Context) {
   const user = c.get("user");
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { email: true },
   });
 
   if (!dbUser) return error(c, "USER_NOT_FOUND", "User not found", 404);
 
-  const methods = await getAvailableMethods(user.sub);
+  const methods = await getAvailableMethods(c.get("db"), user.sub);
   return success(c, { mfaRequired: true, methods, emailHint: maskEmail(dbUser.email) });
 }
 
@@ -34,7 +33,7 @@ export async function deleteChallenge(c: Context) {
 export async function startDeletePasskey(c: Context) {
   const user = c.get("user");
 
-  const options = await generatePasskeyAuthOptions(user.sub);
+  const options = await generatePasskeyAuthOptions(c.get("db"), user.sub);
   if (!options.allowCredentials?.length) {
     return error(c, "PASSKEY_NOT_FOUND", "No passkeys registered", 404);
   }
@@ -45,7 +44,7 @@ export async function startDeletePasskey(c: Context) {
 export async function sendDeleteCode(c: Context) {
   const user = c.get("user");
 
-  const result = await sendActionCode(user.sub, DELETE_PURPOSE);
+  const result = await sendActionCode(c.get("db"), user.sub, DELETE_PURPOSE);
   if (!result.ok) {
     return error(
       c,
@@ -64,7 +63,7 @@ export async function deleteAccount(c: Context) {
   const body = await c.req.json().catch(() => ({}));
   const method = String(body.method || "");
 
-  const userRecord = await db.user.findUnique({
+  const userRecord = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: {
       id: true,
@@ -88,7 +87,7 @@ export async function deleteAccount(c: Context) {
     }
   } else {
     // Step-up via challenge (passkey / TOTP / email code)
-    const verified = await verifyActionByMethod(user.sub, method || "email", body, DELETE_PURPOSE);
+    const verified = await verifyActionByMethod(c.get("db"), user.sub, method || "email", body, DELETE_PURPOSE);
     if (!verified.ok) {
       return error(c, verified.code, verified.message);
     }
@@ -96,14 +95,14 @@ export async function deleteAccount(c: Context) {
 
   // Prevent admin from deleting themselves (optional safeguard)
   if (userRecord.role === "admin") {
-    const adminCount = await db.user.count({ where: { role: "admin" } });
+    const adminCount = await c.get("db").user.count({ where: { role: "admin" } });
     if (adminCount <= 1) {
       return error(c, "FORBIDDEN", "Cannot delete the last admin account");
     }
   }
 
   // Delete user and all related data (cascade)
-  await db.user.delete({ where: { id: user.sub } });
+  await c.get("db").user.delete({ where: { id: user.sub } });
 
   return success(c, { deleted: true });
 }

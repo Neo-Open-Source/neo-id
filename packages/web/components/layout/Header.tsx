@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
+import { NeoLogo } from "@/components/ui/NeoLogo";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguagePicker } from "@/components/features/auth/LanguagePicker";
@@ -48,7 +48,7 @@ export function Header({ user, onLogout }: HeaderProps) {
     <header className="site-header">
       <div className="site-header__inner">
         <Link href="/profile" className="site-header__logo-link" aria-label="Neo ID">
-          <Image src="/splash-icon.png" alt="Neo ID" width={30} height={30} className="site-header__logo" />
+          <NeoLogo size={22} />
         </Link>
 
         <nav className="site-header__nav" aria-label="Main navigation">

@@ -11,6 +11,21 @@ const RP_NAME = WEBAUTHN.RP_NAME;
 const RP_ID = process.env.RP_ID || "id.neome.uk";
 const ORIGIN = process.env.ORIGIN || "https://id.neome.uk";
 
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(s: string): Uint8Array<ArrayBuffer> {
+  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 export interface CredentialDescriptor {
   credentialId: string;
   transports?: string;
@@ -88,7 +103,7 @@ export async function verifyRegistration(
   return {
     verified: true,
     credentialId: credential.id,
-    credentialPublicKey: Buffer.from(credential.publicKey).toString("base64url"),
+    credentialPublicKey: bytesToBase64Url(credential.publicKey),
     counter: credential.counter,
     transports: (response.response as Record<string, unknown>)?.transports as string[] | undefined,
   };
@@ -123,7 +138,7 @@ export async function verifyAuthentication(
   expectedChallenge: string,
   credential: { credentialId: string; publicKey: string; counter: number },
 ): Promise<AuthenticationResult> {
-  const pubKeyBuffer = Buffer.from(credential.publicKey, "base64url");
+  const pubKeyBytes = base64UrlToBytes(credential.publicKey);
 
   const verification = await verifyAuthenticationResponse({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -134,7 +149,7 @@ export async function verifyAuthentication(
     requireUserVerification: false,
     credential: {
       id: credential.credentialId,
-      publicKey: new Uint8Array(pubKeyBuffer),
+      publicKey: pubKeyBytes,
       counter: credential.counter,
     },
   });

@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { success, error } from "../../helpers/response";
 import { maskEmail } from "../../helpers/mfa-code";
 import {
@@ -19,14 +18,14 @@ const EXPORT_PURPOSE = "data_export";
 export async function exportChallenge(c: Context) {
   const user = c.get("user");
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { email: true },
   });
 
   if (!dbUser) return error(c, "USER_NOT_FOUND", "User not found", 404);
 
-  const methods = await getAvailableMethods(user.sub);
+  const methods = await getAvailableMethods(c.get("db"), user.sub);
   return success(c, { mfaRequired: true, methods, emailHint: maskEmail(dbUser.email) });
 }
 
@@ -34,7 +33,7 @@ export async function exportChallenge(c: Context) {
 export async function startExportPasskey(c: Context) {
   const user = c.get("user");
 
-  const options = await generatePasskeyAuthOptions(user.sub);
+  const options = await generatePasskeyAuthOptions(c.get("db"), user.sub);
   if (!options.allowCredentials?.length) {
     return error(c, "PASSKEY_NOT_FOUND", "No passkeys registered", 404);
   }
@@ -45,7 +44,7 @@ export async function startExportPasskey(c: Context) {
 export async function sendExportCode(c: Context) {
   const user = c.get("user");
 
-  const result = await sendActionCode(user.sub, EXPORT_PURPOSE);
+  const result = await sendActionCode(c.get("db"), user.sub, EXPORT_PURPOSE);
   if (!result.ok) {
     return error(c, result.code, result.message, result.code === "RATE_LIMITED" ? 429 : undefined, {
       ...(result.retryAfter !== undefined ? { retryAfter: result.retryAfter } : {}),
@@ -61,12 +60,12 @@ export async function exportUserData(c: Context) {
   const body = await c.req.json().catch(() => ({}));
   const method = String(body.method || "email");
 
-  const verified = await verifyActionByMethod(user.sub, method, body, EXPORT_PURPOSE);
+  const verified = await verifyActionByMethod(c.get("db"), user.sub, method, body, EXPORT_PURPOSE);
   if (!verified.ok) {
     return error(c, verified.code, verified.message);
   }
 
-  const profile = await db.user.findUnique({
+  const profile = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: {
       id: true,
@@ -87,20 +86,20 @@ export async function exportUserData(c: Context) {
   });
 
   const [sessions, passkeys, identities, services] = await Promise.all([
-    db.session.findMany({
+    c.get("db").session.findMany({
       where: { userId: user.sub, isActive: true },
       select: { id: true, deviceInfo: true, ipAddress: true, createdAt: true, lastActiveAt: true },
       orderBy: { createdAt: "desc" },
     }),
-    db.passkey.findMany({
+    c.get("db").passkey.findMany({
       where: { userId: user.sub },
       select: { id: true, deviceName: true, createdAt: true, lastUsedAt: true },
     }),
-    db.identity.findMany({
+    c.get("db").identity.findMany({
       where: { userId: user.sub },
       select: { provider: true, createdAt: true },
     }),
-    db.serviceApp.findMany({
+    c.get("db").serviceApp.findMany({
       where: { ownerId: user.sub },
       select: { id: true, name: true, displayName: true, clientId: true, createdAt: true },
     }),

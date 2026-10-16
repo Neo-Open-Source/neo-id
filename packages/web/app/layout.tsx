@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { Golos_Text } from "next/font/google";
 import "@/styles/foundations.css";
 import "@/styles/components.css";
 import "@/styles/sections.css";
@@ -14,6 +15,12 @@ export const metadata: Metadata = {
   },
   description: "Auth/OIDC Provider",
 };
+
+const golos = Golos_Text({
+  subsets: ["cyrillic", "latin"],
+  variable: "--font-golos",
+  display: "swap",
+});
 
  
 const themeScript = `
@@ -60,7 +67,7 @@ export default async function RootLayout({
   const t = getTranslations(locale);
 
   return (
-    <html lang={serverLocale} suppressHydrationWarning>
+    <html lang={serverLocale} suppressHydrationWarning className={golos.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script dangerouslySetInnerHTML={{ __html: localeScript }} />

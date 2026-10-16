@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setSessionTokens } from "@/lib/api";
+import { prefetchAppBounded } from "@/lib/prefetch-app";
+import { SplashScreen } from "@/components/ui/SplashScreen";
 import { resolveAuthRedirect } from "@/lib/auth-redirect";
 import { useI18n } from "@/lib/i18n/context";
 import { usePageTitle } from "@/lib/use-page-title";
@@ -29,7 +31,7 @@ export default function OAuthCompletePage() {
       body: JSON.stringify({ ticket }),
     })
       .then((res) => res.json())
-      .then((json) => {
+      .then(async (json) => {
         if (!json.ok) throw new Error(json.error?.message || "oauth_failed");
         if (json.data?.accessToken || json.data?.refreshToken) {
           setSessionTokens({
@@ -37,7 +39,7 @@ export default function OAuthCompletePage() {
             refreshToken: json.data.refreshToken,
           });
         }
-        // Keep the OAuth authorize path so the consent screen shows after sign-in
+        await prefetchAppBounded();
         if (returnTo.startsWith("/api/")) {
           window.location.assign(returnTo);
         } else {
@@ -61,9 +63,5 @@ export default function OAuthCompletePage() {
     );
   }
 
-  return (
-    <div className="loading">
-      <div className="loading__spinner" />
-    </div>
-  );
+  return <SplashScreen prefetch />;
 }

@@ -15,13 +15,15 @@
   "scripts": {
     "build": "tsup && tsc --build --force",
     "dev": "tsup --watch",
-    "generate": "prisma generate",
+    "generate": "prisma generate && node ../../scripts/fix-prisma-client.mjs && node ../../scripts/embed-prisma-wasm.mjs",
     "migrate": "prisma migrate dev",
     "migrate:prod": "prisma migrate deploy",
     "studio": "prisma studio"
   },
   "dependencies": {
     "@neo-id/shared": "workspace:*",
+    "@neondatabase/serverless": "^1.2.0",
+    "@prisma/adapter-neon": "^7.9.0",
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
     "dotenv": "^17.4.2",

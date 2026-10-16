@@ -21,7 +21,7 @@
     "@neo-id/shared": "workspace:*",
     "@simplewebauthn/server": "^13.3.2",
     "bcrypt": "^6.0.0",
-    "geoip-lite": "^2.0.3",
+    "bcryptjs": "^3.0.3",
     "jose": "^6.0.0",
     "otpauth": "^9.3.0",
     "simple-oauth2": "^5.1.0",
@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^3.0.0",
     "@types/simple-oauth2": "^5.0.0",
     "@types/uuid": "^10.0.0",
     "tsup": "^8.3.0",

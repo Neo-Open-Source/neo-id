@@ -8,54 +8,10 @@ export interface GeoLocation {
   longitude?: number;
 }
 
-const LOCAL_IPS = new Set(["127.0.0.1", "::1", "localhost"]);
-const LOCAL_RANGES = [/^192\.168\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./];
-
-function isLocalIp(ip: string): boolean {
-  if (LOCAL_IPS.has(ip)) return true;
-  return LOCAL_RANGES.some((re) => re.test(ip));
-}
-
-type GeoIpLookup = {
-  lookup: (ip: string) => { city?: string; country?: string; region?: string; timezone?: string; ll?: [number, number] } | null;
-};
-
-let geoipPromise: Promise<GeoIpLookup> | null = null;
-
-async function loadGeoip(): Promise<GeoIpLookup> {
-  if (!geoipPromise) {
-    geoipPromise = (async () => {
-      // @ts-expect-error — geoip-lite has no type declarations
-      const geoipLite = await import("geoip-lite");
-      return (geoipLite.default || geoipLite) as GeoIpLookup;
-    })();
-  }
-  return geoipPromise;
-}
-
-export function warmGeoIp(): void {
-  void loadGeoip().catch(() => {});
-}
-
-export async function lookupIp(ip: string): Promise<GeoLocation | null> {
-  if (isLocalIp(ip)) return null;
-
-  try {
-    const geoip = await loadGeoip();
-    const geo = geoip.lookup(ip);
-    if (!geo) return null;
-
-    return {
-      city: geo.city || undefined,
-      country: geo.country || undefined,
-      region: geo.region || undefined,
-      timezone: geo.timezone || undefined,
-      latitude: geo.ll?.[0],
-      longitude: geo.ll?.[1],
-    };
-  } catch {
-    return null;
-  }
+export function locationFromCountry(countryCode: string | null | undefined): GeoLocation | null {
+  const code = countryCode?.trim().toUpperCase();
+  if (!code) return null;
+  return { country: code, countryCode: code };
 }
 
 export function formatLocation(geo: GeoLocation | null): string {

@@ -89,6 +89,7 @@ export const DEVICE_CODE = {
 export const AVATAR = {
   MAX_SIZE: 5 * 1024 * 1024, // 5MB
   ALLOWED_TYPES: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+  CDN_WIDTHS: [64, 128, 256],
 } as const;
 
 // ─── OAuth Providers ─────────────────────────────────────────────────────────

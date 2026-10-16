@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { generateToken, verifyAccessToken } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 import { getAccessTokenFromRequest } from "../../helpers/auth-cookies";
@@ -9,14 +8,14 @@ export async function consentInfo(c: Context) {
   const session = c.req.param("session");
   if (!session) return error(c, "INVALID_REQUEST", "session is required");
 
-  const pendingState = await db.oAuthState.findUnique({ where: { id: session } });
+  const pendingState = await c.get("db").oAuthState.findUnique({ where: { id: session } });
 
   if (!pendingState || pendingState.mode !== "pending" || pendingState.expiresAt < new Date()) {
     return error(c, "INVALID_REQUEST", "Invalid or expired consent session");
   }
 
   const app = pendingState.serviceAppId
-    ? await db.serviceApp.findUnique({
+    ? await c.get("db").serviceApp.findUnique({
         where: { id: pendingState.serviceAppId },
         select: { name: true, displayName: true, logoUrl: true, allowedScopes: true },
       })
@@ -47,7 +46,7 @@ export async function consent(c: Context) {
   const { session, approved } = body;
   if (!session) return error(c, "INVALID_REQUEST", "session is required");
 
-  const pendingState = await db.oAuthState.findUnique({ where: { id: session } });
+  const pendingState = await c.get("db").oAuthState.findUnique({ where: { id: session } });
 
   if (
     !pendingState ||
@@ -66,7 +65,7 @@ export async function consent(c: Context) {
   };
 
   if (!approved) {
-    await db.oAuthState.delete({ where: { id: session } });
+    await c.get("db").oAuthState.delete({ where: { id: session } });
     const denyUrl = new URL(redirectUri);
     denyUrl.searchParams.set("error", "access_denied");
     denyUrl.searchParams.set("error_description", "User denied access");
@@ -75,7 +74,7 @@ export async function consent(c: Context) {
   }
 
   const code = generateToken(32);
-  await db.oAuthState.update({
+  await c.get("db").oAuthState.update({
     where: { id: session },
     data: { code, mode: "authorize", expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
   });

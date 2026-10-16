@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { verifyTotp } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 import { issueTokens, getReusableSessionId } from "../../helpers/tokens";
@@ -19,7 +18,7 @@ export async function verifyMfa(c: Context) {
   }
 
   // Find user
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: {
       id: true,
@@ -45,14 +44,14 @@ export async function verifyMfa(c: Context) {
   if (purpose === "verify_email") {
     if (user.emailVerified) return success(c, { verified: true });
 
-    const { valid } = await verifyAndUseMfaCode(user.id, "verify_email", code);
+    const { valid } = await verifyAndUseMfaCode(c.get("db"), user.id, "verify_email", code);
     if (!valid) return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
 
-    await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+    await c.get("db").user.update({ where: { id: user.id }, data: { emailVerified: true } });
 
-    const { deviceInfo, ipAddress } = getRequestInfo(c);
-    const tokens = await issueTokens(
-      { userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress },
+    const { deviceInfo, ipAddress, country } = getRequestInfo(c);
+    const tokens = await issueTokens(c.get("db"), 
+      { userId: user.id, email: user.email, role: user.role, deviceInfo, ipAddress, country },
       await getReusableSessionId(c, user.id),
     );
 
@@ -80,7 +79,7 @@ export async function verifyMfa(c: Context) {
   } else if (method === "email") {
     if (!user.emailMfaEnabled) return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
 
-    const { valid } = await verifyAndUseMfaCode(user.id, "mfa_login", code);
+    const { valid } = await verifyAndUseMfaCode(c.get("db"), user.id, "mfa_login", code);
     if (!valid) return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
   } else {
     return error(c, "INVALID_REQUEST", "Invalid MFA method. Use 'totp' or 'email'.");
@@ -88,14 +87,15 @@ export async function verifyMfa(c: Context) {
 
   // MFA verified — issue tokens. Reuse the browser's existing active session
   // when the user is re-authenticating instead of minting a duplicate.
-  const { deviceInfo, ipAddress } = getRequestInfo(c);
-  const tokens = await issueTokens(
+  const { deviceInfo, ipAddress, country } = getRequestInfo(c);
+  const tokens = await issueTokens(c.get("db"), 
     {
       userId: user.id,
       email: user.email,
       role: user.role,
       deviceInfo,
       ipAddress,
+      country,
     },
     await getReusableSessionId(c, user.id),
   );

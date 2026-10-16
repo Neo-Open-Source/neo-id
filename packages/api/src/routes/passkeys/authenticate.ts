@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { generateAuthenticationOpts, verifyAuthentication } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 import { issueTokens, getReusableSessionId } from "../../helpers/tokens";
@@ -14,7 +13,7 @@ export async function startPasskeyAuthentication(c: Context) {
     return error(c, "INVALID_REQUEST", "email is required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: { id: true, status: true, totpEnabled: true, emailMfaEnabled: true },
   });
@@ -27,7 +26,7 @@ export async function startPasskeyAuthentication(c: Context) {
     return error(c, "USER_BANNED", "Your account has been banned");
   }
 
-  const passkeys = await db.passkey.findMany({
+  const passkeys = await c.get("db").passkey.findMany({
     where: { userId: user.id },
     select: { credentialId: true, transports: true },
   });
@@ -57,7 +56,7 @@ export async function finishPasskeyAuthentication(c: Context) {
     return error(c, "INVALID_REQUEST", "response, expectedChallenge, and email are required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: { id: true, email: true, role: true, status: true },
   });
@@ -70,7 +69,7 @@ export async function finishPasskeyAuthentication(c: Context) {
     return error(c, "USER_BANNED", "Your account has been banned");
   }
 
-  const passkey = await db.passkey.findFirst({
+  const passkey = await c.get("db").passkey.findFirst({
     where: { userId: user.id, credentialId: response.id },
   });
 
@@ -88,7 +87,7 @@ export async function finishPasskeyAuthentication(c: Context) {
     return error(c, "INVALID_REQUEST", "Passkey verification failed");
   }
 
-  await db.passkey.update({
+  await c.get("db").passkey.update({
     where: { id: passkey.id },
     data: {
       counter: result.newCounter ?? passkey.counter,
@@ -96,15 +95,16 @@ export async function finishPasskeyAuthentication(c: Context) {
     },
   });
 
-  const { deviceInfo, ipAddress } = getRequestInfo(c);
+  const { deviceInfo, ipAddress, country } = getRequestInfo(c);
   // Reuse the browser's existing active session instead of minting a duplicate.
-  const tokens = await issueTokens(
+  const tokens = await issueTokens(c.get("db"), 
     {
       userId: user.id,
       email: user.email,
       role: user.role,
       deviceInfo,
       ipAddress,
+      country,
     },
     await getReusableSessionId(c, user.id),
   );

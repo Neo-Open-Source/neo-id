@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { hash, verifyTotp } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
 import { sendPasswordResetEmail } from "../../helpers/email";
@@ -19,7 +18,7 @@ export async function requestPasswordReset(c: Context) {
     return error(c, "INVALID_REQUEST", "Email is required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: {
       id: true,
@@ -42,12 +41,12 @@ async function sendResetLink(c: Context, userId: string, email: string) {
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
 
-  const existingMeta = (await db.user.findUnique({
+  const existingMeta = (await c.get("db").user.findUnique({
     where: { id: userId },
     select: { userMetadata: true },
   }))?.userMetadata as Record<string, unknown> || {};
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: userId },
     data: {
       userMetadata: {
@@ -80,7 +79,7 @@ export async function verifyForgotPasswordMfa(c: Context) {
     return error(c, "INVALID_REQUEST", "email and method are required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: {
       id: true,
@@ -114,7 +113,7 @@ export async function verifyForgotPasswordMfa(c: Context) {
     if (!code) {
       return error(c, "INVALID_REQUEST", "code is required for email MFA");
     }
-    const { valid } = await verifyAndUseMfaCode(user.id, "forgot_password", code);
+    const { valid } = await verifyAndUseMfaCode(c.get("db"), user.id, "forgot_password", code);
     if (!valid) {
       return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
     }
@@ -122,7 +121,7 @@ export async function verifyForgotPasswordMfa(c: Context) {
     if (!response || !expectedChallenge) {
       return error(c, "INVALID_REQUEST", "response and expectedChallenge are required for passkey");
     }
-    const passkey = await db.passkey.findFirst({
+    const passkey = await c.get("db").passkey.findFirst({
       where: { userId: user.id, credentialId: response.id },
     });
     if (!passkey) {
@@ -136,7 +135,7 @@ export async function verifyForgotPasswordMfa(c: Context) {
     if (!result.verified) {
       return error(c, "MFA_INVALID_CODE", "Passkey verification failed");
     }
-    await db.passkey.update({
+    await c.get("db").passkey.update({
       where: { id: passkey.id },
       data: { counter: result.newCounter ?? passkey.counter, lastUsedAt: new Date() },
     });
@@ -155,7 +154,7 @@ export async function startPasskeyResetChallenge(c: Context) {
     return error(c, "INVALID_REQUEST", "email is required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: { id: true, passwordHash: true },
   });
@@ -164,7 +163,7 @@ export async function startPasskeyResetChallenge(c: Context) {
     return success(c, { allow_credentials: [] });
   }
 
-  const passkeys = await db.passkey.findMany({
+  const passkeys = await c.get("db").passkey.findMany({
     where: { userId: user.id },
     select: { credentialId: true, transports: true },
   });
@@ -187,7 +186,7 @@ export async function checkResetToken(c: Context) {
   const token = String(c.req.query("token") || "").trim();
   if (!token) return success(c, { valid: false });
 
-  const users = await db.user.findMany({
+  const users = await c.get("db").user.findMany({
     where: {
       userMetadata: {
         path: ["passwordResetToken"],
@@ -219,7 +218,7 @@ export async function resetPassword(c: Context) {
     return error(c, "INVALID_REQUEST", "Password must be at least 8 characters");
   }
 
-  const users = await db.user.findMany({
+  const users = await c.get("db").user.findMany({
     where: {
       userMetadata: {
         path: ["passwordResetToken"],
@@ -242,7 +241,7 @@ export async function resetPassword(c: Context) {
 
   const passwordHash = await hash(newPassword);
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.id },
     data: {
       passwordHash,
@@ -254,10 +253,12 @@ export async function resetPassword(c: Context) {
     },
   });
 
-  await db.refreshToken.updateMany({
-    where: { userId: user.id },
-    data: { revokedAt: new Date(), revokeReason: "password_reset" },
-  });
+  await c.get("db").$executeRawUnsafe(
+    `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "userId" = $1`,
+    user.id,
+    new Date(),
+    "password_reset",
+  );
 
   return success(c, { reset: true });
 }

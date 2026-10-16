@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { hash, generateToken } from "@neo-id/auth-core";
 import type { JwtPayload } from "@neo-id/auth-core";
 import { success, error } from "../../helpers/response";
@@ -24,7 +23,7 @@ export async function listUsers(c: Context) {
     : {};
 
   const [users, total] = await Promise.all([
-    db.user.findMany({
+    c.get("db").user.findMany({
       where,
       select: {
         id: true,
@@ -49,7 +48,7 @@ export async function listUsers(c: Context) {
       take: limitNum,
       orderBy: { createdAt: "desc" },
     }),
-    db.user.count({ where }),
+    c.get("db").user.count({ where }),
   ]);
 
   return success(c, {
@@ -71,7 +70,7 @@ export async function listUsers(c: Context) {
 export async function getUser(c: Context) {
   const { id } = c.req.param();
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id },
     select: {
       id: true,
@@ -118,7 +117,7 @@ export async function banUser(c: Context) {
   const body = await c.req.json();
   const { banned, reason } = body;
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id },
     select: { id: true, role: true },
   });
@@ -131,26 +130,25 @@ export async function banUser(c: Context) {
     return error(c, "FORBIDDEN", "Cannot ban admin users");
   }
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id },
     data: { status: banned ? "banned" : "active" },
   });
 
   // If banning, revoke all sessions and tokens
   if (banned) {
-    await db.session.updateMany({
-      where: { userId: id, isActive: true },
-      data: { isActive: false },
-    });
-    await db.refreshToken.updateMany({
-      where: { userId: id, revokedAt: null },
-      data: { revokedAt: new Date(), revokeReason: "admin_ban" },
-    });
+    await c.get("db").$executeRawUnsafe(`UPDATE "sessions" SET "isActive" = false WHERE "userId" = $1 AND "isActive" = true`, id);
+    await c.get("db").$executeRawUnsafe(
+      `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "userId" = $1 AND "revokedAt" IS NULL`,
+      id,
+      new Date(),
+      "admin_ban",
+    );
   }
 
   // Log audit
   const admin = getAdmin(c);
-  await db.auditLog.create({
+  await c.get("db").auditLog.create({
     data: {
       actorId: admin.sub,
       actorEmail: admin.email,
@@ -172,7 +170,7 @@ export async function setRole(c: Context) {
     return error(c, "INVALID_REQUEST", "Invalid role");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id },
     select: { id: true, role: true },
   });
@@ -181,14 +179,14 @@ export async function setRole(c: Context) {
     return error(c, "NOT_FOUND", "User not found", 404);
   }
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id },
     data: { role },
   });
 
   // Log audit
   const admin = getAdmin(c);
-  await db.auditLog.create({
+  await c.get("db").auditLog.create({
     data: {
       actorId: admin.sub,
       actorEmail: admin.email,
@@ -210,12 +208,12 @@ export async function getStats(c: Context) {
     totalServices,
     recentLogins,
   ] = await Promise.all([
-    db.user.count(),
-    db.user.count({ where: { status: "active" } }),
-    db.user.count({ where: { OR: [{ totpEnabled: true }, { emailMfaEnabled: true }] } }),
-    db.identity.count(),
-    db.serviceApp.count(),
-    db.user.count({
+    c.get("db").user.count(),
+    c.get("db").user.count({ where: { status: "active" } }),
+    c.get("db").user.count({ where: { OR: [{ totpEnabled: true }, { emailMfaEnabled: true }] } }),
+    c.get("db").identity.count(),
+    c.get("db").serviceApp.count(),
+    c.get("db").user.count({
       where: {
         lastLoginAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
@@ -237,12 +235,12 @@ export async function getAuditLogs(c: Context) {
   const { page: pageNum, limit: limitNum, skip } = parsePagination({ page, limit: limitParam }, 50);
 
   const [logs, total] = await Promise.all([
-    db.auditLog.findMany({
+    c.get("db").auditLog.findMany({
       skip,
       take: limitNum,
       orderBy: { createdAt: "desc" },
     }),
-    db.auditLog.count(),
+    c.get("db").auditLog.count(),
   ]);
 
   return success(c, {
@@ -259,7 +257,7 @@ export async function getAuditLogs(c: Context) {
 export async function resetUserPassword(c: Context) {
   const { id } = c.req.param();
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id },
     select: { id: true, role: true, email: true },
   });
@@ -270,23 +268,22 @@ export async function resetUserPassword(c: Context) {
   const newPassword = generateToken(16);
   const passwordHash = await hash(newPassword);
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id },
     data: { passwordHash },
   });
 
-  await db.refreshToken.updateMany({
-    where: { userId: id, revokedAt: null },
-    data: { revokedAt: new Date(), revokeReason: "admin_password_reset" },
-  });
+  await c.get("db").$executeRawUnsafe(
+    `UPDATE "refresh_tokens" SET "revokedAt" = $2, "revokeReason" = $3 WHERE "userId" = $1 AND "revokedAt" IS NULL`,
+    id,
+    new Date(),
+    "admin_password_reset",
+  );
 
-  await db.session.updateMany({
-    where: { userId: id, isActive: true },
-    data: { isActive: false },
-  });
+  await c.get("db").$executeRawUnsafe(`UPDATE "sessions" SET "isActive" = false WHERE "userId" = $1 AND "isActive" = true`, id);
 
   const admin = getAdmin(c);
-  await db.auditLog.create({
+  await c.get("db").auditLog.create({
     data: {
       actorId: admin.sub,
       actorEmail: admin.email,
@@ -302,7 +299,7 @@ export async function resetUserPassword(c: Context) {
 export async function deleteUserAccount(c: Context) {
   const { id } = c.req.param();
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { id },
     select: { id: true, role: true, email: true },
   });
@@ -310,10 +307,10 @@ export async function deleteUserAccount(c: Context) {
   if (!user) return error(c, "NOT_FOUND", "User not found", 404);
   if (user.role === "admin") return error(c, "FORBIDDEN", "Cannot delete admin users");
 
-  await db.user.delete({ where: { id } });
+  await c.get("db").user.delete({ where: { id } });
 
   const admin = getAdmin(c);
-  await db.auditLog.create({
+  await c.get("db").auditLog.create({
     data: {
       actorId: admin.sub,
       actorEmail: admin.email,

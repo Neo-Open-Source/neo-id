@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import { db } from "@neo-id/db";
 import { generateCode } from "@neo-id/auth-core";
 import { EMAIL } from "@neo-id/shared";
 import { sendLoginCodeEmail, sendEmailCode, sendEmailVerificationEmail } from "../../helpers/email";
@@ -17,7 +16,7 @@ import { verifyActionByMethod } from "../../helpers/action-challenge";
 export async function setupEmailMfa(c: Context) {
   const user = c.get("user");
 
-  const dbUser = await db.user.findUnique({
+  const dbUser = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { emailMfaEnabled: true, email: true },
   });
@@ -30,7 +29,7 @@ export async function setupEmailMfa(c: Context) {
     return error(c, "MFA_ALREADY_ENABLED", "Email MFA is already enabled");
   }
 
-  const gate = await assertResendAllowed(user.sub, "mfa_setup");
+  const gate = await assertResendAllowed(c.get("db"), user.sub, "mfa_setup");
   if (!gate.ok) {
     return error(
       c,
@@ -42,7 +41,7 @@ export async function setupEmailMfa(c: Context) {
   }
 
   const code = generateCode(EMAIL.CODE_LENGTH);
-  await db.mfaCode.create({
+  await c.get("db").mfaCode.create({
     data: {
       userId: user.sub,
       code,
@@ -64,7 +63,7 @@ export async function enableEmailMfa(c: Context) {
   const body = await c.req.json();
   const code = String(body.code || "").trim();
 
-  const existing = await db.user.findUnique({
+  const existing = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { emailMfaEnabled: true },
   });
@@ -72,10 +71,10 @@ export async function enableEmailMfa(c: Context) {
   if (!existing) return error(c, "USER_NOT_FOUND", "User not found", 404);
   if (existing.emailMfaEnabled) return error(c, "MFA_ALREADY_ENABLED", "Email MFA is already enabled");
 
-  const { valid } = await verifyAndUseMfaCode(user.sub, "mfa_setup", code);
+  const { valid } = await verifyAndUseMfaCode(c.get("db"), user.sub, "mfa_setup", code);
   if (!valid) return error(c, "MFA_INVALID_CODE", "Invalid or expired code");
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.sub },
     data: { emailMfaEnabled: true, emailVerified: true },
   });
@@ -86,7 +85,7 @@ export async function enableEmailMfa(c: Context) {
 export async function disableEmailMfa(c: Context) {
   const user = c.get("user");
 
-  const existing = await db.user.findUnique({
+  const existing = await c.get("db").user.findUnique({
     where: { id: user.sub },
     select: { emailMfaEnabled: true },
   });
@@ -94,7 +93,7 @@ export async function disableEmailMfa(c: Context) {
   if (!existing?.emailMfaEnabled) return error(c, "MFA_NOT_ENABLED", "Email MFA is not enabled");
 
   const body = await c.req.json().catch(() => ({}));
-  const verified = await verifyActionByMethod(
+  const verified = await verifyActionByMethod(c.get("db"), 
     user.sub,
     String(body.method || ""),
     body,
@@ -104,7 +103,7 @@ export async function disableEmailMfa(c: Context) {
     return error(c, verified.code, verified.message);
   }
 
-  await db.user.update({
+  await c.get("db").user.update({
     where: { id: user.sub },
     data: { emailMfaEnabled: false },
   });
@@ -122,7 +121,7 @@ export async function resendLoginEmailMfa(c: Context) {
     return error(c, "INVALID_REQUEST", "Email is required");
   }
 
-  const user = await db.user.findUnique({
+  const user = await c.get("db").user.findUnique({
     where: { email },
     select: { id: true, emailMfaEnabled: true, email: true, emailVerified: true },
   });
@@ -136,7 +135,7 @@ export async function resendLoginEmailMfa(c: Context) {
   }
 
   const codePurpose = purpose === "verify_email" ? "verify_email" : "mfa_login";
-  const gate = await assertResendAllowed(user.id, codePurpose);
+  const gate = await assertResendAllowed(c.get("db"), user.id, codePurpose);
   if (!gate.ok) {
     return error(
       c,
@@ -147,10 +146,10 @@ export async function resendLoginEmailMfa(c: Context) {
     );
   }
 
-  await invalidatePendingCodes(user.id, codePurpose);
+  await invalidatePendingCodes(c.get("db"), user.id, codePurpose);
 
   const code = generateCode(EMAIL.CODE_LENGTH);
-  await db.mfaCode.create({
+  await c.get("db").mfaCode.create({
     data: {
       userId: user.id,
       code,
@@ -162,7 +161,7 @@ export async function resendLoginEmailMfa(c: Context) {
 
   let sent: boolean;
   if (purpose === "verify_email") {
-    const linkRecord = await db.mfaCode.findFirst({
+    const linkRecord = await c.get("db").mfaCode.findFirst({
       where: {
         userId: user.id,
         purpose: "verify_email_link",
