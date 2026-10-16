@@ -10,8 +10,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 auth-accounts = { version = "0.1.0", path = "crates/auth-accounts", default-features = false }
-auth-core = { version = "0.1.0", path = "crates/auth-core", default-features = false }
-auth-db = { version = "0.1.0", path = "crates/auth-db" }
+auth-core = { version = "0.1.0", path = "../../crates/auth-core", default-features = false }
+auth-db = { version = "0.1.0", path = "../../crates/auth-db" }
 auth-oidc = { version = "0.1.0", path = "crates/auth-oidc" }
 base64 = "0.22"
 getrandom = "0.3"

@@ -1,5 +1,5 @@
 fn main() {
-    let root = "../../../../proto";
+    let root = "../../proto";
     let mut config = prost_build::Config::new();
     config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
     for (field, name) in [

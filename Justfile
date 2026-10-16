@@ -14,7 +14,7 @@ gate:
 # Unsafe census per crate, for dependency review (exit code ignored: report only).
 geiger:
     #!/usr/bin/env bash
-    for dir in services/auth/crates/*/; do (cd "$dir" && cargo geiger || true); done
+    for dir in services/auth/crates/*/ crates/*/; do (cd "$dir" && cargo geiger || true); done
 
 fmt:
     cargo fmt --all

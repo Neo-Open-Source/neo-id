@@ -14,13 +14,29 @@ just fmt | just lint | just test | just deny | just proto
 just mutants <file>  # new mutants must be killed
 ```
 
+## Machine resources (hard rules)
+
+- Root is a RAM disk: never let builds spill into `/tmp` — always run with
+  `TMPDIR=/home/emily/.cache/tmp` (rustc/linker/nix temps live there, not RAM).
+- Cargo target dir lives on SSD (`~/.cargo/config.toml` sets it + `jobs = 2`).
+  Never override `jobs` upward, never `cargo clean` without owner approval
+  (it forces a full rebuild spike).
+- Dev profile is memory-capped (`[profile.dev] debug = 1`, low codegen units):
+  full debuginfo + parallel codegen OOMs this machine. Do not raise them.
+- One heavy command at a time: no parallel `cargo` invocations, no subagents
+  running cargo while the main session builds. `cargo check -p <crate>`
+  before `test`/`run`; `cargo run`, full `test`, `mutants`, `wrangler dev`
+  only on explicit owner go-ahead each time.
+- If the machine ever freezes again: stop everything, report, do not retry
+  the same command.
+
 ## Layout
 
 ```
 proto/auth/v1/*.proto              # contracts: user, session, client, claims
 services/auth/                      # deployable worker crate (`auth-worker`)
-services/auth/crates/auth-core/     # pure logic: no I/O, no clock, rng passed in
-services/auth/crates/*              # (planned) opaque, db, session, oidc
+crates/auth-core/                   # pure logic: no I/O, no clock, rng passed in
+crates/auth-db/                   # shared Neon HTTP kernel: auth, accounts, admin, developer
 services/auth/src/lib.rs            # entry: adapt request → crates → response
 apps/auth-web/                      # SvelteKit (planned)
 ```
