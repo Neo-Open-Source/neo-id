@@ -931,3 +931,110 @@ async fn logout_ends_session_or_user_or_nothing() {
     assert_eq!(anonymous.redirect_url, "/");
     assert_eq!(db.calls(), Vec::<String>::new());
 }
+
+#[test]
+fn debug_redacts_secrets() {
+    use auth_oidc::ClientRegistered;
+    let tokens = Tokens {
+        access_token: "secret-access".to_string(),
+        refresh_token: "secret-refresh".to_string(),
+        id_token: "secret-id".to_string(),
+        session_id: "sess-1".to_string(),
+        expires_in: 900,
+    };
+    let rendered = format!("{tokens:?}");
+    assert!(rendered.contains("Tokens"));
+    assert!(rendered.contains("sess-1"));
+    assert!(!rendered.contains("secret-access"));
+    assert!(!rendered.contains("secret-refresh"));
+    assert!(!rendered.contains("secret-id"));
+    let registered = ClientRegistered {
+        client_id: "client-1".to_string(),
+        client_secret: "shhh".to_string(),
+        client_secret_hash: "hash-of-shhh".to_string(),
+        redirect_uris: vec!["https://app.example/cb".to_string()],
+    };
+    let rendered = format!("{registered:?}");
+    assert!(rendered.contains("client-1"));
+    assert!(!rendered.contains("shhh"));
+    assert!(!rendered.contains("hash-of-shhh"));
+}
+
+#[tokio::test]
+async fn confidential_client_without_secret_needs_challenge() {
+    let (db, mut rng) = harness();
+    {
+        let mut state = db.state.lock().unwrap();
+        state.codes.push(code_row(&CodeSpec {
+            code: "authcode-2",
+            app: APP_ID,
+            redirect: REDIRECT,
+            challenge: None,
+            legacy: None,
+            session: None,
+            user: USER_ID,
+            expires: NOW + 600,
+        }));
+    }
+    let err = exchange(&db, &mut rng, code_grant("authcode-2", None, None)).await;
+    assert!(matches!(err, Err(WireError::InvalidGrant)));
+}
+
+#[tokio::test]
+async fn banned_user_refresh_is_access_denied() {
+    let (db, mut rng) = harness();
+    {
+        let mut state = db.state.lock().unwrap();
+        state.refreshes.push(refresh_row(
+            "rt-banned",
+            &hash_token("refresh-banned"),
+            Some(SESSION_ID),
+            NOW + 1_000,
+            None,
+            None,
+            "banned",
+        ));
+    }
+    let err = exchange(&db, &mut rng, refresh_grant("refresh-banned")).await;
+    assert!(matches!(err, Err(WireError::AccessDenied)));
+}
+
+#[tokio::test]
+async fn stale_session_forces_new_session() {
+    for (id, active, expires) in [("sess-old", true, NOW), ("sess-off", false, NOW + 1_000)] {
+        let (db, mut rng) = harness();
+        {
+            let mut state = db.state.lock().unwrap();
+            state.sessions.push(session_row(id, active, expires));
+            state.codes.push(code_row(&CodeSpec {
+                code: "authcode-3",
+                app: APP_ID,
+                redirect: REDIRECT,
+                challenge: Some(&pkce_challenge(VERIFIER)),
+                legacy: None,
+                session: Some(id),
+                user: USER_ID,
+                expires: NOW + 600,
+            }));
+        }
+        let tokens = exchange(
+            &db,
+            &mut rng,
+            code_grant("authcode-3", Some(VERIFIER), Some(SECRET)),
+        )
+        .await
+        .unwrap();
+        assert_ne!(tokens.session_id, id);
+    }
+}
+
+#[tokio::test]
+async fn expired_session_marks_refresh_unusable() {
+    let (db, mut rng) = harness();
+    {
+        let mut state = db.state.lock().unwrap();
+        state.sessions[0]["expiresAt"] = serde_json::json!(NOW);
+    }
+    let err = exchange(&db, &mut rng, refresh_grant("refresh-1")).await;
+    assert!(matches!(err, Err(WireError::InvalidGrant)));
+}

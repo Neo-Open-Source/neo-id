@@ -15,6 +15,7 @@ rand = { version = "0.8", default-features = false }
 
 [dev-dependencies]
 futures = "0.3"
+opaque-ke = "4"
 rand_chacha = "0.3"
 
 [features]

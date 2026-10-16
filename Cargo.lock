@@ -110,6 +110,7 @@ dependencies = [
  "auth-proto",
  "base64 0.22.1",
  "futures",
+ "opaque-ke",
  "rand 0.8.8",
  "rand_chacha 0.3.1",
  "serde_json",
@@ -184,12 +185,14 @@ dependencies = [
  "auth-accounts",
  "auth-core",
  "auth-db",
+ "auth-oidc",
  "base64 0.22.1",
  "getrandom 0.3.4",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
  "rsa",
  "serde_json",
+ "url",
  "worker",
 ]
 

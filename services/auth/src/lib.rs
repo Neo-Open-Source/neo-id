@@ -6,6 +6,7 @@
 mod env;
 mod kv;
 mod neon;
+mod oidc;
 mod respond;
 mod routes;
 

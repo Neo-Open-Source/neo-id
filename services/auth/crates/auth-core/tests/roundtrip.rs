@@ -1,5 +1,5 @@
 use auth_core::{
-    AuthError, CredentialId, Envelope, NeoSuite, OpaqueSetup, SessionKey, login_finish,
+    AuthError, CredentialId, Envelope, LoginState, NeoSuite, OpaqueSetup, SessionKey, login_finish,
     login_response, register_response, register_store,
 };
 use opaque_ke::{
@@ -263,4 +263,42 @@ fn seeded_runs_are_byte_identical() {
     let first_env = enroll(&first, &mut ChaCha8Rng::seed_from_u64(9), b"alice", b"pw");
     let second_env = enroll(&second, &mut ChaCha8Rng::seed_from_u64(9), b"alice", b"pw");
     assert_eq!(first_env, second_env);
+}
+
+#[test]
+fn login_state_survives_bytes_roundtrip() {
+    let setup = seeded_setup();
+    let envelope = enroll(
+        &setup,
+        &mut ChaCha8Rng::seed_from_u64(1),
+        b"alice",
+        b"correct horse",
+    );
+    let id = CredentialId::try_from(b"alice".as_slice()).unwrap();
+    let start = ClientLogin::<NeoSuite>::start(&mut ChaCha8Rng::seed_from_u64(2), b"correct horse")
+        .unwrap();
+    let (response_bytes, state) = login_response(
+        &setup,
+        &envelope,
+        &start.message.serialize(),
+        id,
+        &mut ChaCha8Rng::seed_from_u64(3),
+    )
+    .unwrap();
+    let bytes = state.into_bytes();
+    let finish = start
+        .state
+        .finish(
+            &mut ChaCha8Rng::seed_from_u64(2),
+            b"correct horse",
+            CredentialResponse::deserialize(&response_bytes).unwrap(),
+            ClientLoginFinishParameters::default(),
+        )
+        .unwrap();
+    let final_bytes = finish.message.serialize().to_vec();
+    let session = login_finish(LoginState::from_bytes(bytes).unwrap(), &final_bytes).unwrap();
+    assert_eq!(session.expose(), finish.session_key.to_vec());
+
+    assert!(LoginState::from_bytes(vec![]).is_err());
+    assert!(LoginState::from_bytes(vec![0u8; 10]).is_err());
 }

@@ -23,10 +23,10 @@ pub fn generate_id<R: RngCore + CryptoRng>(rng: &mut R) -> String {
     for (i, byte) in bytes.iter().enumerate() {
         let mut byte = *byte;
         if i == 6 {
-            byte = byte & 0x0f | 0x40;
+            byte = (byte & 0x0f) + 0x40;
         }
         if i == 8 {
-            byte = byte & 0x3f | 0x80;
+            byte = (byte & 0x3f) + 0x80;
         }
         if i == 4 || i == 6 || i == 8 || i == 10 {
             id.push('-');

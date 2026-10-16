@@ -33,6 +33,15 @@ fn id_is_v4_uuid() {
 }
 
 #[test]
+fn id_version_and_variant_hold_for_many_seeds() {
+    for seed in 0..64u64 {
+        let id = generate_id(&mut ChaCha8Rng::seed_from_u64(seed));
+        assert_eq!(&id[14..15], "4", "{seed}");
+        assert!(matches!(&id[19..20], "8" | "9" | "a" | "b"), "{seed}");
+    }
+}
+
+#[test]
 fn code_is_numeric_of_length() {
     let code = generate_code(&mut ChaCha8Rng::seed_from_u64(5), 6);
     assert_eq!(code.len(), 6);

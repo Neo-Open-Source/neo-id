@@ -39,6 +39,26 @@ fn email_code_request_verify_cooldown() {
     .unwrap();
     assert!(matches!(outcome, CodeOutcome::Cooldown(50)));
 
+    let boundary = Scripted::feed(vec![
+        vec![serde_json::json!({"id": "c0", "code": "000000", "createdAt": 940})],
+        vec![],
+        vec![],
+    ]);
+    let sent = run(request_email_code(
+        &boundary,
+        &mut ChaCha8Rng::seed_from_u64(1),
+        "u1",
+        "mfa_login",
+        None,
+        1000,
+    ))
+    .unwrap();
+    assert!(matches!(sent, CodeOutcome::Sent(_)));
+    assert_eq!(
+        boundary.param("INSERT INTO \"mfa_codes\"", 4),
+        Some(serde_json::json!(1600))
+    );
+
     let good = Scripted::feed(vec![vec![code_row()], vec![]]);
     assert!(run(verify_email_code(&good, "u1", "mfa_login", "123456", 1100)).unwrap());
 
@@ -65,8 +85,15 @@ fn totp_lifecycle() {
     let enable = Scripted::feed(vec![secret_row(), vec![]]);
     assert!(!run(totp_enable(&enable, "u1", "000000", 1_800_000_000)).unwrap());
 
+    let rfc_row = || vec![serde_json::json!({"totpSecret": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"})];
+    let enable_ok = Scripted::feed(vec![rfc_row(), vec![]]);
+    assert!(run(totp_enable(&enable_ok, "u1", "287082", 59)).unwrap());
+    assert!(enable_ok.ran("UPDATE \"users\""));
+
     let disable = Scripted::feed(vec![secret_row()]);
     assert!(!run(totp_disable(&disable, "u1", "000000", 1_800_000_000)).unwrap());
+    let disable_ok = Scripted::feed(vec![rfc_row(), vec![]]);
+    assert!(run(totp_disable(&disable_ok, "u1", "287082", 59)).unwrap());
 }
 
 #[test]
@@ -92,6 +119,10 @@ fn password_reset_flow() {
     ))
     .unwrap();
     assert!(matches!(outcome, ForgotOutcome::Emailed(_)));
+    assert_eq!(
+        known.param("userMetadata", 2),
+        Some(serde_json::json!(4600))
+    );
 
     let valid = Scripted::feed(vec![vec![user_row()], vec![]]);
     assert_eq!(
@@ -122,7 +153,9 @@ fn change_email_flow() {
         ))
         .unwrap()
     );
+    assert!(confirmed.ran("UPDATE \"users\""));
 
     let verified = Scripted::feed(vec![vec![code_row()], vec![], vec![]]);
     assert!(run(confirm_email(&verified, "u1", "123456", 1100)).unwrap());
+    assert!(verified.ran("UPDATE \"users\""));
 }

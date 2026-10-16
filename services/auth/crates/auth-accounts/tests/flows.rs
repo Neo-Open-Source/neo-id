@@ -119,9 +119,43 @@ fn rotate_happy_path_and_revoked() {
 }
 
 #[test]
+fn register_finish_stores_envelope() {
+    use auth_core::{CredentialId, OpaqueSetup, register_response};
+    use opaque_ke::{ClientRegistration, ClientRegistrationFinishParameters, RegistrationResponse};
+    let setup = OpaqueSetup::generate(&mut ChaCha8Rng::seed_from_u64(1));
+    let mut rng = ChaCha8Rng::seed_from_u64(2);
+    let start = ClientRegistration::<auth_core::NeoSuite>::start(&mut rng, b"pw").unwrap();
+    let response = register_response(
+        &setup,
+        &start.message.serialize(),
+        CredentialId::try_from(b"u1".as_slice()).unwrap(),
+    )
+    .unwrap();
+    let finish = start
+        .state
+        .finish(
+            &mut rng,
+            b"pw",
+            RegistrationResponse::deserialize(&response).unwrap(),
+            ClientRegistrationFinishParameters::default(),
+        )
+        .unwrap();
+    let db = Scripted::feed(vec![vec![]]);
+    run(auth_accounts::finish_registration(
+        &db,
+        "u1",
+        &finish.message.serialize(),
+    ))
+    .unwrap();
+    assert!(db.ran("opaque_records"));
+}
+
+#[test]
 fn logout_deactivates() {
     let db = Scripted::feed(vec![vec![], vec![]]);
     run(end_session(&db, "s1", 1000)).unwrap();
+    assert!(db.ran("UPDATE \"sessions\""));
     let db = Scripted::feed(vec![vec![], vec![]]);
     run(end_all_sessions(&db, "u1", 1000)).unwrap();
+    assert!(db.ran("refresh_tokens"));
 }

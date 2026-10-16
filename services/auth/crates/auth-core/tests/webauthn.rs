@@ -1,8 +1,9 @@
 #![cfg(feature = "webauthn")]
 
 use auth_core::{
-    AuthError, PasskeyRp, StoredCredential, authentication_options, registration_options,
-    verify_authentication, verify_registration,
+    AuthError, AuthenticationState, PasskeyRp, RegistrationState, StoredCredential,
+    authentication_options, registration_options, user_uuid, verify_authentication,
+    verify_registration,
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
@@ -313,4 +314,40 @@ fn webauthn_errors_map_to_coarse_auth_errors() {
         map(WebauthnError::ParseCBORFailure(cbor)),
         AuthError::MalformedMessage
     );
+}
+
+#[test]
+fn user_uuid_is_deterministic_per_user() {
+    assert_eq!(user_uuid("alice"), user_uuid("alice"));
+    assert_ne!(user_uuid("alice"), user_uuid("bob"));
+}
+
+#[test]
+fn registration_state_survives_bytes_roundtrip() {
+    let state = registration_options(&rp(), Uuid::new_v4(), "alice@example.com", &[])
+        .map(|(_, state)| state)
+        .unwrap();
+    let bytes = state.to_bytes().unwrap();
+    let restored = RegistrationState::from_bytes(&bytes).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), bytes);
+    assert!(RegistrationState::from_bytes(b"nope").is_err());
+}
+
+#[test]
+fn authentication_state_survives_bytes_roundtrip() {
+    let credential = StoredCredential {
+        id: vec![7; 32],
+        key: CAPTURED_TOKEN_COSE_ES256.to_vec(),
+        counter: 0,
+        transports: vec![],
+        backup_eligible: false,
+        backup_state: false,
+    };
+    let state = authentication_options(&rp(), &[credential])
+        .map(|(_, state)| state)
+        .unwrap();
+    let bytes = state.to_bytes().unwrap();
+    let restored = AuthenticationState::from_bytes(&bytes).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), bytes);
+    assert!(AuthenticationState::from_bytes(b"nope").is_err());
 }

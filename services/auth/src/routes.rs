@@ -11,15 +11,15 @@ use crate::{
     respond::{fail, ok},
 };
 
-struct Ctx {
-    request_id: String,
-    now_ms: u64,
-    now: u64,
-    app: AppEnv,
-    db: NeonExecutor,
+pub(crate) struct Ctx {
+    pub(crate) request_id: String,
+    pub(crate) now_ms: u64,
+    pub(crate) now: u64,
+    pub(crate) app: AppEnv,
+    pub(crate) db: NeonExecutor,
 }
 
-fn load_cx(env: &Env) -> std::result::Result<Ctx, AuthError> {
+pub(crate) fn load_cx(env: &Env) -> std::result::Result<Ctx, AuthError> {
     let app = load(env)?;
     let endpoint = app.endpoint.clone();
     let connection = env
@@ -272,7 +272,7 @@ fn state_key(state_id: &str) -> String {
     format!("login:{state_id}")
 }
 
-fn header_opt(req: &Request, name: &str) -> Option<String> {
+pub(crate) fn header_opt(req: &Request, name: &str) -> Option<String> {
     req.headers()
         .get(name)
         .ok()
@@ -428,7 +428,7 @@ async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     }
 }
 
-fn worker_rng() -> Result<ChaCha8Rng, AuthError> {
+pub(crate) fn worker_rng() -> Result<ChaCha8Rng, AuthError> {
     let mut seed = [0u8; 32];
     getrandom::fill(&mut seed).map_err(|_| AuthError::Internal)?;
     Ok(ChaCha8Rng::from_seed(seed))
@@ -519,4 +519,13 @@ pub fn router() -> Router<'static, ()> {
         .post_async("/api/v1/auth/login/finish", login_finish)
         .post_async("/api/v1/auth/refresh", refresh_route)
         .post_async("/api/v1/auth/logout", logout_route)
+        .get_async("/api/v1/oauth2/authorize", crate::oidc::authorize_route)
+        .post_async(
+            "/api/v1/oauth2/authorize/consent",
+            crate::oidc::consent_route,
+        )
+        .post_async("/api/v1/oauth2/token", crate::oidc::token_route)
+        .get_async("/api/v1/oauth2/userinfo", crate::oidc::userinfo_route)
+        .post_async("/api/v1/oauth2/logout", crate::oidc::logout_route)
+        .post_async("/api/v1/oauth2/register", crate::oidc::register_route)
 }

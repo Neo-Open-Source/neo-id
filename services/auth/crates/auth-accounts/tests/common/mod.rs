@@ -6,21 +6,41 @@ use std::collections::VecDeque;
 
 pub struct Scripted {
     pub rows: std::sync::Mutex<VecDeque<Vec<serde_json::Value>>>,
+    pub calls: std::sync::Mutex<Vec<(String, Vec<serde_json::Value>)>>,
 }
 
 impl Scripted {
     pub fn feed(values: Vec<Vec<serde_json::Value>>) -> Self {
         Self {
             rows: std::sync::Mutex::new(values.into()),
+            calls: std::sync::Mutex::new(Vec::new()),
         }
+    }
+
+    pub fn ran(&self, needle: &str) -> bool {
+        self.calls
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(sql, _)| sql.contains(needle))
+    }
+
+    pub fn param(&self, sql_needle: &str, index: usize) -> Option<serde_json::Value> {
+        self.calls
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(sql, _)| sql.contains(sql_needle))
+            .and_then(|(_, params)| params.get(index).cloned())
     }
 }
 
 impl Executor for Scripted {
-    fn run(
-        &self,
-        _query: Query,
-    ) -> impl Future<Output = Result<Vec<serde_json::Value>, AuthError>> {
+    fn run(&self, query: Query) -> impl Future<Output = Result<Vec<serde_json::Value>, AuthError>> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push((query.sql.to_string(), query.params.clone()));
         let rows = self.rows.lock().unwrap().pop_front().unwrap_or_default();
         async move { Ok(rows) }
     }
