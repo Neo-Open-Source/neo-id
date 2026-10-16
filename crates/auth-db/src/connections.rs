@@ -11,7 +11,7 @@ pub fn find_connection(user_id: &str, service_app_id: &str) -> Query {
 #[must_use]
 pub fn upsert_connection(user_id: &str, service_app_id: &str, scopes: &[&str], now: u64) -> Query {
     Query {
-        sql: r#"INSERT INTO "authorized_connections" ("id","userId","serviceAppId","scopes","lastUsedAt") VALUES (gen_random_uuid(),$1,$2,$3,to_timestamp($4)) ON CONFLICT ("userId","serviceAppId") DO UPDATE SET "scopes"=$3,"lastUsedAt"=to_timestamp($4)"#,
+        sql: r#"INSERT INTO "authorized_connections" ("id","userId","serviceAppId","scopes","lastUsedAt") VALUES (gen_random_uuid()::text,$1,$2,$3,to_timestamp($4)) ON CONFLICT ("userId","serviceAppId") DO UPDATE SET "scopes"=$3,"lastUsedAt"=to_timestamp($4)"#,
         params: vec![
             text(user_id),
             text(service_app_id),

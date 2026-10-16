@@ -8,7 +8,7 @@ pub fn create_session(
     expires_at: u64,
 ) -> Query {
     Query {
-        sql: r#"INSERT INTO "sessions" ("id","userId","deviceInfo","ipAddress","expiresAt") VALUES (gen_random_uuid(),$1,$2,$3,to_timestamp($4)) RETURNING "id""#,
+        sql: r#"INSERT INTO "sessions" ("id","userId","deviceInfo","ipAddress","expiresAt") VALUES (gen_random_uuid()::text,$1,$2,$3,to_timestamp($4)) RETURNING "id""#,
         params: vec![
             text(user_id),
             nullable(device),

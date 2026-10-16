@@ -25,10 +25,10 @@ pub fn touch_login(user_id: &str, ip: Option<&str>, now: u64) -> Query {
 }
 
 #[must_use]
-pub fn create_user(email: &str) -> Query {
+pub fn create_user(email: &str, now: u64) -> Query {
     Query {
-        sql: r#"INSERT INTO "users" ("id","email") VALUES (gen_random_uuid(),$1) RETURNING "id""#,
-        params: vec![text(email)],
+        sql: r#"INSERT INTO "users" ("id","email","createdAt","updatedAt") VALUES (gen_random_uuid()::text,$1,to_timestamp($2),to_timestamp($2)) RETURNING "id""#,
+        params: vec![text(email), instant(now)],
     }
 }
 

@@ -20,6 +20,7 @@ fn every_builder_binds_all_placeholders() {
         revoke_refresh("r1", "rotated", 1000),
         create_code(
             "code",
+            "state",
             "app",
             "https://a/cb",
             Some("ch"),

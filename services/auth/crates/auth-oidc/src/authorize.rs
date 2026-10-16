@@ -137,8 +137,10 @@ pub async fn decide_consent<E: Executor, R: rand::RngCore + rand::CryptoRng>(
         }),
         ConsentChoice::Approved => {
             let code = generate_token(rng, 32);
+            let state = req.state.clone().unwrap_or_else(|| generate_token(rng, 16));
             db.run(create_code(
                 &code,
+                &state,
                 &req.service_app_id,
                 &req.redirect_uri,
                 req.code_challenge.as_deref(),

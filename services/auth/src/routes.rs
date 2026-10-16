@@ -139,7 +139,7 @@ async fn register_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         }
     }
     let (user_id, status) = match auth_accounts::check_email(&cx.db, email).await {
-        Ok(auth_accounts::Availability::Fresh) => match create_user(&cx.db, email).await {
+        Ok(auth_accounts::Availability::Fresh) => match create_user(&cx.db, email, cx.now).await {
             Ok(id) => (id, "fresh"),
             Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
         },
@@ -180,8 +180,8 @@ fn begin_for(cx: &Ctx, user_id: &str, request_b64: &str, status: &str) -> Result
     }
 }
 
-async fn create_user<E: Executor>(db: &E, email: &str) -> Result<String, AuthError> {
-    let rows = db.run(auth_db::create_user(email)).await?;
+async fn create_user<E: Executor>(db: &E, email: &str, now: u64) -> Result<String, AuthError> {
+    let rows = db.run(auth_db::create_user(email, now)).await?;
     rows.first()
         .and_then(|row| row.get("id"))
         .and_then(serde_json::Value::as_str)

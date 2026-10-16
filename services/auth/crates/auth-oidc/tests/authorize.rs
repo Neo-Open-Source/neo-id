@@ -55,11 +55,12 @@ impl MockDb {
         if query.sql.contains("INSERT INTO \"oauth_states\"") {
             state.codes.push(json!({
                 "code": query.params[0],
-                "serviceAppId": query.params[1],
-                "redirectUri": query.params[2],
-                "codeChallenge": query.params[3],
-                "sessionId": query.params[4],
-                "userId": query.params[5],
+                "state": query.params[1],
+                "serviceAppId": query.params[2],
+                "redirectUri": query.params[3],
+                "codeChallenge": query.params[4],
+                "sessionId": query.params[5],
+                "userId": query.params[6],
             }));
             return Ok(Vec::new());
         }
@@ -267,6 +268,7 @@ async fn approve_creates_code_and_redirects_with_state() {
     assert!(result.url.contains("state=s-7"));
     let codes = db.codes();
     assert_eq!(codes.len(), 1);
+    assert_eq!(codes[0].get("state").and_then(Value::as_str), Some("s-7"));
     assert_eq!(codes[0].get("userId").and_then(Value::as_str), Some("u-1"));
     assert_eq!(
         codes[0].get("sessionId").and_then(Value::as_str),

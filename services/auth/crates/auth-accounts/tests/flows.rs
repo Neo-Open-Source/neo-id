@@ -9,7 +9,7 @@ use common::{Scripted, refresh_row, run, session_row, user_row};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
-const PRIVATE_PEM: &str = include_str!("../../auth-core/tests/data/test-rsa.pem");
+const PRIVATE_PEM: &str = include_str!("../../../../../crates/auth-core/tests/data/test-rsa.pem");
 
 fn params() -> MintParams<'static> {
     MintParams {
@@ -148,6 +148,63 @@ fn register_finish_stores_envelope() {
     ))
     .unwrap();
     assert!(db.ran("opaque_records"));
+}
+
+#[test]
+fn login_handshake_session_keys_match() {
+    use auth_core::{CredentialId, LoginState, login_finish, register_response};
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use opaque_ke::{
+        ClientLogin, ClientLoginFinishParameters, ClientRegistration,
+        ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
+    };
+    let setup = OpaqueSetup::generate(&mut ChaCha8Rng::seed_from_u64(1));
+    let mut rng = ChaCha8Rng::seed_from_u64(2);
+    let start = ClientRegistration::<auth_core::NeoSuite>::start(&mut rng, b"pw").unwrap();
+    let response = register_response(
+        &setup,
+        &start.message.serialize(),
+        CredentialId::try_from(b"u1".as_slice()).unwrap(),
+    )
+    .unwrap();
+    let finish = start
+        .state
+        .finish(
+            &mut rng,
+            b"pw",
+            RegistrationResponse::deserialize(&response).unwrap(),
+            ClientRegistrationFinishParameters::default(),
+        )
+        .unwrap();
+    let envelope = auth_core::register_store(&finish.message.serialize()).unwrap();
+    let login_start = ClientLogin::<auth_core::NeoSuite>::start(&mut rng, b"pw").unwrap();
+    let db = Scripted::feed(vec![
+        vec![user_row()],
+        vec![serde_json::json!({"envelope": URL_SAFE_NO_PAD.encode(envelope.as_bytes())})],
+    ]);
+    let challenge = run(start_login(
+        &db,
+        &setup,
+        &mut rng,
+        "a@b.c",
+        &login_start.message.serialize(),
+    ))
+    .unwrap();
+    let done = login_start
+        .state
+        .finish(
+            &mut rng,
+            b"pw",
+            CredentialResponse::deserialize(&challenge.response).unwrap(),
+            ClientLoginFinishParameters::default(),
+        )
+        .unwrap();
+    let key = login_finish(
+        LoginState::from_bytes(challenge.state).unwrap(),
+        &done.message.serialize(),
+    )
+    .unwrap();
+    assert_eq!(done.session_key.as_slice(), key.expose().as_slice());
 }
 
 #[test]

@@ -2,8 +2,8 @@ mod common;
 
 use auth_accounts::{
     CodeOutcome, ForgotOutcome, change_email_confirm, change_email_request, confirm_email,
-    forgot_password, request_email_code, reset_password, totp_begin, totp_disable, totp_enable,
-    verify_email_code,
+    forgot_password, request_email_code, reset_password, totp_begin, totp_check, totp_disable,
+    totp_enable, verify_email_code,
 };
 use common::{Scripted, run, user_row};
 use rand::SeedableRng;
@@ -94,6 +94,11 @@ fn totp_lifecycle() {
     assert!(!run(totp_disable(&disable, "u1", "000000", 1_800_000_000)).unwrap());
     let disable_ok = Scripted::feed(vec![rfc_row(), vec![]]);
     assert!(run(totp_disable(&disable_ok, "u1", "287082", 59)).unwrap());
+
+    let check_ok = Scripted::feed(vec![rfc_row()]);
+    assert!(run(totp_check(&check_ok, "u1", "287082", 59)).unwrap());
+    let check_bad = Scripted::feed(vec![rfc_row()]);
+    assert!(!run(totp_check(&check_bad, "u1", "000000", 59)).unwrap());
 }
 
 #[test]

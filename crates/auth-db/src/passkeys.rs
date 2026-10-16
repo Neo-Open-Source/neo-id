@@ -12,7 +12,7 @@ pub fn insert_passkey(
     backup_state: bool,
 ) -> Query {
     Query {
-        sql: r#"INSERT INTO "passkeys" ("id","userId","credentialId","publicKey","transports","backupEligible","backupState") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6)"#,
+        sql: r#"INSERT INTO "passkeys" ("id","userId","credentialId","publicKey","transports","backupEligible","backupState") VALUES (gen_random_uuid()::text,$1,$2,$3,$4,$5,$6)"#,
         params: vec![
             text(user_id),
             text(credential_id_b64),

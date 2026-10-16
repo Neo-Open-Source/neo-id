@@ -21,7 +21,7 @@ pub fn create_refresh(
     expires_at: u64,
 ) -> Query {
     Query {
-        sql: r#"INSERT INTO "refresh_tokens" ("id","userId","sessionId","tokenHash","parentId","deviceInfo","ipAddress","expiresAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,to_timestamp($7))"#,
+        sql: r#"INSERT INTO "refresh_tokens" ("id","userId","sessionId","tokenHash","parentId","deviceInfo","ipAddress","expiresAt") VALUES (gen_random_uuid()::text,$1,$2,$3,$4,$5,$6,to_timestamp($7))"#,
         params: vec![
             text(user_id),
             text(session_id),

@@ -1,8 +1,13 @@
 use super::{Query, instant, nullable, text};
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "positional builder mirrors the ten-column INSERT; a struct would split one row across two definitions"
+)]
 #[must_use]
 pub fn create_code(
     code: &str,
+    state: &str,
     service_app_id: &str,
     redirect_uri: &str,
     challenge: Option<&str>,
@@ -11,9 +16,10 @@ pub fn create_code(
     expires_at: u64,
 ) -> Query {
     Query {
-        sql: r#"INSERT INTO "oauth_states" ("id","code","serviceAppId","redirectUri","mode","codeChallenge","sessionId","userId","expiresAt") VALUES (gen_random_uuid(),$1,$2,$3,'authorize',$4,$5,$6,to_timestamp($7))"#,
+        sql: r#"INSERT INTO "oauth_states" ("id","code","state","serviceAppId","redirectUri","mode","codeChallenge","sessionId","userId","expiresAt") VALUES (gen_random_uuid()::text,$1,$2,$3,$4,'authorize',$5,$6,$7,to_timestamp($8))"#,
         params: vec![
             text(code),
+            text(state),
             text(service_app_id),
             text(redirect_uri),
             nullable(challenge),

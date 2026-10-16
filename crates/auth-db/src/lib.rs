@@ -78,3 +78,27 @@ fn nullable(value: Option<&str>) -> serde_json::Value {
 fn instant(unix_secs: u64) -> serde_json::Value {
     serde_json::Value::Number(i64::try_from(unix_secs).unwrap_or(i64::MAX).into())
 }
+
+#[cfg(test)]
+mod id_cast_tests {
+    use super::{
+        create_code, create_refresh, create_session, create_user, insert_passkey, issue_code,
+        upsert_connection,
+    };
+
+    #[test]
+    fn inserts_cast_uuid_to_text_ids() {
+        let statements = [
+            create_user("a@b.co", 0).sql,
+            create_session("u", None, None, 0).sql,
+            create_refresh("u", "s", "h", None, None, None, 0).sql,
+            create_code("c", "s", "app", "https://rp/cb", None, None, "u", 0).sql,
+            issue_code("u", "verify", "123456", None, 0).sql,
+            insert_passkey("u", "cred", "key", None, false, false).sql,
+            upsert_connection("u", "app", &[], 0).sql,
+        ];
+        for sql in statements {
+            assert!(sql.contains("gen_random_uuid()::text"), "{sql}");
+        }
+    }
+}
