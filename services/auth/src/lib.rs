@@ -3,8 +3,11 @@
     reason = "AuthError variants are the single source; per-fn sections would duplicate and drift"
 )]
 
+mod account;
 mod env;
 mod kv;
+mod mail;
+mod mfa;
 mod neon;
 mod oidc;
 mod respond;

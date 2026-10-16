@@ -4,7 +4,8 @@ use auth_core::{
     sign_access, sign_id,
 };
 use auth_db::{
-    Executor, create_refresh, create_session, find_envelope, find_user_by_email, touch_login,
+    Executor, create_refresh, create_session, find_envelope, find_user_by_email, find_user_by_id,
+    touch_login,
 };
 use auth_proto::auth::v1::TokenPair;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -19,6 +20,31 @@ pub struct LoginChallenge {
     pub user: LoginUser,
     pub response: Vec<u8>,
     pub state: Vec<u8>,
+}
+
+pub async fn load_user<E: Executor>(db: &E, email: &str) -> Result<LoginUser, AuthError> {
+    let users = db.run(find_user_by_email(email)).await?;
+    let user = users.first().ok_or(AuthError::InvalidCredentials)?;
+    parse_user(user)
+}
+
+pub async fn load_user_by_id<E: Executor>(db: &E, user_id: &str) -> Result<LoginUser, AuthError> {
+    let users = db.run(find_user_by_id(user_id)).await?;
+    let user = users.first().ok_or(AuthError::InvalidCredentials)?;
+    parse_user(user)
+}
+
+fn parse_user(user: &serde_json::Value) -> Result<LoginUser, AuthError> {
+    let field = |key: &str| {
+        user.get(key)
+            .and_then(serde_json::Value::as_str)
+            .ok_or(AuthError::MalformedMessage)
+    };
+    Ok(LoginUser {
+        id: field("id")?.to_string(),
+        email: field("email")?.to_string(),
+        role: field("role")?.to_string(),
+    })
 }
 
 pub struct MintParams<'a> {

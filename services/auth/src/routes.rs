@@ -121,6 +121,23 @@ async fn register_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         .get("request")
         .and_then(|value| value.as_str())
         .unwrap_or_default();
+    let grant = body_field(&body, "reset_grant");
+    if !grant.is_empty() {
+        let store = match kv_store(&ctx) {
+            Ok(store) => crate::kv::StatesKv::new(store),
+            Err(_) => return fail("unknown", 0, &AuthError::Internal),
+        };
+        match store.get(&format!("pwdreset:{grant}")).await {
+            Ok(Some(user_id)) => {
+                let user_id = String::from_utf8_lossy(&user_id).to_string();
+                return begin_for(&cx, &user_id, body_field(&body, "request"), "reset");
+            }
+            Ok(None) => {
+                return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
+            }
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        }
+    }
     let (user_id, status) = match auth_accounts::check_email(&cx.db, email).await {
         Ok(auth_accounts::Availability::Fresh) => match create_user(&cx.db, email).await {
             Ok(id) => (id, "fresh"),
@@ -137,6 +154,10 @@ async fn register_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         }
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    begin_for(&cx, &user_id, request_b64, status)
+}
+
+fn begin_for(cx: &Ctx, user_id: &str, request_b64: &str, status: &str) -> Result<Response> {
     let Ok(request_bytes) = URL_SAFE_NO_PAD.decode(request_b64) else {
         return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage);
     };
@@ -168,7 +189,7 @@ async fn create_user<E: Executor>(db: &E, email: &str) -> Result<String, AuthErr
         .ok_or(AuthError::Internal)
 }
 
-fn fail_status(cx: &Ctx, status: u16, code: &str, message: &str) -> Result<Response> {
+pub(crate) fn fail_status(cx: &Ctx, status: u16, code: &str, message: &str) -> Result<Response> {
     Response::from_json(&serde_json::json!({
         "ok": false,
         "error": {"code": code, "message": message, "status": status},
@@ -177,10 +198,66 @@ fn fail_status(cx: &Ctx, status: u16, code: &str, message: &str) -> Result<Respo
     .map(|response| response.with_status(status))
 }
 
-fn body_field<'a>(body: &'a serde_json::Value, key: &str) -> &'a str {
+pub(crate) fn body_field<'a>(body: &'a serde_json::Value, key: &str) -> &'a str {
     body.get(key)
         .and_then(|value| value.as_str())
         .unwrap_or_default()
+}
+
+pub(crate) async fn json_body(req: &mut Request) -> Result<serde_json::Value, AuthError> {
+    match req.json().await {
+        Ok(body) => Ok(body),
+        Err(_) => Err(AuthError::MalformedMessage),
+    }
+}
+
+pub(crate) fn authed(cx: &Ctx, req: &Request) -> Result<String, AuthError> {
+    let Some(header) = header_opt(req, "authorization") else {
+        return Err(AuthError::InvalidCredentials);
+    };
+    let Some(presented) = header.strip_prefix("Bearer ") else {
+        return Err(AuthError::MalformedMessage);
+    };
+    match auth_core::verify_access(&cx.app.public_pem, presented, &cx.app.issuer, cx.now) {
+        Ok(claims) => Ok(claims.sub),
+        Err(err) => Err(err),
+    }
+}
+
+pub(crate) async fn mint_response(
+    cx: &Ctx,
+    req: &Request,
+    rng: &mut ChaCha8Rng,
+    user: &auth_accounts::LoginUser,
+) -> Result<Response> {
+    let device = header_opt(req, "user-agent");
+    let ip = header_opt(req, "cf-connecting-ip");
+    let params = auth_accounts::MintParams {
+        private_pem: &cx.app.private_pem,
+        issuer: &cx.app.issuer,
+        device: device.as_deref(),
+        ip: ip.as_deref(),
+        audience: None,
+    };
+    match auth_accounts::complete_login(&cx.db, rng, cx.now, &params, user).await {
+        Ok(tokens) => crate::respond::with_cookies(
+            ok(
+                &cx.request_id,
+                cx.now_ms,
+                &serde_json::json!({
+                    "accessToken": tokens.access_token,
+                    "refreshToken": tokens.refresh_token,
+                    "idToken": tokens.id_token,
+                    "user": {"id": user.id, "email": user.email, "role": user.role},
+                }),
+                200,
+            ),
+            &tokens.access_token,
+            &tokens.refresh_token,
+            auth_core::REFRESH_EXPIRY,
+        ),
+        Err(err) => fail(&cx.request_id, cx.now_ms, &err),
+    }
 }
 
 fn cookie_value(req: &Request, name: &str) -> Option<String> {
@@ -194,7 +271,7 @@ fn cookie_value(req: &Request, name: &str) -> Option<String> {
         .map(|(_, value)| value.trim().to_string())
 }
 
-fn kv_store(ctx: &RouteContext<()>) -> Result<worker::kv::KvStore, AuthError> {
+pub(crate) fn kv_store(ctx: &RouteContext<()>) -> Result<worker::kv::KvStore, AuthError> {
     ctx.env.kv("STATES").map_err(|_| AuthError::Internal)
 }
 
@@ -509,7 +586,7 @@ async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
 }
 
 pub fn router() -> Router<'static, ()> {
-    Router::new()
+    let router = Router::new()
         .get_async("/health", health)
         .get_async("/.well-known/openid-configuration", discovery)
         .get_async("/.well-known/jwks.json", jwks)
@@ -528,4 +605,56 @@ pub fn router() -> Router<'static, ()> {
         .get_async("/api/v1/oauth2/userinfo", crate::oidc::userinfo_route)
         .post_async("/api/v1/oauth2/logout", crate::oidc::logout_route)
         .post_async("/api/v1/oauth2/register", crate::oidc::register_route)
+        .post_async("/api/v1/mfa/email/request", crate::mfa::email_request)
+        .post_async("/api/v1/mfa/email/verify", crate::mfa::email_verify)
+        .post_async("/api/v1/mfa/totp/setup", crate::mfa::totp_setup)
+        .post_async("/api/v1/mfa/totp/enable", crate::mfa::totp_enable)
+        .post_async("/api/v1/mfa/totp/disable", crate::mfa::totp_disable)
+        .post_async("/api/v1/mfa/totp/verify", crate::mfa::totp_verify);
+    #[cfg(feature = "passkeys")]
+    let router = router
+        .post_async(
+            "/api/v1/passkeys/register/start",
+            crate::mfa::passkey_register_start,
+        )
+        .post_async(
+            "/api/v1/passkeys/register/finish",
+            crate::mfa::passkey_register_finish,
+        )
+        .post_async(
+            "/api/v1/passkeys/auth/start",
+            crate::mfa::passkey_auth_start,
+        )
+        .post_async(
+            "/api/v1/passkeys/auth/finish",
+            crate::mfa::passkey_auth_finish,
+        );
+    router
+        .get_async("/api/v1/sessions", crate::account::sessions_list)
+        .delete_async("/api/v1/sessions/:id", crate::account::session_revoke)
+        .delete_async("/api/v1/sessions", crate::account::sessions_revoke_all)
+        .get_async("/api/v1/user/profile", crate::account::profile_get)
+        .put_async("/api/v1/user/profile", crate::account::profile_update)
+        .post_async("/api/v1/user/email/request", crate::account::email_request)
+        .post_async("/api/v1/user/email/confirm", crate::account::email_confirm)
+        .post_async(
+            "/api/v1/user/verify-email/request",
+            crate::account::verify_email_request,
+        )
+        .post_async(
+            "/api/v1/user/verify-email/confirm",
+            crate::account::verify_email_confirm,
+        )
+        .post_async(
+            "/api/v1/auth/password/forgot",
+            crate::account::password_forgot,
+        )
+        .post_async(
+            "/api/v1/auth/password/reset",
+            crate::account::password_reset,
+        )
+        .post_async(
+            "/api/v1/user/password/change",
+            crate::account::password_change,
+        )
 }

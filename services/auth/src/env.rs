@@ -8,6 +8,13 @@ pub struct AppEnv {
     pub public_pem: Vec<u8>,
     pub setup: OpaqueSetup,
     pub issuer: String,
+    pub mail_url: Option<String>,
+    pub mail_key: String,
+    pub web_origin: String,
+    #[cfg(feature = "passkeys")]
+    pub rp_id: String,
+    #[cfg(feature = "passkeys")]
+    pub rp_origin: String,
 }
 
 fn unescape_pem(raw: &str) -> Vec<u8> {
@@ -41,11 +48,34 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
     let issuer = env
         .var("JWT_ISSUER")
         .map_or("https://id.neome.uk".to_string(), |value| value.to_string());
+    let mail_url = env.var("MAIL_API_URL").map(|value| value.to_string()).ok();
+    let mail_key = env
+        .secret("MAIL_API_KEY")
+        .map(|secret| secret.to_string())
+        .unwrap_or_default();
+    let web_origin = env
+        .var("WEB_ORIGIN")
+        .map_or("https://id.neome.uk".to_string(), |value| value.to_string());
+    #[cfg(feature = "passkeys")]
+    let rp_id = env
+        .var("RP_ID")
+        .map_or("id.neome.uk".to_string(), |value| value.to_string());
+    #[cfg(feature = "passkeys")]
+    let rp_origin = env
+        .var("RP_ORIGIN")
+        .map_or("https://id.neome.uk".to_string(), |value| value.to_string());
     Ok(AppEnv {
         endpoint,
         private_pem,
         public_pem,
         setup: OpaqueSetup::try_from_bytes(&setup_raw)?,
         issuer,
+        mail_url,
+        mail_key,
+        web_origin,
+        #[cfg(feature = "passkeys")]
+        rp_id,
+        #[cfg(feature = "passkeys")]
+        rp_origin,
     })
 }

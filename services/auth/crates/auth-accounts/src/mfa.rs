@@ -108,6 +108,15 @@ pub async fn totp_enable<E: Executor>(
     Ok(true)
 }
 
+pub async fn totp_check<E: Executor>(
+    db: &E,
+    user_id: &str,
+    code: &str,
+    now: u64,
+) -> Result<bool, AuthError> {
+    verify_totp(&stored_secret(db, user_id).await?, code, now)
+}
+
 pub async fn totp_disable<E: Executor>(
     db: &E,
     user_id: &str,

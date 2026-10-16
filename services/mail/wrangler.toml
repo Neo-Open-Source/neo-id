@@ -1,0 +1,10 @@
+name = "neo-mail-api"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[build]
+command = "cargo install -q worker-build && worker-build --release"
+
+[vars]
+MAIL_FROM = "Neo ID <noreply@id.neome.uk>"

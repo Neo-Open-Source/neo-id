@@ -14,10 +14,11 @@ mod register;
 mod sessions;
 mod user;
 
-pub use login::{LoginUser, MintParams, complete_login, start_login};
+pub use login::{LoginUser, MintParams, complete_login, load_user, load_user_by_id, start_login};
 pub use logout::{end_all_sessions, end_session};
 pub use mfa::{
-    CodeOutcome, request_email_code, totp_begin, totp_disable, totp_enable, verify_email_code,
+    CodeOutcome, request_email_code, totp_begin, totp_check, totp_disable, totp_enable,
+    verify_email_code,
 };
 #[cfg(feature = "passkeys")]
 pub use passkeys::{

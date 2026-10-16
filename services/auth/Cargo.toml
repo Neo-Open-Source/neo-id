@@ -27,3 +27,7 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [lints]
 workspace = true
+
+[features]
+default = []
+passkeys = ["auth-accounts/passkeys", "auth-core/webauthn"]
