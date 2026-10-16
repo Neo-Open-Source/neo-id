@@ -1,165 +1,120 @@
-# AGENTS.md — neo-id-ts
+# neo-auth — Rust OIDC provider (branch `refactoring`)
 
-## Project
+Rust (edition 2024, MSRV 1.85) on Cloudflare Workers via `workers-rs`, free tier.
+10ms CPU/request ⇒ **no server-side password KDF**: OPAQUE (RFC 9807, `opaque-ke`),
+Argon2id runs on the user device. Web: SvelteKit + adapter-cloudflare.
+Models: `proto/` (buf), written once. No extra *.md files without owner approval.
 
-Auth/OIDC provider — TypeScript monorepo.
-Production domain: `https://id.neome.uk`.
-
-## Stack
-
-| Layer | Choice |
-|-------|--------|
-| Language | TypeScript |
-| API Framework | Hono (Bun) |
-| Database | PostgreSQL via Prisma |
-| Auth | JWT RS256 (access/refresh/ID tokens), OAuth2 (Google/GitHub), WebAuthn, TOTP |
-| Frontend | Next.js 16 (App Router, SSR) |
-| State Management | Zustand (client-side) |
-| Validation | Zod |
-| Build | tsup + Turborepo |
-| Package Manager | pnpm workspaces |
-
-## Monorepo Structure
-
-```
-packages/
-├── shared/        # Types, constants, Zod schemas
-├── db/            # Prisma schema, client, seed
-├── auth-core/     # JWT, bcrypt, OAuth2, TOTP, WebAuthn
-├── api/           # Hono HTTP server
-├── sdk/           # JS/TS client SDK
-└── web/           # Next.js frontend (SSR)
-```
-
-## Code Rules
-
-### 1. NO HARDCODED VALUES
-- All magic numbers, strings, limits → `packages/shared/src/constants.ts`
-- All color/spacing values → CSS variables in `base.css` or Tailwind tokens
-- Environment variables → `.env.example`, accessed via `process.env.*`
-
-### 2. UI AND LOGIC SEPARATION
-- Server Components: data fetching, DB queries, auth checks
-- Client Components (`"use client"`): only UI interactivity
-- No API calls in Client Components when Server Component can do it
-- Zustand stores for cross-component client state only
-
-### 3. NO DUPLICATE COMPONENTS
-- One `Button` with `variant`/`size` props, not separate PrimaryButton/SecondaryButton
-- One `Card`, one `Input`, one `Modal` — reuse with className and props
-- Feature-specific components go in `components/features/<feature>/`
-
-### 4. NO DUPLICATE LOGIC
-- Extract repeated logic into custom hooks (`useUser`, `useAuth`)
-- Shared utilities → `packages/shared/src/`
-- Auth-core functions → `packages/auth-core/src/`
-- API validation → `validate(schema, body)` from `packages/api/src/helpers/request.ts`
-- Pagination → `parsePagination(query, defaultLimit)` from `packages/api/src/helpers/request.ts`
-
-### 5. DICTIONARIES FOR UI STRINGS
-- All user-facing text → i18n JSON files (`dictionaries/en.json`, etc.)
-- Never hardcode: "Save changes", "Error", "Loading..."
-- Use `t()` function or Server Component `getTranslations()`
-
-### 6. CSS VARIABLES ONLY
-- Use design tokens: `bg-surface`, `text-content`, `border-border`
-- Never: `bg-[#0060DF]`, `bg-blue-600`, `text-gray-500`
-- Never: inline `style={{ color: "..." }}` except dynamic values
-
-### 7. COMPONENT FILE STRUCTURE
-```
-components/
-├── ui/              # Reusable primitives (Button, Input, Card, Modal)
-├── layout/          # Layout (Sidebar, Header, Footer)
-├── features/        # Feature-specific
-│   ├── auth/
-│   ├── profile/
-│   ├── services/
-│   └── admin/
-└── providers/       # Context providers
-```
-
-### 8. FILE NAMING
-- Components: `PascalCase.tsx` (Button.tsx, ProfileCard.tsx)
-- Hooks: `use*.ts` (useUser.ts, useAuth.ts)
-- Utils: `camelCase.ts` (formatDate.ts)
-- Constants: `constants.ts`
-- Validation: `validation.ts`
-- Types: `types.ts` or inline
-
-### 9. RESPONSE FORMAT
-```json
-{
-  "ok": true,
-  "data": { ... },
-  "meta": { "request_id": "uuid", "timestamp": "ISO8601" }
-}
-```
-
-### 10. ERROR CODES
-Use typed error codes from `@neo-id/shared`:
-`INVALID_CREDENTIALS`, `MFA_REQUIRED`, `TOKEN_EXPIRED`, `USER_NOT_FOUND`, etc.
-
-## API Routes
-
-```
-POST   /api/v1/auth/register
-POST   /api/v1/auth/login
-POST   /api/v1/auth/refresh
-POST   /api/v1/auth/logout
-POST   /api/v1/auth/forgot-password
-POST   /api/v1/auth/reset-password
-POST   /api/v1/auth/verify-email
-GET    /api/v1/user/profile
-PUT    /api/v1/user/profile
-PUT    /api/v1/user/password
-PUT    /api/v1/user/email
-GET    /api/v1/sessions
-DELETE /api/v1/sessions/:id
-DELETE /api/v1/sessions
-GET    /api/v1/passkeys
-POST   /api/v1/passkeys/register/start
-POST   /api/v1/passkeys/register/finish
-DELETE /api/v1/passkeys/:id
-POST   /api/v1/mfa/totp/setup
-POST   /api/v1/mfa/totp/enable
-POST   /api/v1/mfa/totp/disable
-POST   /api/v1/mfa/email/setup
-POST   /api/v1/mfa/email/enable
-POST   /api/v1/mfa/email/disable
-POST   /api/v1/mfa/verify
-GET    /api/v1/services
-POST   /api/v1/services
-GET    /api/v1/services/:id
-PUT    /api/v1/services/:id
-DELETE /api/v1/services/:id
-POST   /api/v1/services/:id/rotate-secret
-POST   /api/v1/services/:id/logo
-GET    /api/v1/admin/users
-GET    /api/v1/admin/users/:id
-POST   /api/v1/admin/users/:id/ban
-POST   /api/v1/admin/users/:id/role
-POST   /api/v1/admin/users/:id/reset-password
-DELETE /api/v1/admin/users/:id
-GET    /api/v1/admin/stats
-GET    /api/v1/admin/services
-GET    /api/v1/admin/audit-logs
-POST   /api/v1/oauth2/authorize
-POST   /api/v1/oauth2/token
-POST   /api/v1/oauth2/token/introspect
-GET    /.well-known/openid-configuration
-GET    /.well-known/jwks.json
-POST   /api/v1/device/token
-```
-
-## Dev
+## Commands
 
 ```sh
-pnpm install
-cp .env.example .env
-# Edit .env with DATABASE_URL (PostgreSQL)
-pnpm db:generate
-pnpm db:migrate
-pnpm db:seed
-pnpm dev
+nix develop
+just gate            # full local gate: fmt check + clippy + test + deny + audit
+just fmt | just lint | just test | just deny | just proto
+just mutants <file>  # new mutants must be killed
 ```
+
+## Layout
+
+```
+proto/auth/v1/*.proto              # contracts: user, session, client, claims
+services/auth/                      # deployable worker crate (`auth-worker`)
+services/auth/crates/auth-core/     # pure logic: no I/O, no clock, rng passed in
+services/auth/crates/*              # (planned) opaque, db, session, oidc
+services/auth/src/lib.rs            # entry: adapt request → crates → response
+apps/auth-web/                      # SvelteKit (planned)
+```
+
+Library crates hold logic; the worker crate only wires. One domain concept
+per file. `lib.rs` is a facade: docs + `mod` + `pub use`, nothing else.
+
+## Workflow
+
+- Goal + non-goals + testable acceptance criteria before code. Smallest
+  vertical slice first. Read the files you will touch before editing.
+- Diff < 300 LOC, one behavior per change. Reproduce-first for bugfixes
+  (failing test before fix). Verify by execution, never by reasoning:
+  paste command + output as evidence.
+- Commits: short imperative names (<72 chars), e.g. `auth-core: add OPAQUE`.
+  No essays in messages. Commit only on owner request.
+- Rule of three: no new abstraction without 3 uses. No new file for <50
+  lines of shared logic. No new dependency without justification in the
+  change (audit status, MSRV fit, wasm32 build, maintenance signs).
+- Ubiquitous language, no synonyms: OP (our server), RP (external app),
+  envelope (OPAQUE server record — never "hash"), OPRF key (service secret),
+  KSF (client Argon2id), kid, re-enrollment (bcrypt → OPAQUE via email
+  code), shadow run, cutover, lite (no-JS, email-code only).
+
+## Anti-slop (applies to every change, no exceptions)
+
+- No WHAT comments, ever. Module `//!` preambles restating the filename,
+  `///` paraphrasing the signature, `//` narrating the next line, section
+  dividers, commented-out code: delete on sight.
+- Deletion test for every comment: remove it; if the code reads ambiguous,
+  rename, split, add a type, or write a test — do not re-add the prose.
+- WHY only when it cannot be encoded in types, tests, or lint: non-obvious
+  external behavior, negative information (what was deliberately not done),
+  security rationale. Prefer encoding: regression test named after the
+  rationale, `reason = "..."` on allows, failing-check in CI over prose.
+- No single-use named constants (inline the value); no helper called once
+  (inline it); no wrapper forwarding without adding logic; no defensive
+  check the types already guarantee (validate at system boundaries only).
+- No tautological tests: assert properties and cross-boundary behavior,
+  never mirror the implementation's branches. Test names carry intent.
+  Exception: fixed mapping tables at trust boundaries (e.g. lib error →
+  coarse error) are pinned by table tests — the table is the contract.
+
+## Rust (API Guidelines + Ousterhout, enforced in review)
+
+- Naming: `UpperCamelCase` types, `snake_case` fns, `as_` = cheap borrow,
+  `to_` = expensive copy, `into_` = owned conversion. Getters without `get_`
+  (`len()`, not `get_len()`). Conversions via `From`/`AsRef`, not `from_x`.
+- No `bool`/`Option` parameters — enums, config structs, or builders.
+  No `&String`/`&Vec`/`&PathBuf` args — `&str`/`&[T]`/`&Path`. Newtypes for
+  domain values (`UserId(String)`), private field + constructor validating once
+  ("parse, don't validate").
+- Default `pub(crate)`; `pub` needs a reason. No `pub mod everything`,
+  no wildcard imports in lib code, no `pub(super)`. Bounds on `impl`, never
+  on struct definitions. `#[must_use]` on pure value-returning fns,
+  `#[non_exhaustive]` on public evolving enums.
+- Errors: one `thiserror` enum per concern, named `<Concern>Error`,
+  `#[source]`/`#[from]`, per-variant messages, no `String` errors, no
+  `Box<dyn Error>` across modules. `Result` = recoverable, `Option` =
+  normal absence, panic = bug only, never control flow. Name every variant
+  in `match` on security enums (payload `_` only for uninhabited/opaque
+  payloads); a lib upgrade adding a variant must fail compilation. External
+  `#[non_exhaustive]` enums: name all known variants, wildcard arm →
+  `Internal` (fail-closed: unknown future errors alert instead of passing).
+- Deep modules: one `pub fn` hiding parsing/caching/validation beats 8
+  shallow helpers. Split for abstraction, not line count. Iterator pipelines
+  over nested loops. `enum` dispatch over `Box<dyn Trait>` (trait objects
+  only for open extension sets).
+- No WHAT docs. One summary line only when the name does not carry it.
+  WHY only if unencodable in types/tests. `missing_errors_doc` stays allowed
+  crate-wide with `reason` (the error enum is the single source).
+  `Debug` on all public types except secrets (redacted + test).
+
+## CI gates (all green, no exceptions)
+
+1. `cargo fmt --check` (width 100) + `clippy --all-targets -D warnings
+   -W clippy::pedantic`.
+2. `cargo deny check` + `cargo audit`; `Cargo.lock` committed; MIT/Apache-2.0 only.
+3. `cargo test --workspace` passes.
+4. `cargo mutants -f <changed>`: kill all new mutants (stronger than coverage).
+5. Fuzz target for every byte/network input; corpus in repo.
+6. RFC test vectors byte-for-byte; OIDF suite (Basic + Config + Dynamic) is
+   the service DoD.
+
+## Forbid list (hard)
+
+- `unwrap()` / `expect()` / `panic!` / indexing / `todo!` / `dbg!` in `src/`
+  production code (`tests/` and `#[cfg(test)]` exempt). `?`, `let-else`,
+  `map_or`, `unwrap_or*` (total, never panicking) instead.
+- `unsafe` (workspace-deny). `#[allow]` only with `reason = "..."`.
+- weakened assertions, deleted failing tests, or silenced lints to get green.
+- custom crypto: audited high-level crates only, never hand-rolled primitives.
+- `println!` in library code; secrets in logs, errors, or traces
+  (`#[instrument(skip(secret))]`).
+- network in tests; hand-edited lockfiles/generated code; commented-out code;
+  TODO without owner approval.
+- commits without `fmt + lint + test`. No prod deploys, no `--force` pushes.

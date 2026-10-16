@@ -1,19 +1,22 @@
-node_modules/
-dist/
-.next/
-*.tsbuildinfo
-.env
-.env.local
-.env.*.local
-.env.test
-.turbo/
-.direnv/
-coverage/
-*.log
-.DS_Store
+# Rust
+/target/
+**/*.rs.bk
+mutants.out*
 
-# JWT keys (sensitive)
-*.pem
-.vercel
-.env*
-!.envrc
+# Workers
+.wrangler/
+.dev.vars
+
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+apps/*/build/
+apps/*/dist/
+
+# Secrets (prod values only ever live in local .env.prod, never committed)
+.env
+.env.prod
+.env*.local
+
+# OS
+.DS_Store

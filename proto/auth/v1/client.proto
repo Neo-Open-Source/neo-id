@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// Registered OAuth2/OIDC relying party.
+message OAuthClient {
+  string client_id = 1;
+  // Secret hash; empty for public (PKCE-only) clients.
+  string secret_hash = 2;
+  repeated string redirect_uris = 3;
+  repeated string grant_types = 4;
+  repeated string scopes = 5;
+  bool require_pkce = 6;
+  bool confidential = 7;
+}

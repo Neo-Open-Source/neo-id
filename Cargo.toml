@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["services/auth", "services/auth/crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = "deny"
+pedantic = "warn"

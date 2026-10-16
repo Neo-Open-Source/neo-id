@@ -1,0 +1,15 @@
+[package]
+name = "auth-worker"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+auth-core = { version = "0.1.0", path = "crates/auth-core" }
+
+[lints]
+workspace = true

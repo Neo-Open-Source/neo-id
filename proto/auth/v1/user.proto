@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// Canonical user record. Source of truth for Rust + SvelteKit codegen.
+message User {
+  string id = 1;
+  string email = 2;
+  bool email_verified = 3;
+  UserRole role = 4;
+  int64 created_at_unix = 5;
+  // OPAQUE envelope bytes (server-side only, never sent to web clients).
+  bytes opaque_envelope = 6;
+}
+
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER_ROLE_USER = 1;
+  USER_ROLE_ADMIN = 2;
+}

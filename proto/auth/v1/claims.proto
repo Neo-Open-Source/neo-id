@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// ID token claims (OIDC Core). Access-token shape reuses iss/sub/aud/exp.
+message IDTokenClaims {
+  string iss = 1;
+  string sub = 2;
+  repeated string aud = 3;
+  int64 exp_unix = 4;
+  int64 iat_unix = 5;
+  int64 auth_time_unix = 6;
+  string email = 7;
+  bool email_verified = 8;
+  string nonce = 9;
+}

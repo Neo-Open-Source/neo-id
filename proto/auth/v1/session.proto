@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// Server-side session. Cookie holds only the id (signed); payload lives here.
+message Session {
+  string id = 1;
+  string user_id = 2;
+  int64 expires_at_unix = 3;
+  int64 last_seen_at_unix = 4;
+  string ip = 5;
+  string user_agent = 6;
+}
