@@ -433,6 +433,7 @@ async fn registered(req: RegisterRequest) -> Result<ClientRegistered, WireError>
 
 fn register_req(redirects: &[&str]) -> RegisterRequest {
     RegisterRequest {
+        owner_id: "owner-1".to_string(),
         redirect_uris: redirects.iter().map(ToString::to_string).collect(),
         client_name: Some("Example".to_string()),
     }
@@ -456,6 +457,25 @@ async fn register_mints_credentials_and_trims_uris() {
     let debug = format!("{result:?}");
     assert!(!debug.contains(&result.client_secret));
     assert!(!debug.contains(&result.client_secret_hash));
+}
+
+#[tokio::test]
+async fn register_persists_client_row() {
+    let db = MockDb::with_clients(vec![]);
+    let result = register(
+        &db,
+        &mut ChaCha8Rng::seed_from_u64(21),
+        NOW,
+        register_req(&["https://app.example/cb"]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.created_at, NOW);
+    assert!(
+        db.calls()
+            .iter()
+            .any(|sql| sql.contains(r#"INSERT INTO "service_apps""#))
+    );
 }
 
 #[tokio::test]

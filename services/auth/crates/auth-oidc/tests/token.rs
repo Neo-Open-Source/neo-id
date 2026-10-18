@@ -1048,6 +1048,7 @@ fn debug_redacts_secrets() {
         client_secret: "shhh".to_string(),
         client_secret_hash: "hash-of-shhh".to_string(),
         redirect_uris: vec!["https://app.example/cb".to_string()],
+        created_at: 0,
     };
     let rendered = format!("{registered:?}");
     assert!(rendered.contains("client-1"));

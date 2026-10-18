@@ -1,4 +1,4 @@
-use super::{Query, instant, text};
+use super::{Query, instant, text, text_array};
 
 #[must_use]
 pub fn find_connection(user_id: &str, service_app_id: &str) -> Query {
@@ -15,19 +15,10 @@ pub fn upsert_connection(user_id: &str, service_app_id: &str, scopes: &[&str], n
         params: vec![
             text(user_id),
             text(service_app_id),
-            scopes_value(scopes),
+            text_array(scopes),
             instant(now),
         ],
     }
-}
-
-fn scopes_value(scopes: &[&str]) -> serde_json::Value {
-    serde_json::Value::Array(
-        scopes
-            .iter()
-            .map(|scope| serde_json::Value::String((*scope).to_string()))
-            .collect(),
-    )
 }
 
 #[cfg(test)]

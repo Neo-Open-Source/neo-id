@@ -1,10 +1,11 @@
 use auth_core::{generate_token, hash_token};
-use auth_db::Executor;
+use auth_db::{Executor, create_client};
 
 use crate::authorize::WireError;
 
 #[derive(Debug, Clone)]
 pub struct RegisterRequest {
+    pub owner_id: String,
     pub redirect_uris: Vec<String>,
     pub client_name: Option<String>,
 }
@@ -15,6 +16,7 @@ pub struct ClientRegistered {
     pub client_secret: String,
     pub client_secret_hash: String,
     pub redirect_uris: Vec<String>,
+    pub created_at: u64,
 }
 
 impl core::fmt::Debug for ClientRegistered {
@@ -33,26 +35,47 @@ pub async fn register<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     now: u64,
     req: RegisterRequest,
 ) -> Result<ClientRegistered, WireError> {
-    let _ = (db, now);
-    let RegisterRequest {
-        redirect_uris,
-        client_name,
-    } = req;
-    let _ = client_name;
-    let redirect_uris: Vec<String> = redirect_uris
+    let redirect_uris: Vec<String> = req
+        .redirect_uris
         .iter()
         .map(|uri| uri.trim().to_string())
         .filter(|uri| !uri.is_empty())
         .collect();
-    if redirect_uris.is_empty() || redirect_uris.iter().any(|uri| !valid_redirect_uri(uri)) {
+    if req.owner_id.is_empty()
+        || redirect_uris.is_empty()
+        || redirect_uris.iter().any(|uri| !valid_redirect_uri(uri))
+    {
         return Err(WireError::InvalidRequest);
     }
+    let scope = vec!["openid".to_string(), "profile".to_string(), "email".to_string()];
+    let grants = vec![
+        "authorization_code".to_string(),
+        "refresh_token".to_string(),
+    ];
+    let client_id = generate_token(rng, 20);
     let client_secret = generate_token(rng, 40);
+    let client_secret_hash = hash_token(&client_secret);
+    let name = req
+        .client_name
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "Dynamic client".to_string());
+    db.run(create_client(
+        &req.owner_id,
+        &client_id,
+        Some(&client_secret_hash),
+        &name,
+        &redirect_uris,
+        &scope,
+        &grants,
+        now,
+    ))
+    .await?;
     Ok(ClientRegistered {
-        client_id: generate_token(rng, 20),
-        client_secret_hash: hash_token(&client_secret),
+        client_id,
         client_secret,
+        client_secret_hash,
         redirect_uris,
+        created_at: now,
     })
 }
 

@@ -14,7 +14,7 @@ mod sessions;
 mod transport;
 mod users;
 
-pub use clients::find_client;
+pub use clients::{create_client, find_client};
 pub use connections::{find_connection, upsert_connection};
 pub use mfa::{invalidate_pending, issue_code, latest_valid, mark_used};
 pub use oauth::{create_code, delete_code, find_code};
@@ -77,6 +77,10 @@ fn nullable(value: Option<&str>) -> serde_json::Value {
 
 fn instant(unix_secs: u64) -> serde_json::Value {
     serde_json::Value::Number(i64::try_from(unix_secs).unwrap_or(i64::MAX).into())
+}
+
+fn text_array(values: &[&str]) -> serde_json::Value {
+    serde_json::Value::Array(values.iter().map(|value| text(value)).collect())
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use worker::{Request, Response, Result, RouteContext};
 
 use super::{
     respond::{fail, no_store, ok},
-    routes::{Ctx, form_or_json, header_opt, kv_store, load_cx, worker_rng},
+    routes::{Ctx, fail_status, form_or_json, header_opt, kv_store, load_cx, worker_rng},
 };
 
 const NONCE_TTL: u64 = 600;
@@ -409,6 +409,14 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
+    let Some(user) = logged_user(&cx, &req) else {
+        return fail_status(
+            &cx,
+            401,
+            "UNAUTHORIZED",
+            "Client registration requires authentication",
+        );
+    };
     let body: serde_json::Value = match req.json().await {
         Ok(body) => body,
         Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
@@ -437,6 +445,7 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
         &mut rng,
         cx.now,
         RegisterRequest {
+            owner_id: user.0,
             redirect_uris,
             client_name,
         },
@@ -449,7 +458,13 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
             &serde_json::json!({
                 "client_id": client.client_id,
                 "client_secret": client.client_secret,
+                "client_id_issued_at": client.created_at,
+                "client_secret_expires_at": 0,
+                "token_endpoint_auth_method": "client_secret_basic",
                 "redirect_uris": client.redirect_uris,
+                "grant_types": ["authorization_code", "refresh_token"],
+                "response_types": ["code"],
+                "scope": "openid profile email",
             }),
             201,
         ),
