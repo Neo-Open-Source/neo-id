@@ -41,10 +41,18 @@ fn access_input() -> AccessInput {
 }
 
 fn header_alg(token: &str) -> String {
+    header_field(token, "alg")
+}
+
+fn header_kid(token: &str) -> String {
+    header_field(token, "kid")
+}
+
+fn header_field(token: &str, field: &str) -> String {
     let decoded = base64_decode_url(token.split('.').next().unwrap_or_default());
     serde_json::from_slice::<serde_json::Value>(&decoded)
         .ok()
-        .and_then(|header| header["alg"].as_str().map(String::from))
+        .and_then(|header| header[field].as_str().map(String::from))
         .unwrap_or_default()
 }
 
@@ -68,9 +76,28 @@ fn access_roundtrip_checks_claims() {
 fn es256_roundtrip_and_header_algorithm() {
     let token = sign_access(&ec_signing(), &access_input()).unwrap();
     assert_eq!(header_alg(&token), "ES256");
+    assert_eq!(header_kid(&token), "neo-auth-es256");
     let claims = verify_access(&ec_verifying(), &token, ISSUER, NOW + 100).unwrap();
     assert_eq!(claims.sub, "user-1");
     assert_eq!(claims.scope.as_deref(), Some("openid profile"));
+}
+
+#[test]
+fn signing_alg_metadata_is_pinned() {
+    assert_eq!(SigningAlg::Rs256.name(), "RS256");
+    assert_eq!(SigningAlg::Es256.name(), "ES256");
+    assert_eq!(SigningAlg::Rs256.kid(), "neo-auth-rs256");
+    assert_eq!(SigningAlg::Es256.kid(), "neo-auth-es256");
+}
+
+#[test]
+fn key_debug_reveals_alg_but_not_pem_material() {
+    let signing = format!("{:?}", rsa_signing());
+    assert!(signing.contains("Rs256"));
+    assert!(!signing.contains("PRIVATE KEY"));
+    let verify = format!("{:?}", rsa_verifying());
+    assert!(verify.contains("Rs256"));
+    assert!(!verify.contains("PUBLIC KEY"));
 }
 
 #[test]

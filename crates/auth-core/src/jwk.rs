@@ -3,7 +3,7 @@ use p256::PublicKey;
 use rsa::{RsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyParts};
 
 use crate::error::AuthError;
-use crate::jwt::{EC_KEY_ID, KEY_ID};
+use crate::jwt::{EC_KEY_ID, KEY_ID, SigningAlg};
 
 pub fn rs256(public_pem: &[u8]) -> Result<serde_json::Value, AuthError> {
     let text = core::str::from_utf8(public_pem).map_err(|_| AuthError::Internal)?;
@@ -12,7 +12,7 @@ pub fn rs256(public_pem: &[u8]) -> Result<serde_json::Value, AuthError> {
         "kty": "RSA",
         "n": URL_SAFE_NO_PAD.encode(key.n().to_bytes_be()),
         "e": URL_SAFE_NO_PAD.encode(key.e().to_bytes_be()),
-        "alg": "RS256",
+        "alg": SigningAlg::Rs256.name(),
         "use": "sig",
         "kid": KEY_ID,
     }))
@@ -29,7 +29,7 @@ pub fn es256(public_pem: &[u8]) -> Result<serde_json::Value, AuthError> {
         "crv": "P-256",
         "x": URL_SAFE_NO_PAD.encode(x),
         "y": URL_SAFE_NO_PAD.encode(y),
-        "alg": "ES256",
+        "alg": SigningAlg::Es256.name(),
         "use": "sig",
         "kid": EC_KEY_ID,
     }))
