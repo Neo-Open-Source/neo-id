@@ -1,0 +1,9 @@
+node_modules
+.svelte-kit
+build
+.wrangler
+.vercel
+.output
+.env
+.env.*
+!.env.example
