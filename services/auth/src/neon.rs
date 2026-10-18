@@ -1,5 +1,5 @@
 use auth_core::AuthError;
-use auth_db::{Executor, Query, query_body, rows};
+use db::{Executor, Query, query_body, rows};
 use worker::{Fetch, Headers, Method, Request, RequestInit};
 
 pub struct NeonExecutor {

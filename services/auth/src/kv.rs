@@ -11,7 +11,7 @@ impl StatesKv {
     }
 }
 
-impl auth_db::Kv for StatesKv {
+impl db::Kv for StatesKv {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, AuthError> {
         self.store
             .get(key)

@@ -2,17 +2,121 @@ use auth_accounts::CodeOutcome;
 use auth_core::AuthError;
 use worker::{Request, Response, Result, RouteContext};
 
-#[cfg(feature = "passkeys")]
-use super::routes::Ctx;
 use super::{
     mail::mailer,
     respond::{fail, ok},
     routes::{
-        authed, body_field, fail_status, json_body, kv_store, load_cx, mint_response, worker_rng,
+        Ctx, authed_from, body_field, cookie_value, fail_status, header_opt, json_body, kv_store,
+        load_cx, mint_response, worker_rng,
     },
 };
+
+async fn send_login_code<R: rand_core::RngCore + rand_core::CryptoRng>(
+    cx: &Ctx,
+    rng: &mut R,
+    user: &auth_accounts::LoginUser,
+) -> Result<CodeOutcome, AuthError> {
+    match auth_accounts::request_email_code(&cx.db, rng, &user.id, "mfa_login", None, cx.now)
+        .await?
+    {
+        CodeOutcome::Sent(code) => {
+            let mailer = mailer(cx)?;
+            mailer
+                .send(&user.email, "login_code", Some(&code), None)
+                .await?;
+            Ok(CodeOutcome::Sent(code))
+        }
+        CodeOutcome::Cooldown(remaining) => Ok(CodeOutcome::Cooldown(remaining)),
+    }
+}
 #[cfg(feature = "passkeys")]
-use auth_db::Kv as _;
+use db::Kv as _;
+
+pub async fn lite_start(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let cx = match load_cx(&ctx.env) {
+        Ok(cx) => cx,
+        Err(err) => return fail("unknown", 0, &err),
+    };
+    let body = match json_body(&mut req).await {
+        Ok(body) => body,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    match super::routes::captcha_rejection(&cx, &req, &body).await {
+        Ok(None) => {}
+        Ok(Some(response)) => return Ok(response),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let email = body_field(&body, "email");
+    let bucket = format!("rl:lite:{}", email.trim().to_lowercase());
+    match auth_accounts::rate_limit_allow(&store, &bucket, 5, 3600).await {
+        Ok(true) => {}
+        Ok(false) => return fail_status(&cx, 429, "RATE_LIMITED", "Too many requests"),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
+    let mut rng = match worker_rng() {
+        Ok(rng) => rng,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let account = match auth_accounts::lite_account(&cx.db, email).await {
+        Ok(Some(account)) => account,
+        Ok(None) => {
+            return ok(
+                &cx.request_id,
+                cx.now_ms,
+                &serde_json::json!({"mfaMethods": [], "sent": false}),
+                200,
+            );
+        }
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let methods = auth_accounts::lite_methods(&account);
+    let attempt_id = auth_core::generate_id(&mut rng);
+    let challenge = auth_accounts::MfaChallenge {
+        user_id: account.user.id.clone(),
+        email: account.user.email.clone(),
+        role: account.user.role.clone(),
+        totp: methods.totp,
+        email_mfa: methods.email,
+        passkey: methods.passkey,
+    };
+    if let Err(err) = auth_accounts::store_challenge(&store, &attempt_id, &challenge).await {
+        return fail(&cx.request_id, cx.now_ms, &err);
+    }
+    let mut list = Vec::new();
+    if methods.totp {
+        list.push("totp");
+    }
+    if methods.email {
+        list.push("email");
+    }
+    if methods.passkey {
+        list.push("passkey");
+    }
+    let mut sent = false;
+    if methods.email {
+        match send_login_code(&cx, &mut rng, &account.user).await {
+            Ok(CodeOutcome::Sent(_)) => sent = true,
+            Ok(CodeOutcome::Cooldown(_)) => {}
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        }
+    }
+    ok(
+        &cx.request_id,
+        cx.now_ms,
+        &serde_json::json!({
+            "attempt_id": attempt_id,
+            "mfaMethods": list,
+            "passkeyAvailable": methods.passkey,
+            "emailHint": methods.email.then(|| account.user.email.clone()),
+            "sent": sent,
+        }),
+        200,
+    )
+}
 
 pub async fn email_request(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let cx = match load_cx(&ctx.env) {
@@ -23,60 +127,31 @@ pub async fn email_request(mut req: Request, ctx: RouteContext<()>) -> Result<Re
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
     let attempt_id = body_field(&body, "attempt_id");
-    let user = if attempt_id.is_empty() {
-        match auth_accounts::lite_login_user(&cx.db, body_field(&body, "email")).await {
-            Ok(Some(user)) => user,
-            Ok(None) => {
-                return ok(
-                    &cx.request_id,
-                    cx.now_ms,
-                    &serde_json::json!({"sent": true}),
-                    200,
-                );
-            }
-            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-        }
-    } else {
-        let store = match kv_store(&ctx) {
-            Ok(store) => crate::kv::StatesKv::new(store),
-            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-        };
-        match auth_accounts::load_challenge(&store, attempt_id).await {
-            Ok(Some(challenge)) => auth_accounts::LoginUser {
-                id: challenge.user_id,
-                email: challenge.email,
-                role: challenge.role,
-            },
-            Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
-            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-        }
+    let user = match auth_accounts::load_challenge(&store, attempt_id).await {
+        Ok(Some(challenge)) => auth_accounts::LoginUser {
+            id: challenge.user_id,
+            email: challenge.email,
+            role: challenge.role,
+        },
+        Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    match auth_accounts::request_email_code(&cx.db, &mut rng, &user.id, "mfa_login", None, cx.now)
-        .await
-    {
-        Ok(CodeOutcome::Sent(code)) => {
-            let mailer = match mailer(&cx) {
-                Ok(mailer) => mailer,
-                Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-            };
-            if let Err(err) = mailer
-                .send(&user.email, "login_code", Some(&code), None)
-                .await
-            {
-                return fail(&cx.request_id, cx.now_ms, &err);
-            }
-            ok(
-                &cx.request_id,
-                cx.now_ms,
-                &serde_json::json!({"sent": true}),
-                200,
-            )
-        }
+    match send_login_code(&cx, &mut rng, &user).await {
+        Ok(CodeOutcome::Sent(_)) => ok(
+            &cx.request_id,
+            cx.now_ms,
+            &serde_json::json!({"sent": true}),
+            200,
+        ),
         Ok(CodeOutcome::Cooldown(remaining)) => {
             fail_status(&cx, 429, "RATE_LIMITED", &format!("Retry in {remaining}s"))
         }
@@ -97,31 +172,11 @@ pub async fn email_verify(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let attempt_id = body_field(&body, "attempt_id");
-    if attempt_id.is_empty() {
-        let user = match auth_accounts::lite_login_user(&cx.db, body_field(&body, "email")).await {
-            Ok(Some(user)) => user,
-            Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
-            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-        };
-        return match auth_accounts::verify_email_code(
-            &cx.db,
-            &user.id,
-            "mfa_login",
-            body_field(&body, "code"),
-            cx.now,
-        )
-        .await
-        {
-            Ok(true) => mint_response(&cx, &req, &mut rng, &user).await,
-            Ok(false) => fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
-            Err(err) => fail(&cx.request_id, cx.now_ms, &err),
-        };
-    }
     let store = match kv_store(&ctx) {
         Ok(store) => crate::kv::StatesKv::new(store),
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    let attempt_id = body_field(&body, "attempt_id");
     let user = match auth_accounts::load_challenge(&store, attempt_id).await {
         Ok(Some(challenge)) => auth_accounts::LoginUser {
             id: challenge.user_id,
@@ -141,11 +196,15 @@ pub async fn email_verify(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     .await
     {
         Ok(true) => {
-            let _ = auth_accounts::clear_challenge(&store, attempt_id).await;
+            if let Err(err) = auth_accounts::clear_challenge(&store, attempt_id).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
+            }
             mint_response(&cx, &req, &mut rng, &user).await
         }
         Ok(false) => {
-            let _ = auth_accounts::fail_attempt(&store, attempt_id).await;
+            if let Err(err) = auth_accounts::fail_attempt(&store, attempt_id).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
+            }
             fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials)
         }
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
@@ -157,7 +216,11 @@ pub async fn totp_setup(req: Request, ctx: RouteContext<()>) -> Result<Response>
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    let sub = match authed(&cx, &req) {
+    let sub = match authed_from(
+        &cx,
+        header_opt(&req, "authorization").as_deref(),
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    ) {
         Ok(sub) => sub,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
@@ -193,7 +256,11 @@ async fn totp_toggle(mut req: Request, ctx: RouteContext<()>, enable: bool) -> R
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    let sub = match authed(&cx, &req) {
+    let sub = match authed_from(
+        &cx,
+        header_opt(&req, "authorization").as_deref(),
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    ) {
         Ok(sub) => sub,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
@@ -251,11 +318,15 @@ pub async fn totp_verify(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
     };
     match auth_accounts::totp_check(&cx.db, &user.id, body_field(&body, "code"), cx.now).await {
         Ok(true) => {
-            let _ = auth_accounts::clear_challenge(&store, attempt_id).await;
+            if let Err(err) = auth_accounts::clear_challenge(&store, attempt_id).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
+            }
             mint_response(&cx, &req, &mut rng, &user).await
         }
         Ok(false) => {
-            let _ = auth_accounts::fail_attempt(&store, attempt_id).await;
+            if let Err(err) = auth_accounts::fail_attempt(&store, attempt_id).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
+            }
             fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials)
         }
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
@@ -287,7 +358,7 @@ async fn kv_take(ctx: &RouteContext<()>, key: &str) -> Result<Vec<u8>, AuthError
         Ok(None) => return Err(AuthError::InvalidCredentials),
         Err(err) => return Err(err),
     };
-    let _ = store.delete(key).await;
+    store.delete(key).await?;
     Ok(bytes)
 }
 
@@ -302,7 +373,11 @@ pub async fn passkey_register_start(req: Request, ctx: RouteContext<()>) -> Resu
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    let sub = match authed(&cx, &req) {
+    let sub = match authed_from(
+        &cx,
+        header_opt(&req, "authorization").as_deref(),
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    ) {
         Ok(sub) => sub,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
@@ -342,7 +417,11 @@ pub async fn passkey_register_finish(mut req: Request, ctx: RouteContext<()>) ->
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    let sub = match authed(&cx, &req) {
+    let sub = match authed_from(
+        &cx,
+        header_opt(&req, "authorization").as_deref(),
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    ) {
         Ok(sub) => sub,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };

@@ -1,9 +1,8 @@
 use auth_core::{AuthError, percent_encode, verify_access, verify_id};
-use auth_db::Kv as _;
 use auth_oidc::{
-    AuthorizeRequest, ConsentChoice, ConsentRequest, Grant, LogoutRequest, RegisterRequest,
-    TokenRequest, UserInfoRequest, WireError, authorize, decide_consent, logout, register, token,
-    userinfo,
+    AuthorizationCode, AuthorizeRequest, ClientRegistrationRequest, ConsentChoice, ConsentRequest,
+    Grant, LogoutRequest, TokenRequest, UserInfoRequest, WireError, authorize, decide_consent,
+    logout, register, token, userinfo,
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use worker::{Request, Response, Result, RouteContext};
@@ -15,28 +14,29 @@ use super::{
     },
 };
 
-const NONCE_TTL: u64 = 600;
-
-fn nonce_key(code: &str) -> String {
+fn code_key(code: &str) -> String {
     format!("acn:{code}")
 }
 
-async fn store_nonce(ctx: &RouteContext<()>, code: &str, nonce: &str) -> Result<(), AuthError> {
-    let store = crate::kv::StatesKv::new(kv_store(ctx)?);
-    store
-        .put(&nonce_key(code), nonce.as_bytes(), NONCE_TTL)
-        .await
+fn pending_key(state: &str) -> String {
+    format!("acp:{state}")
 }
 
-async fn take_nonce(ctx: &RouteContext<()>, code: &str) -> Result<Option<String>, AuthError> {
+async fn put_state(
+    ctx: &RouteContext<()>,
+    key: &str,
+    state: &AuthorizationCode,
+) -> Result<(), AuthError> {
     let store = crate::kv::StatesKv::new(kv_store(ctx)?);
-    match store.get(&nonce_key(code)).await? {
-        Some(bytes) => {
-            store.delete(&nonce_key(code)).await?;
-            Ok(String::from_utf8(bytes).ok())
-        }
-        None => Ok(None),
-    }
+    auth_oidc::store_authcode_state(&store, key, state).await
+}
+
+async fn take_state(
+    ctx: &RouteContext<()>,
+    key: &str,
+) -> Result<Option<AuthorizationCode>, AuthError> {
+    let store = crate::kv::StatesKv::new(kv_store(ctx)?);
+    auth_oidc::take_authcode_state(&store, key).await
 }
 
 fn basic_credentials(header: Option<&str>) -> Option<(String, String)> {
@@ -54,21 +54,29 @@ fn form_decode(value: &str) -> String {
         .unwrap_or_default()
 }
 
+fn wire_error_status(err: WireError) -> u16 {
+    match err {
+        WireError::InvalidClient => 401,
+        WireError::ServerError => 500,
+        _ => 400,
+    }
+}
+
 fn oauth_error(cx: &Ctx, err: WireError) -> Result<Response> {
-    let (status, code) = match err {
-        WireError::InvalidClient => (401, err.as_str()),
-        WireError::ServerError => (500, err.as_str()),
-        _ => (400, err.as_str()),
-    };
-    Response::from_json(&serde_json::json!({"error": code}))
+    let status = wire_error_status(err);
+    Response::from_json(&serde_json::json!({"error": err.as_str()}))
         .map(|response| response.with_status(status))
         .or_else(|_| fail(&cx.request_id, cx.now_ms, &AuthError::Internal))
 }
 
-fn logged_user(cx: &Ctx, req: &Request) -> Option<(String, Option<String>, u64)> {
-    let presented = header_opt(req, "authorization")
-        .and_then(|header| header.strip_prefix("Bearer ").map(String::from))
-        .or_else(|| cookie_value(req, "neo_id_access"))?;
+fn logged_user_from(
+    cx: &Ctx,
+    header: Option<&str>,
+    cookie: Option<&str>,
+) -> Option<(String, Option<String>, u64)> {
+    let presented = header
+        .and_then(|value| value.strip_prefix("Bearer ").map(String::from))
+        .or_else(|| cookie.map(String::from))?;
     let claims = verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now).ok()?;
     let auth_time = claims
         .auth_time_unix
@@ -95,7 +103,11 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
     };
     let params = query_pairs(&url);
     let required = |key: &str| params.get(key).cloned().unwrap_or_default();
-    let user = logged_user(&cx, &req);
+    let user = logged_user_from(
+        &cx,
+        header_opt(&req, "authorization").as_deref(),
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    );
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
@@ -133,30 +145,43 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             service_app_id,
             nonce,
             scopes,
-        }) => ok(
-            &cx.request_id,
-            cx.now_ms,
-            &serde_json::json!({
-                "consent_required": true,
-                "state": state,
-                "redirect_uri": redirect_uri,
-                "service_app_id": service_app_id,
-                "nonce": nonce,
-                "scopes": scopes,
-            }),
-            200,
-        ),
+        }) => {
+            let pending = AuthorizationCode {
+                nonce: nonce.clone(),
+                scopes: scopes.clone(),
+            };
+            if let Err(err) = put_state(&ctx, &pending_key(&state), &pending).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
+            }
+            ok(
+                &cx.request_id,
+                cx.now_ms,
+                &serde_json::json!({
+                    "consent_required": true,
+                    "state": state,
+                    "redirect_uri": redirect_uri,
+                    "service_app_id": service_app_id,
+                    "nonce": nonce,
+                    "scopes": scopes,
+                }),
+                200,
+            )
+        }
         Ok(
             auth_oidc::AuthorizeOutcome::Login { url } | auth_oidc::AuthorizeOutcome::Error { url },
         ) => match url::Url::parse(&url) {
             Ok(target) => Response::redirect(target),
             Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
         },
-        Ok(auth_oidc::AuthorizeOutcome::Granted { url, code, nonce }) => {
-            if let Some(nonce) = nonce.as_deref() {
-                if let Err(err) = store_nonce(&ctx, &code, nonce).await {
-                    return fail(&cx.request_id, cx.now_ms, &err);
-                }
+        Ok(auth_oidc::AuthorizeOutcome::Granted {
+            url,
+            code,
+            nonce,
+            scopes,
+        }) => {
+            let state = AuthorizationCode { nonce, scopes };
+            if let Err(err) = put_state(&ctx, &code_key(&code), &state).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
             }
             match url::Url::parse(&url) {
                 Ok(target) => Response::redirect(target),
@@ -176,7 +201,11 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
         Ok(body) => body,
         Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
     };
-    let Some(user) = logged_user(&cx, &req) else {
+    let Some(user) = logged_user_from(
+        &cx,
+        header_opt(&req, "authorization").as_deref(),
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    ) else {
         return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
     };
     let approved = body
@@ -197,7 +226,15 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
         let value = field(key);
         if value.is_empty() { None } else { Some(value) }
     };
-    let nonce = optional("nonce");
+    let state = optional("state");
+    let pending = match state.as_deref() {
+        Some(state) => match take_state(&ctx, &pending_key(state)).await {
+            Ok(Some(pending)) => pending,
+            Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        },
+        None => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
+    };
     match decide_consent(
         &cx.db,
         &mut rng,
@@ -212,15 +249,15 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
             user_id: user.0.clone(),
             session_id: user.1.clone(),
             redirect_uri: field("redirect_uri"),
-            state: optional("state"),
+            state,
             code_challenge: optional("code_challenge"),
         },
     )
     .await
     {
         Ok(redirect) => {
-            if let (Some(code), Some(nonce)) = (redirect.code.as_deref(), nonce.as_deref()) {
-                if let Err(err) = store_nonce(&ctx, code, nonce).await {
+            if let Some(code) = redirect.code.as_deref() {
+                if let Err(err) = put_state(&ctx, &code_key(code), &pending).await {
                     return fail(&cx.request_id, cx.now_ms, &err);
                 }
             }
@@ -260,11 +297,12 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
     let grant = match field("grant_type").as_str() {
         "authorization_code" => {
             let code = field("code");
-            let nonce = if code.is_empty() {
-                None
+            let state = if code.is_empty() {
+                AuthorizationCode::default()
             } else {
-                match take_nonce(&ctx, &code).await {
-                    Ok(nonce) => nonce,
+                match take_state(&ctx, &code_key(&code)).await {
+                    Ok(Some(state)) => state,
+                    Ok(None) => AuthorizationCode::default(),
                     Err(err) => return no_store(fail(&cx.request_id, cx.now_ms, &err)),
                 }
             };
@@ -276,7 +314,8 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
                 client_id,
                 client_secret,
                 code_verifier: optional("code_verifier"),
-                nonce,
+                nonce: state.nonce,
+                scopes: state.scopes,
             }
         }
         "refresh_token" => {
@@ -339,21 +378,15 @@ pub async fn userinfo_route(req: Request, ctx: RouteContext<()>) -> Result<Respo
     let Ok(claims) = verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now) else {
         return unauthorized(&cx.request_id, cx.now_ms, "Invalid access token");
     };
-    match userinfo(&cx.db, UserInfoRequest { sub: claims.sub }).await {
-        Ok(info) => ok(
-            &cx.request_id,
-            cx.now_ms,
-            &serde_json::json!({
-                "sub": info.sub,
-                "email": info.email,
-                "email_verified": info.email_verified,
-                "name": info.name,
-                "given_name": info.given_name,
-                "family_name": info.family_name,
-                "picture": info.picture,
-            }),
-            200,
-        ),
+    let request = UserInfoRequest {
+        sub: claims.sub,
+        scope: claims.scope,
+    };
+    match userinfo(&cx.db, request).await {
+        Ok(info) => match serde_json::to_value(&info) {
+            Ok(data) => ok(&cx.request_id, cx.now_ms, &data, 200),
+            Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+        },
         Err(err) => oauth_error(&cx, err),
     }
 }
@@ -404,7 +437,11 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    let Some(user) = logged_user(&cx, &req) else {
+    let Some(user) = logged_user_from(
+        &cx,
+        header_opt(&req, "authorization").as_deref(),
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    ) else {
         return fail_status(
             &cx,
             401,
@@ -439,7 +476,7 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
         &cx.db,
         &mut rng,
         cx.now,
-        RegisterRequest {
+        ClientRegistrationRequest {
             owner_id: user.0,
             redirect_uris,
             client_name,
@@ -469,8 +506,13 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
 
 #[cfg(test)]
 mod tests {
-    use super::{basic_credentials, form_decode};
+    use super::{
+        basic_credentials, code_key, form_decode, logged_user_from, pending_key, query_pairs,
+        some_query, wire_error_status,
+    };
+    use auth_oidc::WireError;
     use base64::{Engine, engine::general_purpose::STANDARD};
+    use std::collections::HashMap;
 
     fn basic(id: &str, secret: &str) -> String {
         format!("Basic {}", STANDARD.encode(format!("{id}:{secret}")))
@@ -491,5 +533,59 @@ mod tests {
     fn form_decode_keeps_equals_and_plus() {
         assert_eq!(form_decode("a%3Db"), "a=b");
         assert_eq!(form_decode("x+y"), "x y");
+    }
+
+    #[test]
+    fn query_pairs_collects_params() {
+        let url = url::Url::parse("https://x/a?state=s&code=c&empty=").unwrap();
+        let params = query_pairs(&url);
+        assert_eq!(params.get("state").map(String::as_str), Some("s"));
+        assert_eq!(params.get("code").map(String::as_str), Some("c"));
+        assert_eq!(params.get("empty").map(String::as_str), Some(""));
+    }
+
+    #[test]
+    fn kv_keys_are_namespaced() {
+        assert_eq!(code_key("abc"), "acn:abc");
+        assert_eq!(pending_key("st"), "acp:st");
+    }
+
+    #[test]
+    fn wire_error_status_maps_client_and_server() {
+        assert_eq!(wire_error_status(WireError::InvalidClient), 401);
+        assert_eq!(wire_error_status(WireError::ServerError), 500);
+        assert_eq!(wire_error_status(WireError::InvalidRequest), 400);
+        assert_eq!(wire_error_status(WireError::AccessDenied), 400);
+    }
+
+    #[test]
+    fn logged_user_from_accepts_bearer_or_cookie() {
+        let cx = crate::test_support::test_ctx(1_800_000_000);
+        let token = crate::test_support::test_access_token(&cx);
+        let bearer = format!("Bearer {token}");
+        assert_eq!(
+            logged_user_from(&cx, Some(&bearer), None)
+                .map(|(sub, _, _)| sub)
+                .as_deref(),
+            Some("u1")
+        );
+        assert_eq!(
+            logged_user_from(&cx, None, Some(&token))
+                .map(|(sub, _, _)| sub)
+                .as_deref(),
+            Some("u1")
+        );
+        assert!(logged_user_from(&cx, Some("Bearer nope"), None).is_none());
+        assert!(logged_user_from(&cx, None, None).is_none());
+    }
+
+    #[test]
+    fn some_query_skips_empty_values() {
+        let mut params = HashMap::new();
+        params.insert("a".to_string(), "1".to_string());
+        params.insert("b".to_string(), String::new());
+        assert_eq!(some_query(&params, "a").as_deref(), Some("1"));
+        assert_eq!(some_query(&params, "b"), None);
+        assert_eq!(some_query(&params, "missing"), None);
     }
 }

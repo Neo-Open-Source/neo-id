@@ -1,18 +1,23 @@
 use auth_core::AuthError;
-use auth_db::{Executor as _, Kv as _};
+use db::{Executor as _, Kv as _};
 use worker::{Request, Response, Result, RouteContext};
 
 use super::{
     mail::mailer,
     respond::{fail, ok},
     routes::{
-        Ctx, authed, body_field, fail_status, header_opt, json_body, kv_store, load_cx, worker_rng,
+        Ctx, authed_from, body_field, cookie_value, fail_status, header_opt, json_body, kv_store,
+        load_cx, worker_rng,
     },
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 
 fn authed_user_id(cx: &Ctx, req: &Request) -> Result<String, AuthError> {
-    authed(cx, req)
+    authed_from(
+        cx,
+        header_opt(req, "authorization").as_deref(),
+        cookie_value(header_opt(req, "cookie").as_deref(), "neo_id_access").as_deref(),
+    )
 }
 
 pub async fn sessions_list(req: Request, ctx: RouteContext<()>) -> Result<Response> {
@@ -289,6 +294,11 @@ pub async fn password_forgot(mut req: Request, ctx: RouteContext<()>) -> Result<
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    match crate::routes::captcha_rejection(&cx, &req, &body).await {
+        Ok(None) => {}
+        Ok(Some(response)) => return Ok(response),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),

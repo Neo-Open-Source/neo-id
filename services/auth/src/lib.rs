@@ -4,6 +4,8 @@
 )]
 
 mod account;
+mod captcha;
+mod device;
 mod env;
 mod kv;
 mod mail;
@@ -12,6 +14,8 @@ mod neon;
 mod oidc;
 mod respond;
 mod routes;
+#[cfg(test)]
+mod test_support;
 
 use worker::{Context, Env, Request, Response, Result};
 

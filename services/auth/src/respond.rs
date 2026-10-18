@@ -79,3 +79,16 @@ pub fn no_store(response: Result<Response>) -> Result<Response> {
         .map_err(|_| worker::Error::RustError("header append failed".to_string()))?;
     Ok(response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::cookie;
+
+    #[test]
+    fn cookie_sets_security_attributes() {
+        assert_eq!(
+            cookie("neo_id_access", "tok", 100),
+            "neo_id_access=tok; Path=/; Max-Age=100; HttpOnly; Secure; SameSite=Lax"
+        );
+    }
+}

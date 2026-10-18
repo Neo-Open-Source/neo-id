@@ -11,6 +11,8 @@ pub struct AppEnv {
     pub mail_url: Option<String>,
     pub mail_key: String,
     pub web_origin: String,
+    pub turnstile_secret: Option<String>,
+    pub altcha_secret: Option<String>,
     #[cfg(feature = "passkeys")]
     pub rp_id: String,
     #[cfg(feature = "passkeys")]
@@ -56,6 +58,14 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
     let web_origin = env
         .var("WEB_ORIGIN")
         .map_or("https://id.neome.uk".to_string(), |value| value.to_string());
+    let turnstile_secret = env
+        .secret("TURNSTILE_SECRET")
+        .map(|secret| secret.to_string())
+        .ok();
+    let altcha_secret = env
+        .secret("ALTCHA_SECRET")
+        .map(|secret| secret.to_string())
+        .ok();
     #[cfg(feature = "passkeys")]
     let rp_id = env
         .var("RP_ID")
@@ -73,9 +83,22 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
         mail_url,
         mail_key,
         web_origin,
+        turnstile_secret,
+        altcha_secret,
         #[cfg(feature = "passkeys")]
         rp_id,
         #[cfg(feature = "passkeys")]
         rp_origin,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unescape_pem;
+
+    #[test]
+    fn unescape_pem_replaces_literal_newlines() {
+        assert_eq!(unescape_pem("a\\nb"), b"a\nb".to_vec());
+        assert_eq!(unescape_pem("plain"), b"plain".to_vec());
+    }
 }

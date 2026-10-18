@@ -1,6 +1,6 @@
 use auth_core::{AuthError, CredentialId, register_response};
-use auth_db::{Executor, Kv as _};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use db::{Executor, Kv as _};
 use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
 use rsa::{RsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyParts};
 use worker::{Env, Request, Response, Result, RouteContext, Router};
@@ -122,6 +122,11 @@ async fn register_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         Ok(body) => body,
         Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
     };
+    match captcha_rejection(&cx, &req, &body).await {
+        Ok(None) => {}
+        Ok(Some(response)) => return Ok(response),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
     let email = body
         .get("email")
         .and_then(|value| value.as_str())
@@ -207,6 +212,25 @@ pub(crate) fn fail_status(cx: &Ctx, status: u16, code: &str, message: &str) -> R
     .map(|response| response.with_status(status))
 }
 
+pub(crate) async fn captcha_rejection(
+    cx: &Ctx,
+    req: &Request,
+    body: &serde_json::Value,
+) -> Result<Option<Response>, AuthError> {
+    let verdict = crate::captcha::verify(cx, req, body).await?;
+    Ok(match verdict {
+        crate::captcha::Captcha::Pass => None,
+        crate::captcha::Captcha::Missing => Some(
+            fail_status(cx, 400, "CAPTCHA_REQUIRED", "Captcha is required")
+                .map_err(|_| AuthError::Internal)?,
+        ),
+        crate::captcha::Captcha::Invalid => Some(
+            fail_status(cx, 400, "CAPTCHA_INVALID", "Captcha verification failed")
+                .map_err(|_| AuthError::Internal)?,
+        ),
+    })
+}
+
 pub(crate) fn body_field<'a>(body: &'a serde_json::Value, key: &str) -> &'a str {
     body.get(key)
         .and_then(|value| value.as_str())
@@ -241,14 +265,16 @@ pub(crate) fn form_to_object(text: &str) -> serde_json::Value {
     serde_json::Value::Object(map)
 }
 
-pub(crate) fn authed(cx: &Ctx, req: &Request) -> Result<String, AuthError> {
-    let Some(header) = header_opt(req, "authorization") else {
-        return Err(AuthError::InvalidCredentials);
-    };
-    let Some(presented) = header.strip_prefix("Bearer ") else {
-        return Err(AuthError::MalformedMessage);
-    };
-    match auth_core::verify_access(&cx.app.public_pem, presented, &cx.app.issuer, cx.now) {
+pub(crate) fn authed_from(
+    cx: &Ctx,
+    header: Option<&str>,
+    cookie: Option<&str>,
+) -> Result<String, AuthError> {
+    let presented = header
+        .and_then(|value| value.strip_prefix("Bearer ").map(String::from))
+        .or_else(|| cookie.map(String::from))
+        .ok_or(AuthError::InvalidCredentials)?;
+    match auth_core::verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now) {
         Ok(claims) => Ok(claims.sub),
         Err(err) => Err(err),
     }
@@ -290,11 +316,8 @@ pub(crate) async fn mint_response(
     }
 }
 
-pub(crate) fn cookie_value(req: &Request, name: &str) -> Option<String> {
-    req.headers()
-        .get("cookie")
-        .ok()
-        .flatten()?
+pub(crate) fn cookie_value(cookie_header: Option<&str>, name: &str) -> Option<String> {
+    cookie_header?
         .split(';')
         .filter_map(|pair| pair.trim().split_once('='))
         .find(|(key, _)| key.trim() == name)
@@ -336,6 +359,11 @@ async fn login_start(mut req: Request, ctx: RouteContext<()>) -> Result<Response
         Ok(body) => body,
         Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
     };
+    match captcha_rejection(&cx, &req, &body).await {
+        Ok(None) => {}
+        Ok(Some(response)) => return Ok(response),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
     let Ok(request_bytes) = URL_SAFE_NO_PAD.decode(body_field(&body, "request")) else {
         return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage);
     };
@@ -397,7 +425,7 @@ struct VerifiedUser {
     email_mfa: bool,
 }
 
-async fn verified_user<E: auth_db::Executor>(
+async fn verified_user<E: db::Executor>(
     db: &E,
     email: &str,
 ) -> Result<Option<VerifiedUser>, AuthError> {
@@ -498,7 +526,9 @@ async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
         Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let _ = store.delete(&state_key(attempt_id)).await;
+    if let Err(err) = store.delete(&state_key(attempt_id)).await {
+        return fail(&cx.request_id, cx.now_ms, &err);
+    }
     let Ok(final_bytes) = URL_SAFE_NO_PAD.decode(body_field(&body, "finalization")) else {
         return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage);
     };
@@ -573,7 +603,7 @@ async fn refresh_route(mut req: Request, ctx: RouteContext<()>) -> Result<Respon
     let body: serde_json::Value = req.json().await.unwrap_or(serde_json::Value::Null);
     let presented = body_field(&body, "refresh_token").to_string();
     let presented = if presented.is_empty() {
-        match cookie_value(&req, "neo_id_refresh") {
+        match cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_refresh") {
             Some(value) => value,
             None => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
         }
@@ -623,7 +653,7 @@ async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     let body: serde_json::Value = req.json().await.unwrap_or(serde_json::Value::Null);
     let presented = body_field(&body, "access_token").to_string();
     let presented = if presented.is_empty() {
-        cookie_value(&req, "neo_id_access").unwrap_or_default()
+        cookie_value(header_opt(&req, "cookie").as_deref(), "neo_id_access").unwrap_or_default()
     } else {
         presented
     };
@@ -644,11 +674,14 @@ pub fn router() -> Router<'static, ()> {
         .get_async("/health", health)
         .get_async("/.well-known/openid-configuration", discovery)
         .get_async("/.well-known/jwks.json", jwks)
+        .get_async("/api/v1/captcha/altcha", crate::captcha::altcha_challenge)
+        .get_async("/altcha.js", crate::captcha::altcha_script)
         .post_async("/api/v1/auth/register/start", register_start)
         .post_async("/api/v1/auth/register/finish", register_finish)
         .post_async("/api/v1/auth/login/start", login_start)
         .post_async("/api/v1/auth/login/finish", login_finish)
         .post_async("/api/v1/auth/refresh", refresh_route)
+        .post_async("/api/v1/auth/lite/start", crate::mfa::lite_start)
         .post_async("/api/v1/auth/logout", logout_route)
         .get_async("/api/v1/oauth2/authorize", crate::oidc::authorize_route)
         .post_async(
@@ -662,6 +695,9 @@ pub fn router() -> Router<'static, ()> {
         .post_async("/api/v1/oauth2/register", crate::oidc::register_route)
         .post_async("/api/v1/mfa/email/request", crate::mfa::email_request)
         .post_async("/api/v1/mfa/email/verify", crate::mfa::email_verify)
+        .post_async("/api/v1/device/authorize", crate::device::authorize_device)
+        .post_async("/api/v1/device/approve", crate::device::approve_device)
+        .post_async("/api/v1/device/token", crate::device::device_token)
         .post_async("/api/v1/mfa/totp/setup", crate::mfa::totp_setup)
         .post_async("/api/v1/mfa/totp/enable", crate::mfa::totp_enable)
         .post_async("/api/v1/mfa/totp/disable", crate::mfa::totp_disable)
@@ -716,7 +752,42 @@ pub fn router() -> Router<'static, ()> {
 
 #[cfg(test)]
 mod tests {
-    use super::form_to_object;
+    use super::{
+        AuthError, authed_from, body_field, cookie_value, create_user, form_to_object, rsa_jwk,
+        state_key, verified_user,
+    };
+    use db::Query;
+    use std::collections::VecDeque;
+    use std::sync::Mutex;
+
+    const TEST_PUB_PEM: &[u8] =
+        include_str!("../../../crates/auth-core/tests/data/test-rsa.pub.pem").as_bytes();
+
+    struct MockDb {
+        batches: Mutex<VecDeque<Vec<serde_json::Value>>>,
+    }
+
+    impl MockDb {
+        fn new(batches: Vec<Vec<serde_json::Value>>) -> Self {
+            Self {
+                batches: Mutex::new(batches.into()),
+            }
+        }
+    }
+
+    impl db::Executor for MockDb {
+        fn run(
+            &self,
+            _query: Query,
+        ) -> impl std::future::Future<Output = Result<Vec<serde_json::Value>, AuthError>> {
+            let next = self
+                .batches
+                .lock()
+                .map(|mut batches| batches.pop_front().unwrap_or_default())
+                .unwrap_or_default();
+            async move { Ok(next) }
+        }
+    }
 
     #[test]
     fn form_to_object_decodes_oauth_params() {
@@ -733,5 +804,93 @@ mod tests {
     fn form_to_object_collapses_duplicate_keys_last_wins() {
         let value = form_to_object("a=1&a=2");
         assert_eq!(value["a"], "2");
+    }
+
+    #[test]
+    fn body_field_reads_strings_only() {
+        let body = serde_json::json!({"a": "x", "n": 1});
+        assert_eq!(body_field(&body, "a"), "x");
+        assert_eq!(body_field(&body, "n"), "");
+        assert_eq!(body_field(&body, "missing"), "");
+    }
+
+    #[test]
+    fn state_key_namespaces_attempt() {
+        assert_eq!(state_key("id1"), "login:id1");
+    }
+
+    #[test]
+    fn cookie_value_finds_named_cookie() {
+        assert_eq!(
+            cookie_value(Some("a=1; neo_id_access=tok; b=2"), "neo_id_access").as_deref(),
+            Some("tok")
+        );
+        assert_eq!(cookie_value(Some("a=1"), "neo_id_access"), None);
+        assert_eq!(cookie_value(None, "neo_id_access"), None);
+    }
+
+    #[tokio::test]
+    async fn verified_user_reports_enabled_methods() {
+        let db = MockDb::new(vec![
+            vec![serde_json::json!({
+                "id": "u1", "email": "a@b.c", "role": "user", "totpEnabled": true
+            })],
+            vec![],
+        ]);
+        let user = verified_user(&db, "a@b.c").await.unwrap().unwrap();
+        assert_eq!(user.id, "u1");
+        assert_eq!(user.methods, vec!["totp"]);
+        assert!(!user.email_mfa);
+        assert_eq!(user.passkeys, 0);
+    }
+
+    #[tokio::test]
+    async fn verified_user_absent_is_none() {
+        let db = MockDb::new(vec![vec![]]);
+        assert!(verified_user(&db, "nobody@x").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn verified_user_lists_passkey_when_present() {
+        let db = MockDb::new(vec![
+            vec![serde_json::json!({"id": "u1", "email": "a@b.c", "role": "user"})],
+            vec![serde_json::json!({"id": "p1"})],
+        ]);
+        let user = verified_user(&db, "a@b.c").await.unwrap().unwrap();
+        assert_eq!(user.methods, vec!["passkey"]);
+        assert_eq!(user.passkeys, 1);
+    }
+
+    #[test]
+    fn rsa_jwk_exposes_rs256_metadata() {
+        let jwk = rsa_jwk(TEST_PUB_PEM).unwrap();
+        assert_eq!(jwk["kty"], "RSA");
+        assert_eq!(jwk["alg"], "RS256");
+        assert_eq!(jwk["use"], "sig");
+        assert_eq!(jwk["kid"], "neo-auth-rs256");
+        assert_ne!(jwk["n"].as_str().unwrap_or(""), "");
+    }
+
+    #[test]
+    fn authed_from_accepts_bearer_and_cookie() {
+        let cx = crate::test_support::test_ctx(1_800_000_000);
+        let token = crate::test_support::test_access_token(&cx);
+        let bearer = format!("Bearer {token}");
+        assert_eq!(authed_from(&cx, Some(&bearer), None).unwrap(), "u1");
+        assert_eq!(authed_from(&cx, None, Some(&token)).unwrap(), "u1");
+        assert_eq!(
+            authed_from(&cx, Some("Basic y"), Some(&token)).unwrap(),
+            "u1"
+        );
+        assert!(authed_from(&cx, None, None).is_err());
+        assert!(authed_from(&cx, Some("Bearer x"), None).is_err());
+    }
+
+    #[tokio::test]
+    async fn create_user_returns_inserted_id() {
+        let db = MockDb::new(vec![vec![serde_json::json!({"id": "u1"})]]);
+        assert_eq!(create_user(&db, "a@b.c", 1000).await.unwrap(), "u1");
+        let empty = MockDb::new(vec![vec![]]);
+        assert!(create_user(&empty, "a@b.c", 1000).await.is_err());
     }
 }
