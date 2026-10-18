@@ -61,6 +61,8 @@ pub struct AuthorizeRequest {
     pub nonce: Option<String>,
     pub prompt: Option<String>,
     pub response_mode: Option<String>,
+    pub max_age: Option<u64>,
+    pub auth_time: Option<u64>,
     pub code_challenge: Option<String>,
     pub code_challenge_method: Option<String>,
     pub user_id: Option<String>,
@@ -141,6 +143,7 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
         Err(Denied::Redirect(outcome)) => return Ok(outcome),
     };
     let state = req.state.clone();
+    let fresh = session_is_fresh(&req, now);
     let prompts: Vec<&str> = req
         .prompt
         .as_deref()
@@ -161,7 +164,15 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             }
         }
         Some(user_id) => {
-            if prompts.contains(&"login") {
+            if prompts.contains(&"login") || !fresh {
+                if prompts.contains(&"none") {
+                    return Ok(redirect_error(
+                        &req.redirect_uri,
+                        "login_required",
+                        "Authentication is required",
+                        state.as_deref(),
+                    ));
+                }
                 return Ok(AuthorizeOutcome::Login { url: req.login_url });
             }
             if prompts.contains(&"none") {
@@ -239,6 +250,15 @@ fn redirect_error(
 ) -> AuthorizeOutcome {
     AuthorizeOutcome::Error {
         url: error_url(redirect_uri, error, description, state),
+    }
+}
+
+fn session_is_fresh(req: &AuthorizeRequest, now: u64) -> bool {
+    match req.max_age {
+        None => true,
+        Some(max_age) => req
+            .auth_time
+            .is_some_and(|auth_time| now.saturating_sub(auth_time) <= max_age),
     }
 }
 

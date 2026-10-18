@@ -188,6 +188,7 @@ pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
             session_id: Some(session_id.to_string()),
             issuer: params.issuer.to_string(),
             issued_at: now,
+            auth_time,
             jti: generate_id(rng),
         },
     )?;

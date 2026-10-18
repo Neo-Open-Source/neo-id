@@ -67,12 +67,16 @@ fn oauth_error(cx: &Ctx, err: WireError) -> Result<Response> {
         .or_else(|_| fail(&cx.request_id, cx.now_ms, &AuthError::Internal))
 }
 
-fn logged_user(cx: &Ctx, req: &Request) -> Option<(String, Option<String>)> {
+fn logged_user(cx: &Ctx, req: &Request) -> Option<(String, Option<String>, u64)> {
     let presented = header_opt(req, "authorization")
         .and_then(|header| header.strip_prefix("Bearer ").map(String::from))
         .or_else(|| cookie_value(req, "neo_id_access"))?;
     let claims = verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now).ok()?;
-    Some((claims.sub, claims.session_id))
+    let auth_time = claims
+        .auth_time_unix
+        .and_then(|value| u64::try_from(value).ok())
+        .unwrap_or(0);
+    Some((claims.sub, claims.session_id, auth_time))
 }
 
 fn query_pairs(url: &url::Url) -> std::collections::HashMap<String, String> {
@@ -126,10 +130,15 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             nonce: some_query(&params, "nonce"),
             prompt: some_query(&params, "prompt"),
             response_mode: some_query(&params, "response_mode"),
+            max_age: some_query(&params, "max_age").and_then(|value| value.parse::<u64>().ok()),
             code_challenge: some_query(&params, "code_challenge"),
             code_challenge_method: some_query(&params, "code_challenge_method"),
-            user_id: user.as_ref().map(|(sub, _)| sub.clone()),
-            session_id: user.as_ref().and_then(|(_, session)| session.clone()),
+            user_id: user.as_ref().map(|(sub, _, _)| sub.clone()),
+            session_id: user.as_ref().and_then(|(_, session, _)| session.clone()),
+            auth_time: user
+                .as_ref()
+                .map(|(_, _, auth_time)| *auth_time)
+                .filter(|auth_time| *auth_time > 0),
             login_url: format!("/auth?redirect={}", encode_redirect(url.as_str())),
         },
     )

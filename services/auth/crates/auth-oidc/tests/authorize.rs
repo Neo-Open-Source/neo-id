@@ -119,6 +119,8 @@ fn authorize_req() -> AuthorizeRequest {
         nonce: None,
         prompt: None,
         response_mode: None,
+        max_age: None,
+        auth_time: None,
         code_challenge: None,
         code_challenge_method: None,
         user_id: Some("u-1".to_string()),
@@ -570,5 +572,48 @@ async fn register_rejects_missing_or_malformed_uris() {
         register_req(&["https://ok.example/cb", "has space://x"]),
     ] {
         assert_eq!(registered(req).await, Err(WireError::InvalidRequest));
+    }
+}
+
+#[tokio::test]
+async fn max_age_within_window_keeps_consent() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        max_age: Some(300),
+        auth_time: Some(NOW - 100),
+        ..authorize_req()
+    };
+    assert!(matches!(
+        outcome(&db, req).await.unwrap(),
+        AuthorizeOutcome::Consent { .. }
+    ));
+}
+
+#[tokio::test]
+async fn max_age_exceeded_forces_login() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        max_age: Some(300),
+        auth_time: Some(NOW - 400),
+        ..authorize_req()
+    };
+    assert!(matches!(
+        outcome(&db, req).await.unwrap(),
+        AuthorizeOutcome::Login { .. }
+    ));
+}
+
+#[tokio::test]
+async fn max_age_exceeded_with_prompt_none_is_login_required() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        max_age: Some(300),
+        auth_time: Some(NOW - 400),
+        prompt: Some("none".to_string()),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Error { url } => assert!(url.contains("error=login_required")),
+        other => panic!("expected error redirect, got {other:?}"),
     }
 }

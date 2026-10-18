@@ -16,6 +16,7 @@ fn access_input() -> AccessInput {
         session_id: Some("sess-1".to_string()),
         issuer: ISSUER.to_string(),
         issued_at: NOW,
+        auth_time: NOW,
         jti: "jti-1".to_string(),
     }
 }

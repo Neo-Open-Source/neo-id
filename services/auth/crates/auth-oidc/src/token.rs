@@ -340,6 +340,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
                 session_id: Some(session_id.to_string()),
                 issuer: self.issuer.to_string(),
                 issued_at: self.now,
+                auth_time: self.now,
                 jti: generate_id(&mut *self.rng),
             },
         )?;
