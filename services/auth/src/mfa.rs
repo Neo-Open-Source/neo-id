@@ -41,7 +41,7 @@ pub async fn lite_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    match super::routes::captcha_rejection(&cx, &req, &body).await {
+    match crate::captcha::reject_lite(&cx, &ctx, &body).await {
         Ok(None) => {}
         Ok(Some(response)) => return Ok(response),
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
@@ -51,11 +51,18 @@ pub async fn lite_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
     let email = body_field(&body, "email");
-    let bucket = format!("rl:lite:{}", email.trim().to_lowercase());
-    match auth_accounts::rate_limit_allow(&store, &bucket, 5, 3600).await {
-        Ok(true) => {}
-        Ok(false) => return fail_status(&cx, 429, "RATE_LIMITED", "Too many requests"),
-        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    // Defence in depth on top of captcha: bound sends per email and per IP.
+    let email_bucket = format!("rl:lite:{}", email.trim().to_lowercase());
+    let ip_bucket = format!(
+        "rl:lite-ip:{}",
+        header_opt(&req, "cf-connecting-ip").unwrap_or_default()
+    );
+    for (bucket, max) in [(&email_bucket, 5u32), (&ip_bucket, 20u32)] {
+        match auth_accounts::rate_limit_allow(&store, bucket, max, 3600).await {
+            Ok(true) => {}
+            Ok(false) => return fail_status(&cx, 429, "RATE_LIMITED", "Too many requests"),
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        }
     }
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
@@ -64,10 +71,16 @@ pub async fn lite_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
     let account = match auth_accounts::lite_account(&cx.db, email).await {
         Ok(Some(account)) => account,
         Ok(None) => {
-            return ok(
+            return crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({"mfaMethods": [], "sent": false}),
+                &auth_proto::auth::v1::LiteStartResponse {
+                    attempt_id: String::new(),
+                    mfa_methods: Vec::new(),
+                    passkey_available: false,
+                    email_hint: None,
+                    sent: false,
+                },
                 200,
             );
         }
@@ -88,13 +101,13 @@ pub async fn lite_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
     }
     let mut list = Vec::new();
     if methods.totp {
-        list.push("totp");
+        list.push("totp".to_string());
     }
     if methods.email {
-        list.push("email");
+        list.push("email".to_string());
     }
     if methods.passkey {
-        list.push("passkey");
+        list.push("passkey".to_string());
     }
     let mut sent = false;
     if methods.email {
@@ -104,16 +117,16 @@ pub async fn lite_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
             Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
         }
     }
-    ok(
+    crate::respond::ok_message(
         &cx.request_id,
         cx.now_ms,
-        &serde_json::json!({
-            "attempt_id": attempt_id,
-            "mfaMethods": list,
-            "passkeyAvailable": methods.passkey,
-            "emailHint": methods.email.then(|| account.user.email.clone()),
-            "sent": sent,
-        }),
+        &auth_proto::auth::v1::LiteStartResponse {
+            attempt_id,
+            mfa_methods: list,
+            passkey_available: methods.passkey,
+            email_hint: methods.email.then(|| account.user.email.clone()),
+            sent,
+        },
         200,
     )
 }
@@ -279,10 +292,10 @@ async fn totp_toggle(mut req: Request, ctx: RouteContext<()>, enable: bool) -> R
         auth_accounts::totp_disable(&cx.db, &user.id, code, cx.now).await
     };
     match done {
-        Ok(enabled) => ok(
+        Ok(enabled) => crate::respond::ok_message(
             &cx.request_id,
             cx.now_ms,
-            &serde_json::json!({"enabled": enabled}),
+            &auth_proto::auth::v1::EnabledResponse { enabled },
             200,
         ),
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),

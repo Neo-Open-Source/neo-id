@@ -15,14 +15,16 @@ impl db::Kv for StatesKv {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, AuthError> {
         self.store
             .get(key)
-            .bytes()
+            .text()
             .await
+            .map(|value| value.map(String::into_bytes))
             .map_err(|_| AuthError::Internal)
     }
 
     async fn put(&self, key: &str, value: &[u8], ttl_secs: u64) -> Result<(), AuthError> {
+        let text = std::str::from_utf8(value).map_err(|_| AuthError::Internal)?;
         self.store
-            .put(key, value.to_vec())
+            .put(key, text.to_string())
             .map_err(|_| AuthError::Internal)?
             .expiration_ttl(ttl_secs)
             .execute()

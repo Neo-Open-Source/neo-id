@@ -201,17 +201,17 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             if let Err(err) = put_state(&store, &pending_key(&state), &pending).await {
                 return fail(&cx.request_id, cx.now_ms, &err);
             }
-            ok(
+            crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({
-                    "consent_required": true,
-                    "state": state,
-                    "redirect_uri": redirect_uri,
-                    "service_app_id": service_app_id,
-                    "nonce": nonce,
-                    "scopes": scopes,
-                }),
+                &auth_proto::auth::v1::AuthorizeConsentResponse {
+                    consent_required: true,
+                    state,
+                    redirect_uri,
+                    service_app_id,
+                    nonce,
+                    scopes,
+                },
                 200,
             )
         }

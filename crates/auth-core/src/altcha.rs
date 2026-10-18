@@ -137,3 +137,50 @@ pub fn verify_solution(payload: &AltchaPayload, secret: &str, now: u64) -> Resul
     }
     Ok(derived_hex.starts_with(&parameters.key_prefix.to_lowercase()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ALTCHA_COST, create_challenge, derive, password, verify_solution};
+    use auth_proto::auth::v1::{AltchaPayload, AltchaSolution};
+    use rand_chacha::ChaCha8Rng;
+    use rand_chacha::rand_core::SeedableRng;
+
+    fn solve(challenge: auth_proto::auth::v1::AltchaChallenge) -> AltchaPayload {
+        let parameters = challenge.parameters.clone().unwrap();
+        let nonce = hex::decode(&parameters.nonce).unwrap();
+        let salt = hex::decode(&parameters.salt).unwrap();
+        let mut counter = 0u32;
+        let derived_hex = loop {
+            let derived = derive(
+                &password(&nonce, counter),
+                &salt,
+                parameters.cost,
+                parameters.key_length,
+            );
+            let hexed = hex::encode(&derived);
+            if hexed.starts_with(&parameters.key_prefix) {
+                break hexed;
+            }
+            counter += 1;
+        };
+        AltchaPayload {
+            challenge: Some(challenge),
+            solution: Some(AltchaSolution {
+                counter,
+                derived_key: derived_hex,
+                time: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn solution_verifies_and_rejects_tampering() {
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
+        let challenge = create_challenge(&mut rng, "secret", 1_000, ALTCHA_COST).unwrap();
+        let payload = solve(challenge);
+
+        assert!(verify_solution(&payload, "secret", 1_000).unwrap());
+        assert!(!verify_solution(&payload, "wrong", 1_000).unwrap());
+        assert!(!verify_solution(&payload, "secret", 10_000).unwrap());
+    }
+}

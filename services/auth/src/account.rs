@@ -51,10 +51,10 @@ pub async fn session_revoke(req: Request, ctx: RouteContext<()>) -> Result<Respo
     };
     let id = ctx.param("id").cloned().unwrap_or_default();
     match auth_accounts::revoke_session(&cx.db, &id, &user_id, cx.now).await {
-        Ok(revoked) => ok(
+        Ok(revoked) => crate::respond::ok_message(
             &cx.request_id,
             cx.now_ms,
-            &serde_json::json!({"revoked": revoked}),
+            &auth_proto::auth::v1::RevokedResponse { revoked },
             200,
         ),
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
@@ -157,10 +157,10 @@ pub async fn email_request(mut req: Request, ctx: RouteContext<()>) -> Result<Re
             {
                 return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
             }
-            ok(
+            crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({"sent": true}),
+                &auth_proto::auth::v1::SentResponse { sent: true },
                 200,
             )
         }
@@ -200,10 +200,10 @@ pub async fn email_confirm(mut req: Request, ctx: RouteContext<()>) -> Result<Re
     )
     .await
     {
-        Ok(true) => ok(
+        Ok(true) => crate::respond::ok_message(
             &cx.request_id,
             cx.now_ms,
-            &serde_json::json!({"changed": true}),
+            &auth_proto::auth::v1::ChangedResponse { changed: true },
             200,
         ),
         Ok(false) => fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
@@ -249,10 +249,10 @@ pub async fn verify_email_request(req: Request, ctx: RouteContext<()>) -> Result
             {
                 return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
             }
-            ok(
+            crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({"sent": true}),
+                &auth_proto::auth::v1::SentResponse { sent: true },
                 200,
             )
         }
@@ -274,10 +274,10 @@ pub async fn verify_email_confirm(mut req: Request, ctx: RouteContext<()>) -> Re
         return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
     };
     match auth_accounts::confirm_email(&cx.db, &user.id, body_field(&body, "code"), cx.now).await {
-        Ok(true) => ok(
+        Ok(true) => crate::respond::ok_message(
             &cx.request_id,
             cx.now_ms,
-            &serde_json::json!({"verified": true}),
+            &auth_proto::auth::v1::VerifiedResponse { verified: true },
             200,
         ),
         Ok(false) => fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
@@ -336,17 +336,17 @@ pub async fn password_forgot(mut req: Request, ctx: RouteContext<()>) -> Result<
             {
                 return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
             }
-            ok(
+            crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({"sent": true}),
+                &auth_proto::auth::v1::SentResponse { sent: true },
                 200,
             )
         }
-        Ok(auth_accounts::ForgotOutcome::Unknown) => ok(
+        Ok(auth_accounts::ForgotOutcome::Unknown) => crate::respond::ok_message(
             &cx.request_id,
             cx.now_ms,
-            &serde_json::json!({"sent": true}),
+            &auth_proto::auth::v1::SentResponse { sent: true },
             200,
         ),
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
@@ -389,10 +389,13 @@ pub async fn password_reset(mut req: Request, ctx: RouteContext<()>) -> Result<R
             {
                 return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
             }
-            ok(
+            crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({"user_id": user_id, "reset_grant": grant}),
+                &auth_proto::auth::v1::PasswordResetResponse {
+                    user_id,
+                    reset_grant: grant,
+                },
                 200,
             )
         }

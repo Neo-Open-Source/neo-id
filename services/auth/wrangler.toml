@@ -4,7 +4,7 @@ compatibility_date = "2026-09-01"
 workers_dev = true
 
 [build]
-command = "cargo install -q worker-build && worker-build --release"
+command = "cargo install -q worker-build && PATH=\"${CARGO_HOME:-$HOME/.cargo}/bin:$PATH\" worker-build --release"
 
 [[kv_namespaces]]
 binding = "STATES"

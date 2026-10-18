@@ -170,14 +170,14 @@ fn begin_for(cx: &Ctx, user_id: &str, request_b64: &str, status: &str) -> Result
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
     match register_response(&cx.app.setup, &request_bytes, credential) {
-        Ok(response) => ok(
+        Ok(response) => crate::respond::ok_message(
             &cx.request_id,
             cx.now_ms,
-            &serde_json::json!({
-                "status": status,
-                "user_id": user_id,
-                "response": URL_SAFE_NO_PAD.encode(response),
-            }),
+            &auth_proto::auth::v1::RegisterStartResponse {
+                status: status.to_string(),
+                user_id: user_id.to_string(),
+                response: URL_SAFE_NO_PAD.encode(response),
+            },
             200,
         ),
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
@@ -384,13 +384,13 @@ async fn login_start(mut req: Request, ctx: RouteContext<()>) -> Result<Response
             {
                 return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
             }
-            ok(
+            crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({
-                    "attempt_id": attempt_id,
-                    "response": URL_SAFE_NO_PAD.encode(challenge.response),
-                }),
+                &auth_proto::auth::v1::LoginStartResponse {
+                    attempt_id,
+                    response: URL_SAFE_NO_PAD.encode(challenge.response),
+                },
                 200,
             )
         }
@@ -497,17 +497,19 @@ async fn begin_mfa(
     {
         return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
     }
-    ok(
+    crate::respond::ok_message(
         &cx.request_id,
         cx.now_ms,
-        &serde_json::json!({
-            "mfaRequired": true,
-            "attempt_id": attempt_id,
-            "mfaMethods": verified.methods,
-            "passkeyAvailable": verified.passkeys > 0,
-            "emailHint": verified.email_mfa.then_some(verified.email.clone()),
-            "user": {"id": verified.id, "email": verified.email, "role": verified.role},
-        }),
+        &auth_proto::auth::v1::LoginFinishResponse {
+            mfa_required: true,
+            attempt_id: Some(attempt_id.to_string()),
+            mfa_methods: verified.methods.iter().map(|m| (*m).to_string()).collect(),
+            passkey_available: Some(verified.passkeys > 0),
+            email_hint: verified.email_mfa.then(|| verified.email.clone()),
+            access_token: None,
+            refresh_token: None,
+            id_token: None,
+        },
         200,
     )
 }
@@ -575,15 +577,19 @@ async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     };
     match auth_accounts::complete_login(&cx.db, &mut rng, cx.now, &params, &login_user).await {
         Ok(tokens) => crate::respond::with_cookies(
-            ok(
+            crate::respond::ok_message(
                 &cx.request_id,
                 cx.now_ms,
-                &serde_json::json!({
-                    "accessToken": tokens.access_token,
-                    "refreshToken": tokens.refresh_token,
-                    "idToken": tokens.id_token,
-                    "user": {"id": login_user.id, "email": login_user.email, "role": login_user.role},
-                }),
+                &auth_proto::auth::v1::LoginFinishResponse {
+                    mfa_required: false,
+                    attempt_id: None,
+                    mfa_methods: Vec::new(),
+                    passkey_available: None,
+                    email_hint: None,
+                    access_token: Some(tokens.access_token.clone()),
+                    refresh_token: Some(tokens.refresh_token.clone()),
+                    id_token: Some(tokens.id_token.clone()),
+                },
                 200,
             ),
             &tokens.access_token,
@@ -680,7 +686,8 @@ pub fn router() -> Router<'static, ()> {
         .get_async("/.well-known/openid-configuration", discovery)
         .get_async("/.well-known/jwks.json", jwks)
         .get_async("/api/v1/captcha/altcha", crate::captcha::altcha_challenge)
-        .get_async("/altcha.js", crate::captcha::altcha_script)
+        .get_async("/api/v1/captcha/altcha.js", crate::captcha::altcha_script)
+        .get_async("/api/v1/captcha/lite", crate::captcha::lite_challenge)
         .post_async("/api/v1/auth/register/start", register_start)
         .post_async("/api/v1/auth/register/finish", register_finish)
         .post_async("/api/v1/auth/login/start", login_start)
@@ -957,5 +964,25 @@ mod tests {
         assert_eq!(create_user(&db, "a@b.c", 1000).await.unwrap(), "u1");
         let empty = MockDb::new(vec![vec![]]);
         assert!(create_user(&empty, "a@b.c", 1000).await.is_err());
+    }
+
+    #[test]
+    fn login_finish_wire_keeps_camel_case_mfa_names() {
+        let value = serde_json::to_value(auth_proto::auth::v1::LoginFinishResponse {
+            mfa_required: true,
+            attempt_id: Some("a".to_string()),
+            mfa_methods: vec!["totp".to_string()],
+            passkey_available: Some(true),
+            email_hint: Some("a@b.c".to_string()),
+            access_token: None,
+            refresh_token: None,
+            id_token: None,
+        })
+        .unwrap();
+        assert_eq!(value["mfaRequired"], true);
+        assert_eq!(value["mfaMethods"][0], "totp");
+        assert_eq!(value["attempt_id"], "a");
+        assert!(value.get("passkeyAvailable").is_some());
+        assert!(value.get("accessToken").is_none());
     }
 }

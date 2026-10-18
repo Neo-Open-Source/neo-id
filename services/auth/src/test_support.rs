@@ -49,6 +49,7 @@ pub(crate) fn test_ctx_with(now: u64, alg: SigningAlg) -> Ctx {
         web_origin: TEST_ISSUER.to_string(),
         turnstile_secret: None,
         altcha_secret: None,
+        altcha_fallback: true,
         #[cfg(feature = "passkeys")]
         rp_id: "id.neome.uk".to_string(),
         #[cfg(feature = "passkeys")]

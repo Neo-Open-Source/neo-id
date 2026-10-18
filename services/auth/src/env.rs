@@ -15,6 +15,7 @@ pub struct AppEnv {
     pub web_origin: String,
     pub turnstile_secret: Option<String>,
     pub altcha_secret: Option<String>,
+    pub altcha_fallback: bool,
     #[cfg(feature = "passkeys")]
     pub rp_id: String,
     #[cfg(feature = "passkeys")]
@@ -39,6 +40,17 @@ fn secret_pem(env: &Env, name: &str) -> Option<Vec<u8>> {
     env.secret(name)
         .ok()
         .map(|value| unescape_pem(&value.to_string()))
+}
+
+fn non_empty(value: Option<String>) -> Option<String> {
+    value.filter(|raw| !raw.is_empty())
+}
+
+fn flag(value: Option<&str>) -> bool {
+    match value {
+        None => true,
+        Some(raw) => !matches!(raw.to_lowercase().as_str(), "0" | "false" | "off" | "no"),
+    }
 }
 
 fn signing_alg(choice: Option<&str>) -> Result<SigningAlg, AuthError> {
@@ -113,14 +125,22 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
     let web_origin = env
         .var("WEB_ORIGIN")
         .map_or("https://id.neome.uk".to_string(), |value| value.to_string());
-    let turnstile_secret = env
-        .secret("TURNSTILE_SECRET")
-        .map(|secret| secret.to_string())
-        .ok();
-    let altcha_secret = env
-        .secret("ALTCHA_SECRET")
-        .map(|secret| secret.to_string())
-        .ok();
+    let turnstile_secret = non_empty(
+        env.secret("TURNSTILE_SECRET")
+            .map(|secret| secret.to_string())
+            .ok(),
+    );
+    let altcha_secret = non_empty(
+        env.secret("ALTCHA_SECRET")
+            .map(|secret| secret.to_string())
+            .ok(),
+    );
+    let altcha_fallback = flag(
+        env.var("CAPTCHA_ALTCHA_FALLBACK")
+            .map(|value| value.to_string())
+            .ok()
+            .as_deref(),
+    );
     #[cfg(feature = "passkeys")]
     let rp_id = env
         .var("RP_ID")
@@ -142,6 +162,7 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
         web_origin,
         turnstile_secret,
         altcha_secret,
+        altcha_fallback,
         #[cfg(feature = "passkeys")]
         rp_id,
         #[cfg(feature = "passkeys")]
@@ -151,8 +172,26 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_signing, signing_alg, unescape_pem};
+    use super::{build_signing, flag, non_empty, signing_alg, unescape_pem};
     use auth_core::SigningAlg;
+
+    #[test]
+    fn empty_secret_is_treated_as_absent() {
+        assert_eq!(non_empty(Some(String::new())), None);
+        assert_eq!(non_empty(None), None);
+        assert_eq!(non_empty(Some("x".to_string())), Some("x".to_string()));
+    }
+
+    #[test]
+    fn fallback_flag_defaults_on_and_parses_off() {
+        assert!(flag(None));
+        assert!(flag(Some("true")));
+        assert!(flag(Some("altcha")));
+        assert!(!flag(Some("0")));
+        assert!(!flag(Some("false")));
+        assert!(!flag(Some("OFF")));
+        assert!(!flag(Some("no")));
+    }
 
     #[test]
     fn unescape_pem_replaces_literal_newlines() {
