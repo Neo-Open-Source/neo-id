@@ -67,6 +67,7 @@ async fn discovery(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
             "registration_endpoint": format!("{issuer}/api/v1/oauth2/register"),
             "end_session_endpoint": format!("{issuer}/api/v1/oauth2/logout"),
             "response_types_supported": ["code"],
+            "response_modes_supported": ["query"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
             "subject_types_supported": ["public"],
@@ -74,6 +75,10 @@ async fn discovery(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
             "scopes_supported": ["openid", "profile", "email"],
             "claims_supported": ["iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "email", "email_verified", "name", "given_name", "family_name", "picture"],
             "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
+            "claims_parameter_supported": false,
+            "request_parameter_supported": false,
+            "request_uri_parameter_supported": false,
+            "authorization_response_iss_parameter_supported": false,
         }),
         200,
     )
