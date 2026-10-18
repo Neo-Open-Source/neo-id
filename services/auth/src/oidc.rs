@@ -22,21 +22,19 @@ fn pending_key(state: &str) -> String {
     format!("acp:{state}")
 }
 
-async fn put_state(
-    ctx: &RouteContext<()>,
+async fn put_state<K: db::Kv>(
+    store: &K,
     key: &str,
     state: &AuthorizationCode,
 ) -> Result<(), AuthError> {
-    let store = crate::kv::StatesKv::new(kv_store(ctx)?);
-    auth_oidc::store_authcode_state(&store, key, state).await
+    auth_oidc::store_authcode_state(store, key, state).await
 }
 
-async fn take_state(
-    ctx: &RouteContext<()>,
+async fn take_state<K: db::Kv>(
+    store: &K,
     key: &str,
 ) -> Result<Option<AuthorizationCode>, AuthError> {
-    let store = crate::kv::StatesKv::new(kv_store(ctx)?);
-    auth_oidc::take_authcode_state(&store, key).await
+    auth_oidc::take_authcode_state(store, key).await
 }
 
 fn basic_credentials(header: Option<&str>) -> Option<(String, String)> {
@@ -93,6 +91,72 @@ fn some_query(params: &std::collections::HashMap<String, String>, key: &str) -> 
     params.get(key).filter(|value| !value.is_empty()).cloned()
 }
 
+fn authorize_request(
+    params: &std::collections::HashMap<String, String>,
+    url: &url::Url,
+    user: Option<&(String, Option<String>, u64)>,
+) -> AuthorizeRequest {
+    let required = |key: &str| params.get(key).cloned().unwrap_or_default();
+    AuthorizeRequest {
+        response_type: required("response_type"),
+        client_id: required("client_id"),
+        redirect_uri: required("redirect_uri"),
+        scope: required("scope"),
+        state: some_query(params, "state"),
+        nonce: some_query(params, "nonce"),
+        prompt: some_query(params, "prompt"),
+        response_mode: some_query(params, "response_mode"),
+        max_age: some_query(params, "max_age").and_then(|value| value.parse::<u64>().ok()),
+        code_challenge: some_query(params, "code_challenge"),
+        code_challenge_method: some_query(params, "code_challenge_method"),
+        user_id: user.map(|(sub, _, _)| sub.clone()),
+        session_id: user.and_then(|(_, session, _)| session.clone()),
+        auth_time: user
+            .map(|(_, _, auth_time)| *auth_time)
+            .filter(|auth_time| *auth_time > 0),
+        login_url: format!("/auth?redirect={}", percent_encode(url.as_str())),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GrantKind {
+    Code,
+    Refresh,
+    Unsupported,
+}
+
+fn grant_kind(grant_type: &str) -> GrantKind {
+    match grant_type {
+        "authorization_code" => GrantKind::Code,
+        "refresh_token" => GrantKind::Refresh,
+        _ => GrantKind::Unsupported,
+    }
+}
+
+fn client_credentials(
+    client_id: String,
+    client_secret: Option<String>,
+    basic: Option<(String, String)>,
+) -> (String, Option<String>) {
+    match basic {
+        Some((id, secret)) => (id, Some(secret)),
+        None => (client_id, client_secret),
+    }
+}
+
+fn logout_field(
+    params: &std::collections::HashMap<String, String>,
+    body: &serde_json::Value,
+    key: &str,
+) -> Option<String> {
+    some_query(params, key).or_else(|| {
+        body.get(key)
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(String::from)
+    })
+}
+
 pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let cx = match load_cx(&ctx.env) {
         Ok(cx) => cx,
@@ -102,7 +166,6 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
         return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage);
     };
     let params = query_pairs(&url);
-    let required = |key: &str| params.get(key).cloned().unwrap_or_default();
     let user = logged_user_from(
         &cx,
         header_opt(&req, "authorization").as_deref(),
@@ -116,26 +179,7 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
         &cx.db,
         &mut rng,
         cx.now,
-        AuthorizeRequest {
-            response_type: required("response_type"),
-            client_id: required("client_id"),
-            redirect_uri: required("redirect_uri"),
-            scope: required("scope"),
-            state: some_query(&params, "state"),
-            nonce: some_query(&params, "nonce"),
-            prompt: some_query(&params, "prompt"),
-            response_mode: some_query(&params, "response_mode"),
-            max_age: some_query(&params, "max_age").and_then(|value| value.parse::<u64>().ok()),
-            code_challenge: some_query(&params, "code_challenge"),
-            code_challenge_method: some_query(&params, "code_challenge_method"),
-            user_id: user.as_ref().map(|(sub, _, _)| sub.clone()),
-            session_id: user.as_ref().and_then(|(_, session, _)| session.clone()),
-            auth_time: user
-                .as_ref()
-                .map(|(_, _, auth_time)| *auth_time)
-                .filter(|auth_time| *auth_time > 0),
-            login_url: format!("/auth?redirect={}", percent_encode(url.as_str())),
-        },
+        authorize_request(&params, &url, user.as_ref()),
     )
     .await
     {
@@ -150,7 +194,11 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
                 nonce: nonce.clone(),
                 scopes: scopes.clone(),
             };
-            if let Err(err) = put_state(&ctx, &pending_key(&state), &pending).await {
+            let store = match kv_store(&ctx) {
+                Ok(store) => crate::kv::StatesKv::new(store),
+                Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+            };
+            if let Err(err) = put_state(&store, &pending_key(&state), &pending).await {
                 return fail(&cx.request_id, cx.now_ms, &err);
             }
             ok(
@@ -180,7 +228,11 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             scopes,
         }) => {
             let state = AuthorizationCode { nonce, scopes };
-            if let Err(err) = put_state(&ctx, &code_key(&code), &state).await {
+            let store = match kv_store(&ctx) {
+                Ok(store) => crate::kv::StatesKv::new(store),
+                Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+            };
+            if let Err(err) = put_state(&store, &code_key(&code), &state).await {
                 return fail(&cx.request_id, cx.now_ms, &err);
             }
             match url::Url::parse(&url) {
@@ -227,8 +279,12 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
         if value.is_empty() { None } else { Some(value) }
     };
     let state = optional("state");
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+    };
     let pending = match state.as_deref() {
-        Some(state) => match take_state(&ctx, &pending_key(state)).await {
+        Some(state) => match take_state(&store, &pending_key(state)).await {
             Ok(Some(pending)) => pending,
             Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
             Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
@@ -257,7 +313,11 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
     {
         Ok(redirect) => {
             if let Some(code) = redirect.code.as_deref() {
-                if let Err(err) = put_state(&ctx, &code_key(code), &pending).await {
+                let store = match kv_store(&ctx) {
+                    Ok(store) => crate::kv::StatesKv::new(store),
+                    Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+                };
+                if let Err(err) = put_state(&store, &code_key(code), &pending).await {
                     return fail(&cx.request_id, cx.now_ms, &err);
                 }
             }
@@ -290,24 +350,26 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
         if value.is_empty() { None } else { Some(value) }
     };
     let basic = basic_credentials(header_opt(&req, "authorization").as_deref());
-    let basic_client = |field: String, optional: Option<String>| match &basic {
-        Some((id, secret)) => (id.clone(), Some(secret.clone())),
-        None => (field, optional),
-    };
-    let grant = match field("grant_type").as_str() {
-        "authorization_code" => {
+    let (client_id, client_secret) =
+        client_credentials(field("client_id"), optional("client_secret"), basic);
+    let grant = match grant_kind(&field("grant_type")) {
+        GrantKind::Code => {
             let code = field("code");
             let state = if code.is_empty() {
                 AuthorizationCode::default()
             } else {
-                match take_state(&ctx, &code_key(&code)).await {
+                let store = match kv_store(&ctx) {
+                    Ok(store) => crate::kv::StatesKv::new(store),
+                    Err(_) => {
+                        return no_store(fail(&cx.request_id, cx.now_ms, &AuthError::Internal));
+                    }
+                };
+                match take_state(&store, &code_key(&code)).await {
                     Ok(Some(state)) => state,
                     Ok(None) => AuthorizationCode::default(),
                     Err(err) => return no_store(fail(&cx.request_id, cx.now_ms, &err)),
                 }
             };
-            let (client_id, client_secret) =
-                basic_client(field("client_id"), optional("client_secret"));
             Grant::Code {
                 code,
                 redirect_uri: field("redirect_uri"),
@@ -318,16 +380,14 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
                 scopes: state.scopes,
             }
         }
-        "refresh_token" => {
-            let (client_id, client_secret) =
-                basic_client(field("client_id"), optional("client_secret"));
-            Grant::Refresh {
-                refresh_token: field("refresh_token"),
-                client_id,
-                client_secret,
-            }
+        GrantKind::Refresh => Grant::Refresh {
+            refresh_token: field("refresh_token"),
+            client_id,
+            client_secret,
+        },
+        GrantKind::Unsupported => {
+            return no_store(oauth_error(&cx, WireError::UnsupportedGrantType));
         }
-        _ => return no_store(oauth_error(&cx, WireError::UnsupportedGrantType)),
     };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
@@ -398,14 +458,7 @@ pub async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     };
     let params = req.url().map(|url| query_pairs(&url)).unwrap_or_default();
     let body: serde_json::Value = req.json().await.unwrap_or(serde_json::Value::Null);
-    let field = |key: &str| {
-        some_query(&params, key).or_else(|| {
-            body.get(key)
-                .and_then(serde_json::Value::as_str)
-                .filter(|value| !value.is_empty())
-                .map(String::from)
-        })
-    };
+    let field = |key: &str| logout_field(&params, &body, key);
     let user_id = field("user_id").or_else(|| {
         field("id_token_hint").and_then(|token| {
             verify_id(&cx.app.verify, &token, &cx.app.issuer, cx.now)
@@ -507,11 +560,14 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
 #[cfg(test)]
 mod tests {
     use super::{
-        basic_credentials, code_key, form_decode, logged_user_from, pending_key, query_pairs,
-        some_query, wire_error_status,
+        GrantKind, authorize_request, basic_credentials, client_credentials, code_key, form_decode,
+        grant_kind, logged_user_from, logout_field, pending_key, put_state, query_pairs,
+        some_query, take_state, wire_error_status,
     };
-    use auth_oidc::WireError;
+    use auth_core::AuthError;
+    use auth_oidc::{AuthorizationCode, WireError};
     use base64::{Engine, engine::general_purpose::STANDARD};
+    use db::Kv;
     use std::collections::HashMap;
 
     fn basic(id: &str, secret: &str) -> String {
@@ -587,5 +643,147 @@ mod tests {
         assert_eq!(some_query(&params, "a").as_deref(), Some("1"));
         assert_eq!(some_query(&params, "b"), None);
         assert_eq!(some_query(&params, "missing"), None);
+    }
+
+    #[test]
+    fn authorize_request_parses_params_and_user() {
+        let url = url::Url::parse(
+            "https://id.neome.uk/api/v1/oauth2/authorize?response_type=code&client_id=c&redirect_uri=https%3A%2F%2Fapp%2Fcb&scope=openid+profile&state=s&nonce=n&max_age=120",
+        )
+        .unwrap();
+        let params = query_pairs(&url);
+        let user = ("u1".to_string(), Some("sess".to_string()), 1_800_000_000);
+        let request = authorize_request(&params, &url, Some(&user));
+        assert_eq!(request.response_type, "code");
+        assert_eq!(request.client_id, "c");
+        assert_eq!(request.redirect_uri, "https://app/cb");
+        assert_eq!(request.scope, "openid profile");
+        assert_eq!(request.state.as_deref(), Some("s"));
+        assert_eq!(request.nonce.as_deref(), Some("n"));
+        assert_eq!(request.max_age, Some(120));
+        assert_eq!(request.user_id.as_deref(), Some("u1"));
+        assert_eq!(request.session_id.as_deref(), Some("sess"));
+        assert_eq!(request.auth_time, Some(1_800_000_000));
+        assert!(request.login_url.starts_with("/auth?redirect="));
+    }
+
+    #[test]
+    fn authorize_request_omits_zero_auth_time_and_bad_max_age() {
+        let url = url::Url::parse("https://id.neome.uk/a?max_age=abc&state=").unwrap();
+        let params = query_pairs(&url);
+        let user = ("u1".to_string(), None, 0);
+        let request = authorize_request(&params, &url, Some(&user));
+        assert_eq!(request.auth_time, None);
+        assert_eq!(request.max_age, None);
+        assert_eq!(request.state, None);
+        assert_eq!(request.client_id, "");
+
+        let anonymous = authorize_request(&params, &url, None);
+        assert_eq!(anonymous.user_id, None);
+        assert_eq!(anonymous.session_id, None);
+        assert_eq!(anonymous.auth_time, None);
+    }
+
+    #[test]
+    fn grant_kind_maps_known_grants() {
+        assert_eq!(grant_kind("authorization_code"), GrantKind::Code);
+        assert_eq!(grant_kind("refresh_token"), GrantKind::Refresh);
+        assert_eq!(grant_kind("client_credentials"), GrantKind::Unsupported);
+    }
+
+    #[test]
+    fn client_credentials_prefers_basic_auth() {
+        assert_eq!(
+            client_credentials(
+                "body-id".to_string(),
+                Some("body-secret".to_string()),
+                Some(("basic-id".to_string(), "basic-secret".to_string())),
+            ),
+            ("basic-id".to_string(), Some("basic-secret".to_string()))
+        );
+        assert_eq!(
+            client_credentials("body-id".to_string(), None, None),
+            ("body-id".to_string(), None)
+        );
+    }
+
+    #[test]
+    fn logout_field_prefers_query_then_nonempty_body() {
+        let mut params = HashMap::new();
+        params.insert("state".to_string(), "from-query".to_string());
+        let body = serde_json::json!({"state": "from-body", "session_id": "sid", "empty": ""});
+        assert_eq!(
+            logout_field(&params, &body, "state").as_deref(),
+            Some("from-query")
+        );
+        assert_eq!(
+            logout_field(&params, &body, "session_id").as_deref(),
+            Some("sid")
+        );
+        assert_eq!(logout_field(&params, &body, "empty"), None);
+        assert_eq!(logout_field(&params, &body, "missing"), None);
+    }
+
+    #[derive(Default)]
+    struct MemKv {
+        data: std::sync::Mutex<HashMap<String, Vec<u8>>>,
+    }
+
+    impl Kv for MemKv {
+        fn get(
+            &self,
+            key: &str,
+        ) -> impl std::future::Future<Output = Result<Option<Vec<u8>>, AuthError>> {
+            let value = self
+                .data
+                .lock()
+                .map(|data| data.get(key).cloned())
+                .map_err(|_| AuthError::Internal);
+            async move { value }
+        }
+
+        fn put(
+            &self,
+            key: &str,
+            value: &[u8],
+            _ttl_secs: u64,
+        ) -> impl std::future::Future<Output = Result<(), AuthError>> {
+            let result = self
+                .data
+                .lock()
+                .map(|mut data| {
+                    data.insert(key.to_string(), value.to_vec());
+                })
+                .map_err(|_| AuthError::Internal);
+            async move { result }
+        }
+
+        fn delete(&self, key: &str) -> impl std::future::Future<Output = Result<(), AuthError>> {
+            let result = self
+                .data
+                .lock()
+                .map(|mut data| {
+                    data.remove(key);
+                })
+                .map_err(|_| AuthError::Internal);
+            async move { result }
+        }
+    }
+
+    #[tokio::test]
+    async fn authcode_state_roundtrips_and_is_single_use() {
+        let kv = MemKv::default();
+        let state = AuthorizationCode {
+            nonce: Some("n-1".to_string()),
+            scopes: vec!["openid".to_string(), "email".to_string()],
+        };
+        put_state(&kv, "k", &state).await.unwrap();
+        let taken = take_state(&kv, "k").await.unwrap().unwrap();
+        assert_eq!(taken.nonce.as_deref(), Some("n-1"));
+        assert_eq!(
+            taken.scopes,
+            vec!["openid".to_string(), "email".to_string()]
+        );
+        assert!(take_state(&kv, "k").await.unwrap().is_none());
     }
 }

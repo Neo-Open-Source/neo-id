@@ -30,10 +30,14 @@ pub(crate) fn load_cx(env: &Env) -> std::result::Result<Ctx, AuthError> {
     Ok(Ctx {
         request_id: auth_core::generate_id(&mut rng),
         now_ms,
-        now: now_ms / 1000,
+        now: seconds(now_ms),
         app,
         db: NeonExecutor::new(endpoint, connection),
     })
+}
+
+fn seconds(now_ms: u64) -> u64 {
+    now_ms / 1000
 }
 
 async fn health(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
@@ -122,7 +126,7 @@ async fn register_start(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         .and_then(|value| value.as_str())
         .unwrap_or_default();
     let grant = body_field(&body, "reset_grant");
-    if !grant.is_empty() {
+    if present(grant) {
         let store = match kv_store(&ctx) {
             Ok(store) => crate::kv::StatesKv::new(store),
             Err(_) => return fail("unknown", 0, &AuthError::Internal),
@@ -223,6 +227,10 @@ pub(crate) fn body_field<'a>(body: &'a serde_json::Value, key: &str) -> &'a str 
         .unwrap_or_default()
 }
 
+fn present(value: &str) -> bool {
+    !value.is_empty()
+}
+
 pub(crate) async fn json_body(req: &mut Request) -> Result<serde_json::Value, AuthError> {
     match req.json().await {
         Ok(body) => Ok(body),
@@ -233,11 +241,12 @@ pub(crate) async fn json_body(req: &mut Request) -> Result<serde_json::Value, Au
 pub(crate) async fn form_or_json(req: &mut Request) -> Result<serde_json::Value, AuthError> {
     let form = header_opt(req, "content-type")
         .is_some_and(|value| value.starts_with("application/x-www-form-urlencoded"));
-    if !form {
-        return json_body(req).await;
+    if form {
+        let text = req.text().await.map_err(|_| AuthError::MalformedMessage)?;
+        Ok(form_to_object(&text))
+    } else {
+        json_body(req).await
     }
-    let text = req.text().await.map_err(|_| AuthError::MalformedMessage)?;
-    Ok(form_to_object(&text))
 }
 
 pub(crate) fn form_to_object(text: &str) -> serde_json::Value {
@@ -411,6 +420,16 @@ struct VerifiedUser {
     email_mfa: bool,
 }
 
+impl VerifiedUser {
+    fn has_passkey(&self) -> bool {
+        self.passkeys > 0
+    }
+
+    fn mfa_required(&self) -> bool {
+        !self.methods.is_empty()
+    }
+}
+
 async fn verified_user<E: db::Executor>(
     db: &E,
     email: &str,
@@ -470,7 +489,7 @@ async fn begin_mfa(
         role: verified.role.clone(),
         totp: verified.methods.contains(&"totp"),
         email_mfa: verified.email_mfa,
-        passkey: verified.passkeys > 0,
+        passkey: verified.has_passkey(),
     };
     if auth_accounts::store_challenge(store, attempt_id, &challenge)
         .await
@@ -537,7 +556,7 @@ async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
         Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    if !verified.methods.is_empty() {
+    if verified.mfa_required() {
         return begin_mfa(&cx, &store, attempt_id, &verified).await;
     }
     let device = header_opt(&req, "user-agent");
@@ -643,7 +662,7 @@ async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     } else {
         presented
     };
-    if !presented.is_empty() {
+    if present(&presented) {
         if let Ok(claims) =
             auth_core::verify_access(&cx.app.verify, &presented, &cx.app.issuer, cx.now)
         {
@@ -739,8 +758,8 @@ pub fn router() -> Router<'static, ()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        AuthError, authed_from, body_field, cookie_value, create_user, form_to_object, state_key,
-        verified_user,
+        AuthError, VerifiedUser, authed_from, body_field, cookie_value, create_user,
+        form_to_object, present, seconds, state_key, verified_user,
     };
     use db::Query;
     use std::collections::VecDeque;
@@ -895,6 +914,41 @@ mod tests {
             authed_from(&cx, Some(&format!("Bearer {token}")), None).unwrap(),
             "u1"
         );
+    }
+
+    #[test]
+    fn present_rejects_empty() {
+        assert!(!present(""));
+        assert!(present("x"));
+    }
+
+    #[test]
+    fn seconds_converts_millis_to_seconds() {
+        assert_eq!(seconds(999), 0);
+        assert_eq!(seconds(1500), 1);
+        assert_eq!(seconds(2_000), 2);
+    }
+
+    #[test]
+    fn verified_user_reports_passkey_and_mfa_needs() {
+        let plain = VerifiedUser {
+            id: "u1".to_string(),
+            email: "a@b.c".to_string(),
+            role: "user".to_string(),
+            methods: Vec::new(),
+            passkeys: 0,
+            email_mfa: false,
+        };
+        assert!(!plain.has_passkey());
+        assert!(!plain.mfa_required());
+
+        let secured = VerifiedUser {
+            methods: vec!["totp"],
+            passkeys: 2,
+            ..plain
+        };
+        assert!(secured.has_passkey());
+        assert!(secured.mfa_required());
     }
 
     #[tokio::test]
