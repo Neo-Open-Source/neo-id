@@ -368,6 +368,7 @@ fn code_grant(code: &str, verifier: Option<&str>, secret: Option<&str>) -> Token
             client_secret: secret.map(str::to_string),
             code_verifier: verifier.map(str::to_string),
             nonce: None,
+            scopes: vec!["openid".to_string()],
         },
         device: Some("test-browser".to_string()),
         ip: Some("10.0.0.1".to_string()),
@@ -421,6 +422,7 @@ async fn code_flow_issues_bearer_set() {
     .unwrap();
     assert_eq!(claims.sub, USER_ID);
     assert_eq!(claims.session_id.as_deref(), Some(SESSION_ID));
+    assert_eq!(claims.scope.as_deref(), Some("openid"));
     assert_eq!(id_payload(&tokens.id_token)["aud"], json!(CLIENT_ID));
     let stored: Vec<Value> = db
         .refreshes()
@@ -430,6 +432,25 @@ async fn code_flow_issues_bearer_set() {
     assert_eq!(stored.len(), 1);
     let debug = format!("{tokens:?}");
     assert!(!debug.contains(&tokens.refresh_token));
+}
+
+#[tokio::test]
+async fn id_token_omitted_without_openid_scope() {
+    let (db, mut rng) = harness();
+    let mut req = code_grant("authcode-1", Some(VERIFIER), Some(SECRET));
+    if let Grant::Code { scopes, .. } = &mut req.grant {
+        *scopes = vec!["profile".to_string()];
+    }
+    let tokens = exchange(&db, &mut rng, req).await.unwrap();
+    assert_eq!(tokens.id_token, "");
+    let claims = verify_access(
+        PUBLIC_PEM.as_bytes(),
+        &tokens.access_token,
+        ISSUER,
+        NOW + 10,
+    )
+    .unwrap();
+    assert_eq!(claims.scope.as_deref(), Some("profile"));
 }
 
 #[tokio::test]
@@ -553,6 +574,7 @@ async fn redirect_mismatch_or_expired_code_is_invalid_grant() {
             client_secret: Some(SECRET.to_string()),
             code_verifier: Some(VERIFIER.to_string()),
             nonce: None,
+            scopes: vec!["openid".to_string()],
         },
         device: None,
         ip: None,
@@ -569,6 +591,7 @@ async fn redirect_mismatch_or_expired_code_is_invalid_grant() {
             client_secret: Some(SECRET.to_string()),
             code_verifier: Some(VERIFIER.to_string()),
             nonce: None,
+            scopes: vec!["openid".to_string()],
         },
         device: None,
         ip: None,
@@ -658,6 +681,7 @@ async fn public_client_without_pkce_is_invalid_grant() {
             client_secret: None,
             code_verifier: None,
             nonce: None,
+            scopes: vec!["openid".to_string()],
         },
         device: None,
         ip: None,
@@ -674,6 +698,7 @@ async fn public_client_without_pkce_is_invalid_grant() {
             client_secret: None,
             code_verifier: Some(VERIFIER.to_string()),
             nonce: None,
+            scopes: vec!["openid".to_string()],
         },
         device: None,
         ip: None,
@@ -909,14 +934,15 @@ async fn userinfo_returns_openid_profile() {
         &db,
         UserInfoRequest {
             sub: USER_ID.to_string(),
+            scope: Some("openid profile email".to_string()),
         },
     )
     .await
     .unwrap();
     assert_eq!(profile.sub, USER_ID);
-    assert_eq!(profile.email, "alice@example.com");
-    assert!(profile.email_verified);
-    assert_eq!(profile.name, "Alice");
+    assert_eq!(profile.email.as_deref(), Some("alice@example.com"));
+    assert_eq!(profile.email_verified, Some(true));
+    assert_eq!(profile.name.as_deref(), Some("Alice"));
     assert_eq!(profile.given_name.as_deref(), Some("Alice"));
     assert_eq!(profile.family_name.as_deref(), Some("Liddell"));
     assert_eq!(
@@ -926,12 +952,31 @@ async fn userinfo_returns_openid_profile() {
 }
 
 #[tokio::test]
+async fn userinfo_respects_granted_scope() {
+    let (db, _rng) = harness();
+    let bare = userinfo(
+        &db,
+        UserInfoRequest {
+            sub: USER_ID.to_string(),
+            scope: Some("openid".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(bare.sub, USER_ID);
+    assert!(bare.email.is_none());
+    assert!(bare.name.is_none());
+    assert!(bare.picture.is_none());
+}
+
+#[tokio::test]
 async fn userinfo_unknown_or_banned() {
     let (db, _rng) = harness();
     let missing = userinfo(
         &db,
         UserInfoRequest {
             sub: "ghost".to_string(),
+            scope: Some("openid".to_string()),
         },
     )
     .await;
@@ -944,6 +989,7 @@ async fn userinfo_unknown_or_banned() {
         &db,
         UserInfoRequest {
             sub: USER_ID.to_string(),
+            scope: Some("openid".to_string()),
         },
     )
     .await;

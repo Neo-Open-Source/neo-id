@@ -25,3 +25,15 @@ message OpaqueRecord {
   string user_id = 1;
   bytes envelope = 2;
 }
+
+// OpenID Connect UserInfo response. Claims are present only when the
+// access token's granted scope allows them.
+message UserInfo {
+  string sub = 1;
+  optional string email = 2;
+  optional bool email_verified = 3;
+  optional string name = 4;
+  optional string given_name = 5;
+  optional string family_name = 6;
+  optional string picture = 7;
+}

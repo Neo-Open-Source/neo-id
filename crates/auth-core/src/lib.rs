@@ -3,6 +3,7 @@
     reason = "AuthError variants are the single source; per-fn sections would duplicate and drift"
 )]
 
+mod altcha;
 mod ciphersuite;
 mod client;
 mod codes;
@@ -17,6 +18,10 @@ mod totp;
 #[cfg(feature = "webauthn")]
 mod webauthn;
 
+pub use altcha::{
+    ALTCHA_COST, create_challenge as create_altcha_challenge, verify_solution as verify_altcha,
+};
+pub use auth_proto::auth::v1::{AltchaChallenge, AltchaPayload, AltchaSolution};
 pub use ciphersuite::NeoSuite;
 pub use client::{login_finalize, login_request, register_request, register_upload};
 pub use codes::{constant_time_equal, generate_code, generate_id, generate_token, hash_token};

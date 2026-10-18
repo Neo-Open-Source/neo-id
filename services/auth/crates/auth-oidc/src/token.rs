@@ -1,13 +1,15 @@
 use crate::authorize::{WireError, app_id, epoch, field, flag, optional};
 use auth_core::{
-    ACCESS_TOKEN_TTL, AccessInput, IdInput, RefreshDecision, SecretCheck, client_secret_check,
-    encode_error, enforce_pkce, generate_id, generate_token, hash_token, refresh_decision,
-    refresh_expiry, session_expiry, sign_access, sign_id,
+    ACCESS_TOKEN_TTL, AccessInput, AuthError, IdInput, RefreshDecision, SecretCheck,
+    client_secret_check, encode_error, enforce_pkce, generate_id, generate_token, hash_token,
+    refresh_decision, refresh_expiry, session_expiry, sign_access, sign_id,
 };
 use auth_db::{
-    Executor, create_refresh, create_session, delete_code, find_client, find_code, find_refresh,
-    find_session, find_user_by_id, parse_refresh, revoke_refresh, touch_login, touch_session,
+    Executor, Kv, create_refresh, create_session, delete_code, find_client, find_code,
+    find_refresh, find_session, find_user_by_id, parse_refresh, revoke_refresh, touch_login,
+    touch_session,
 };
+use auth_proto::auth::v1::AuthorizationCode;
 
 #[derive(Debug, Clone)]
 pub enum Grant {
@@ -18,6 +20,7 @@ pub enum Grant {
         client_secret: Option<String>,
         code_verifier: Option<String>,
         nonce: Option<String>,
+        scopes: Vec<String>,
     },
     Refresh {
         refresh_token: String,
@@ -78,15 +81,17 @@ pub async fn token<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             client_secret,
             code_verifier,
             nonce,
+            scopes,
         } => {
-            call.exchange_code(
-                &code,
-                &redirect_uri,
-                &client_id,
-                client_secret.as_deref(),
-                code_verifier.as_deref(),
-                nonce.as_deref(),
-            )
+            call.exchange_code(CodeExchange {
+                code: &code,
+                redirect_uri: &redirect_uri,
+                client_id: &client_id,
+                client_secret: client_secret.as_deref(),
+                code_verifier: code_verifier.as_deref(),
+                nonce: nonce.as_deref(),
+                scopes: &scopes,
+            })
             .await
         }
         Grant::Refresh {
@@ -121,35 +126,48 @@ struct Client {
     secret_hash: Option<String>,
 }
 
+struct CodeExchange<'a> {
+    code: &'a str,
+    redirect_uri: &'a str,
+    client_id: &'a str,
+    client_secret: Option<&'a str>,
+    code_verifier: Option<&'a str>,
+    nonce: Option<&'a str>,
+    scopes: &'a [String],
+}
+
 impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
-    async fn exchange_code(
-        &mut self,
-        code: &str,
-        redirect_uri: &str,
-        client_id: &str,
-        client_secret: Option<&str>,
-        code_verifier: Option<&str>,
-        nonce: Option<&str>,
-    ) -> Result<Tokens, WireError> {
-        let client = self.client(client_id).await?;
-        match client_secret_check(client.secret_hash.as_deref(), client_secret) {
+    async fn exchange_code(&mut self, exchange: CodeExchange<'_>) -> Result<Tokens, WireError> {
+        let client = self.client(exchange.client_id).await?;
+        match client_secret_check(client.secret_hash.as_deref(), exchange.client_secret) {
             SecretCheck::Skipped | SecretCheck::Valid => {}
             SecretCheck::Invalid => return Err(WireError::InvalidClient),
         }
         let rows = self
             .db
-            .run(find_code(code, &client.app_id, redirect_uri, self.now))
+            .run(find_code(
+                exchange.code,
+                &client.app_id,
+                exchange.redirect_uri,
+                self.now,
+            ))
             .await?;
         let row = rows.first().ok_or(WireError::InvalidGrant)?;
         let user_id = field(row, "userId")?.to_string();
         let session_id = optional(row, "sessionId");
         let challenge = optional(row, "codeChallenge").or_else(|| optional(row, "codeVerifier"));
         let public = client.secret_hash.is_none();
-        enforce_pkce(challenge.as_deref(), public, code_verifier)?;
-        self.db.run(delete_code(code)).await?;
+        enforce_pkce(challenge.as_deref(), public, exchange.code_verifier)?;
+        self.db.run(delete_code(exchange.code)).await?;
         let subject = self.subject(&user_id).await?;
         let session = self.session(&user_id, session_id.as_deref()).await?;
-        let (access_token, id_token) = self.mint(&subject, &session, client_id, nonce)?;
+        let (access_token, id_token) = self.mint(
+            &subject,
+            &session,
+            exchange.client_id,
+            exchange.nonce,
+            &exchange.scopes.join(" "),
+        )?;
         let refresh_token = self.store_refresh(&user_id, &session, None).await?;
         self.db
             .run(touch_login(&user_id, self.ip, self.now))
@@ -214,7 +232,8 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
             ))
             .await?;
         let subject = self.subject(&user_id).await?;
-        let (access_token, id_token) = self.mint(&subject, &session, client_id, None)?;
+        let (access_token, id_token) =
+            self.mint(&subject, &session, client_id, None, "openid profile email")?;
         let refresh_token = self
             .store_refresh(&user_id, &session, Some(&token_id))
             .await?;
@@ -323,6 +342,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         session_id: &str,
         audience: &str,
         nonce: Option<&str>,
+        scope: &str,
     ) -> Result<(String, String), WireError> {
         let access = sign_access(
             self.private_pem,
@@ -334,23 +354,28 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
                 issuer: self.issuer.to_string(),
                 issued_at: self.now,
                 auth_time: self.now,
+                scope: scope.to_string(),
                 jti: generate_id(&mut *self.rng),
             },
         )?;
-        let id = sign_id(
-            self.private_pem,
-            &IdInput {
-                sub: subject.user_id.clone(),
-                email: subject.email.clone(),
-                audience: audience.to_string(),
-                issuer: self.issuer.to_string(),
-                issued_at: self.now,
-                auth_time: self.now,
-                nonce: nonce.map(String::from),
-                access_token: Some(access.clone()),
-                jti: generate_id(&mut *self.rng),
-            },
-        )?;
+        let id = if scope.split_whitespace().any(|entry| entry == "openid") {
+            sign_id(
+                self.private_pem,
+                &IdInput {
+                    sub: subject.user_id.clone(),
+                    email: subject.email.clone(),
+                    audience: audience.to_string(),
+                    issuer: self.issuer.to_string(),
+                    issued_at: self.now,
+                    auth_time: self.now,
+                    nonce: nonce.map(String::from),
+                    access_token: Some(access.clone()),
+                    jti: generate_id(&mut *self.rng),
+                },
+            )?
+        } else {
+            String::new()
+        };
         Ok((access, id))
     }
 
@@ -374,4 +399,27 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
             .await?;
         Ok(raw)
     }
+}
+
+const CODE_STATE_TTL: u64 = 600;
+
+pub async fn store_authcode_state<K: Kv>(
+    kv: &K,
+    key: &str,
+    state: &AuthorizationCode,
+) -> Result<(), AuthError> {
+    let bytes = serde_json::to_vec(state).map_err(|_| AuthError::Internal)?;
+    kv.put(key, &bytes, CODE_STATE_TTL).await
+}
+
+pub async fn take_authcode_state<K: Kv>(
+    kv: &K,
+    key: &str,
+) -> Result<Option<AuthorizationCode>, AuthError> {
+    let Some(bytes) = kv.get(key).await? else {
+        return Ok(None);
+    };
+    let state = serde_json::from_slice(&bytes).map_err(|_| AuthError::Internal)?;
+    kv.delete(key).await?;
+    Ok(Some(state))
 }

@@ -34,10 +34,32 @@ pub async fn load_user_by_id<E: Executor>(db: &E, user_id: &str) -> Result<Login
     parse_user(user)
 }
 
-pub async fn lite_login_user<E: Executor>(
+pub struct LiteAccount {
+    pub user: LoginUser,
+    pub totp: bool,
+    pub email_mfa: bool,
+    pub passkey: bool,
+}
+
+pub struct LiteMethods {
+    pub totp: bool,
+    pub email: bool,
+    pub passkey: bool,
+}
+
+#[must_use]
+pub fn lite_methods(account: &LiteAccount) -> LiteMethods {
+    LiteMethods {
+        totp: account.totp,
+        email: account.email_mfa || (!account.totp && !account.passkey),
+        passkey: account.passkey,
+    }
+}
+
+pub async fn lite_account<E: Executor>(
     db: &E,
     email: &str,
-) -> Result<Option<LoginUser>, AuthError> {
+) -> Result<Option<LiteAccount>, AuthError> {
     let users = db.run(find_user_by_email(email)).await?;
     let Some(row) = users.first() else {
         return Ok(None);
@@ -47,17 +69,14 @@ pub async fn lite_login_user<E: Executor>(
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false)
     };
-    if enabled("totpEnabled") || enabled("emailMfaEnabled") {
-        return Ok(None);
-    }
     let user = parse_user(row)?;
-    if !db.run(find_envelope(&user.id)).await?.is_empty() {
-        return Ok(None);
-    }
-    if !db.run(passkeys_by_user(&user.id)).await?.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(user))
+    let passkey = !db.run(passkeys_by_user(&user.id)).await?.is_empty();
+    Ok(Some(LiteAccount {
+        totp: enabled("totpEnabled"),
+        email_mfa: enabled("emailMfaEnabled"),
+        passkey,
+        user,
+    }))
 }
 
 fn parse_user(user: &serde_json::Value) -> Result<LoginUser, AuthError> {
@@ -188,6 +207,7 @@ pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
             issuer: params.issuer.to_string(),
             issued_at: now,
             auth_time,
+            scope: "openid profile email".to_string(),
             jti: generate_id(rng),
         },
     )?;

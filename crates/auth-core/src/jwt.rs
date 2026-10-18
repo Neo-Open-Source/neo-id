@@ -20,6 +20,7 @@ pub struct AccessInput {
     pub issuer: String,
     pub issued_at: u64,
     pub auth_time: u64,
+    pub scope: String,
     pub jti: String,
 }
 
@@ -60,6 +61,7 @@ pub fn sign_access(private_pem: &[u8], input: &AccessInput) -> Result<String, Au
             .unwrap_or(i64::MAX),
         jti: input.jti.clone(),
         auth_time_unix: (input.auth_time > 0).then(|| i64::try_from(input.auth_time).unwrap_or(0)),
+        scope: (!input.scope.is_empty()).then(|| input.scope.clone()),
     };
     encode(&header(), &claims, &key).map_err(|_| AuthError::Internal)
 }

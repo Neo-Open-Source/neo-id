@@ -85,6 +85,7 @@ pub enum AuthorizeOutcome {
         url: String,
         code: String,
         nonce: Option<String>,
+        scopes: Vec<String>,
     },
     Error {
         url: String,
@@ -202,6 +203,7 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
                     url,
                     code,
                     nonce: req.nonce,
+                    scopes,
                 });
             }
             let state = state.unwrap_or_else(|| generate_token(rng, 16));

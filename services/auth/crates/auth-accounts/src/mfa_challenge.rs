@@ -1,19 +1,9 @@
 use auth_core::AuthError;
 use auth_db::Kv;
-use serde::{Deserialize, Serialize};
+use auth_proto::auth::v1::MfaChallenge;
 
 const CHALLENGE_TTL: u64 = 300;
 const MAX_ATTEMPTS: u32 = 5;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MfaChallenge {
-    pub user_id: String,
-    pub email: String,
-    pub role: String,
-    pub totp: bool,
-    pub email_mfa: bool,
-    pub passkey: bool,
-}
 
 fn challenge_key(id: &str) -> String {
     format!("mfa:{id}")

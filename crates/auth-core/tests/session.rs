@@ -1,7 +1,7 @@
 use auth_core::{
     RefreshDecision, SecretCheck, authcode_expiry, client_secret_check, encode_error, enforce_pkce,
-    generate_verifier, pkce_challenge, redirect_matches, refresh_decision, refresh_expiry,
-    session_expiry, ticket_expiry,
+    generate_verifier, percent_encode, pkce_challenge, redirect_matches, refresh_decision,
+    refresh_expiry, session_expiry, ticket_expiry,
 };
 use auth_proto::auth::v1::RefreshToken;
 use rand::SeedableRng;
@@ -180,4 +180,11 @@ fn secret_check_forms() {
         client_secret_check(Some(&sha_hash), Some("wrong")),
         SecretCheck::Invalid
     );
+}
+
+#[test]
+fn percent_encode_escapes_only_reserved() {
+    assert_eq!(percent_encode("Az09-_.~"), "Az09-_.~");
+    assert_eq!(percent_encode("a b/c?d=e&f"), "a%20b%2Fc%3Fd%3De%26f");
+    assert_eq!(percent_encode(""), "");
 }

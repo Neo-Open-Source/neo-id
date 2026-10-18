@@ -1,5 +1,5 @@
 use auth_core::{
-    ACCESS_TOKEN_TTL, AccessInput, AuthError, ID_TOKEN_TTL, IdInput, sign_access, sign_id,
+    ACCESS_TOKEN_TTL, AccessInput, AuthError, ID_TOKEN_TTL, IdInput, at_hash, sign_access, sign_id,
     verify_access, verify_id,
 };
 
@@ -17,6 +17,7 @@ fn access_input() -> AccessInput {
         issuer: ISSUER.to_string(),
         issued_at: NOW,
         auth_time: NOW,
+        scope: "openid profile".to_string(),
         jti: "jti-1".to_string(),
     }
 }
@@ -29,10 +30,24 @@ fn access_roundtrip_checks_claims() {
     assert_eq!(claims.email, "alice@example.com");
     assert_eq!(claims.role, "user");
     assert_eq!(claims.session_id.as_deref(), Some("sess-1"));
+    assert_eq!(claims.auth_time_unix, Some(i64::try_from(NOW).unwrap_or(0)));
+    assert_eq!(claims.scope.as_deref(), Some("openid profile"));
     assert_eq!(
         u64::try_from(claims.exp_unix - claims.iat_unix).unwrap_or(0),
         ACCESS_TOKEN_TTL
     );
+}
+
+#[test]
+fn at_hash_is_left_half_of_sha256_base64url() {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use sha2::{Digest, Sha256};
+    let token = "some-access-token";
+    let digest = Sha256::digest(token.as_bytes());
+    let expected = URL_SAFE_NO_PAD.encode(&digest[..16]);
+    assert_eq!(at_hash(token), expected);
+    assert_eq!(at_hash(token).len(), 22);
+    assert_ne!(at_hash(token), at_hash("other-token"));
 }
 
 #[test]
@@ -157,6 +172,43 @@ fn verify_id_checks_signature_issuer_and_expiry() {
         verify_id(PUBLIC_PEM.as_bytes(), &token, "https://evil.test", NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
+}
+
+#[test]
+fn zero_auth_time_and_empty_scope_are_omitted() {
+    let id = IdInput {
+        sub: "user-1".to_string(),
+        email: "alice@example.com".to_string(),
+        audience: "client-9".to_string(),
+        issuer: ISSUER.to_string(),
+        issued_at: NOW,
+        auth_time: 0,
+        nonce: None,
+        access_token: None,
+        jti: "jti-0".to_string(),
+    };
+    let payload: serde_json::Value = {
+        let token = sign_id(PRIVATE_PEM.as_bytes(), &id).unwrap();
+        let parts: Vec<&str> = token.split('.').collect();
+        serde_json::from_slice(&base64_decode_url(parts[1])).unwrap()
+    };
+    assert!(payload.get("auth_time").is_none());
+
+    let access = AccessInput {
+        sub: "user-1".to_string(),
+        email: "alice@example.com".to_string(),
+        role: "user".to_string(),
+        session_id: Some("sess-1".to_string()),
+        issuer: ISSUER.to_string(),
+        issued_at: NOW,
+        auth_time: 0,
+        scope: String::new(),
+        jti: "jti-0".to_string(),
+    };
+    let token = sign_access(PRIVATE_PEM.as_bytes(), &access).unwrap();
+    let claims = verify_access(PUBLIC_PEM.as_bytes(), &token, ISSUER, NOW + 1).unwrap();
+    assert_eq!(claims.auth_time_unix, None);
+    assert_eq!(claims.scope, None);
 }
 
 fn base64_decode_url(s: &str) -> Vec<u8> {

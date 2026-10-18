@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// Second-factor challenge bound to a login attempt (KV-backed, short TTL).
+message MfaChallenge {
+  string user_id = 1;
+  string email = 2;
+  string role = 3;
+  bool totp = 4;
+  bool email_mfa = 5;
+  bool passkey = 6;
+}

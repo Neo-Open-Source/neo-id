@@ -28,4 +28,5 @@ message AccessClaims {
   int64 exp_unix = 7;
   string jti = 8;
   optional int64 auth_time_unix = 9;
+  optional string scope = 10;
 }

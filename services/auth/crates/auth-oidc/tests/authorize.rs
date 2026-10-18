@@ -1,8 +1,8 @@
 use auth_core::AuthError;
 use auth_db::{Executor, Query};
 use auth_oidc::{
-    AuthorizeOutcome, AuthorizeRequest, ClientRegistered, ConsentChoice, ConsentRequest,
-    RegisterRequest, WireError, authorize, decide_consent, register,
+    AuthorizeOutcome, AuthorizeRequest, ClientRegistered, ClientRegistrationRequest, ConsentChoice,
+    ConsentRequest, WireError, authorize, decide_consent, register,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -401,7 +401,9 @@ async fn prompt_none_with_prior_consent_grants_code() {
         ..authorize_req()
     };
     match outcome(&db, req).await.unwrap() {
-        AuthorizeOutcome::Granted { url, code, nonce } => {
+        AuthorizeOutcome::Granted {
+            url, code, nonce, ..
+        } => {
             assert!(url.contains("code="));
             assert_ne!(code, "");
             assert_eq!(nonce.as_deref(), Some("n-1"));
@@ -509,7 +511,7 @@ fn wire_codes_match_oauth_strings() {
     }
 }
 
-async fn registered(req: RegisterRequest) -> Result<ClientRegistered, WireError> {
+async fn registered(req: ClientRegistrationRequest) -> Result<ClientRegistered, WireError> {
     register(
         &MockDb::with_clients(vec![]),
         &mut ChaCha8Rng::seed_from_u64(21),
@@ -519,8 +521,8 @@ async fn registered(req: RegisterRequest) -> Result<ClientRegistered, WireError>
     .await
 }
 
-fn register_req(redirects: &[&str]) -> RegisterRequest {
-    RegisterRequest {
+fn register_req(redirects: &[&str]) -> ClientRegistrationRequest {
+    ClientRegistrationRequest {
         owner_id: "owner-1".to_string(),
         redirect_uris: redirects.iter().map(ToString::to_string).collect(),
         client_name: Some("Example".to_string()),

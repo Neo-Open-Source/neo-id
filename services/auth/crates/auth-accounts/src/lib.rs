@@ -17,16 +17,15 @@ mod sessions;
 mod user;
 
 pub use login::{
-    LoginUser, MintParams, complete_login, lite_login_user, load_user, load_user_by_id, start_login,
+    LiteAccount, LiteMethods, LoginUser, MintParams, complete_login, lite_account, lite_methods,
+    load_user, load_user_by_id, start_login,
 };
 pub use logout::{end_all_sessions, end_session};
 pub use mfa::{
     CodeOutcome, request_email_code, totp_begin, totp_check, totp_disable, totp_enable,
     verify_email_code,
 };
-pub use mfa_challenge::{
-    Attempt, MfaChallenge, clear_challenge, fail_attempt, load_challenge, store_challenge,
-};
+pub use mfa_challenge::{Attempt, clear_challenge, fail_attempt, load_challenge, store_challenge};
 #[cfg(feature = "passkeys")]
 pub use passkeys::{
     NewCredential, VerifiedCounter, authenticate_begin, authenticate_finish, register_begin,
@@ -40,6 +39,7 @@ pub use sessions::{list_sessions, revoke_all_sessions, revoke_session};
 pub use user::{change_email_confirm, change_email_request, confirm_email, update_user_profile};
 
 use auth_core::AuthError;
+pub use auth_proto::auth::v1::MfaChallenge;
 
 #[derive(Debug)]
 pub enum Failure {

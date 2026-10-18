@@ -10,3 +10,9 @@ message TokenPair {
   string session_id = 4;
   uint64 expires_in = 5;
 }
+
+// Authorization code state kept server-side (KV) between authorize and token.
+message AuthorizationCode {
+  optional string nonce = 1;
+  repeated string scopes = 2;
+}

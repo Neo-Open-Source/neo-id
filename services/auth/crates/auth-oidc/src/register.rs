@@ -1,14 +1,8 @@
 use auth_core::{generate_token, hash_token};
 use auth_db::{Executor, create_client};
+use auth_proto::auth::v1::ClientRegistrationRequest;
 
 use crate::authorize::WireError;
-
-#[derive(Debug, Clone)]
-pub struct RegisterRequest {
-    pub owner_id: String,
-    pub redirect_uris: Vec<String>,
-    pub client_name: Option<String>,
-}
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct ClientRegistered {
@@ -33,7 +27,7 @@ pub async fn register<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     db: &E,
     rng: &mut R,
     now: u64,
-    req: RegisterRequest,
+    req: ClientRegistrationRequest,
 ) -> Result<ClientRegistered, WireError> {
     let redirect_uris: Vec<String> = req
         .redirect_uris

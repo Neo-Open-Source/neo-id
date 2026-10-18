@@ -2,7 +2,7 @@ mod common;
 
 use auth_accounts::{
     Availability, Failure, LoginUser, MintParams, check_email, complete_login, end_all_sessions,
-    end_session, rotate_refresh, start_login,
+    end_session, lite_account, lite_methods, rotate_refresh, start_login,
 };
 use auth_core::{AuthError, OpaqueSetup};
 use common::{Scripted, refresh_row, run, session_row, user_row};
@@ -208,43 +208,41 @@ fn login_handshake_session_keys_match() {
 }
 
 #[test]
-fn lite_login_only_for_passwordless_accounts() {
-    let allowed = Scripted::feed(vec![vec![user_row()], vec![], vec![]]);
-    assert!(
-        run(auth_accounts::lite_login_user(&allowed, "a@b.c"))
-            .unwrap()
-            .is_some()
-    );
+fn lite_methods_follow_enabled_factors() {
+    // Password-only account: email code is the fallback and mandatory.
+    let db = Scripted::feed(vec![vec![user_row()], vec![]]);
+    let account = run(lite_account(&db, "a@b.c")).unwrap().unwrap();
+    let methods = lite_methods(&account);
+    assert!(methods.email && !methods.totp && !methods.passkey);
 
-    let with_password = Scripted::feed(vec![
-        vec![user_row()],
-        vec![serde_json::json!({"envelope": "x"})],
-    ]);
-    assert!(
-        run(auth_accounts::lite_login_user(&with_password, "a@b.c"))
-            .unwrap()
-            .is_none()
-    );
-
-    let with_totp = Scripted::feed(vec![vec![serde_json::json!({
-        "id": "u1", "email": "a@b.c", "role": "user", "totpEnabled": true
-    })]]);
-    assert!(
-        run(auth_accounts::lite_login_user(&with_totp, "a@b.c"))
-            .unwrap()
-            .is_none()
-    );
-
-    let with_passkey = Scripted::feed(vec![
-        vec![user_row()],
+    // TOTP enabled, no email MFA: only TOTP.
+    let db = Scripted::feed(vec![
+        vec![serde_json::json!({
+            "id": "u1", "email": "a@b.c", "role": "user", "totpEnabled": true
+        })],
         vec![],
+    ]);
+    let methods = lite_methods(&run(lite_account(&db, "a@b.c")).unwrap().unwrap());
+    assert!(methods.totp && !methods.email && !methods.passkey);
+
+    // TOTP + email MFA: choice.
+    let db = Scripted::feed(vec![
+        vec![serde_json::json!({
+            "id": "u1", "email": "a@b.c", "role": "user",
+            "totpEnabled": true, "emailMfaEnabled": true
+        })],
+        vec![],
+    ]);
+    let methods = lite_methods(&run(lite_account(&db, "a@b.c")).unwrap().unwrap());
+    assert!(methods.totp && methods.email && !methods.passkey);
+
+    // Passkey-only: no email fallback (use QR/device approval).
+    let db = Scripted::feed(vec![
+        vec![user_row()],
         vec![serde_json::json!({"id": "p1"})],
     ]);
-    assert!(
-        run(auth_accounts::lite_login_user(&with_passkey, "a@b.c"))
-            .unwrap()
-            .is_none()
-    );
+    let methods = lite_methods(&run(lite_account(&db, "a@b.c")).unwrap().unwrap());
+    assert!(methods.passkey && !methods.email && !methods.totp);
 }
 
 #[test]

@@ -4,6 +4,7 @@
 )]
 
 mod authorize;
+mod device;
 mod logout;
 mod register;
 mod token;
@@ -13,7 +14,10 @@ pub use authorize::{
     AuthorizeOutcome, AuthorizeRequest, ConsentChoice, ConsentRequest, Redirect, WireError,
     authorize, decide_consent,
 };
+pub use device::{ApproveOutcome, DeviceStart, DeviceStatus, approve, poll, start_device};
 pub use logout::{Logout, LogoutRequest, logout};
-pub use register::{ClientRegistered, RegisterRequest, register};
-pub use token::{Grant, TokenRequest, Tokens, token};
-pub use userinfo::{UserInfo, UserInfoRequest, userinfo};
+pub use register::{ClientRegistered, register};
+pub use token::{Grant, TokenRequest, Tokens, store_authcode_state, take_authcode_state, token};
+pub use userinfo::{UserInfoRequest, userinfo};
+
+pub use auth_proto::auth::v1::{AuthorizationCode, ClientRegistrationRequest, UserInfo};

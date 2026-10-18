@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// ALTCHA Proof-of-Work v2 challenge parameters (camelCase on the wire).
+message AltchaParameters {
+  string algorithm = 1;
+  uint32 cost = 2;
+  optional int64 expires_at = 3;
+  uint32 key_length = 4;
+  string key_prefix = 5;
+  optional string key_signature = 6;
+  optional uint32 memory_cost = 7;
+  string nonce = 8;
+  optional uint32 parallelism = 9;
+  string salt = 10;
+}
+
+// Signed challenge issued to the client.
+message AltchaChallenge {
+  AltchaParameters parameters = 1;
+  optional string signature = 2;
+}
+
+// Solution produced by the client widget.
+message AltchaSolution {
+  uint32 counter = 1;
+  string derived_key = 2;
+  optional double time = 3;
+}
+
+// Combined payload submitted back to the server for verification.
+message AltchaPayload {
+  AltchaChallenge challenge = 1;
+  AltchaSolution solution = 2;
+}
