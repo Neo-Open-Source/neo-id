@@ -35,8 +35,8 @@ pub use pkce::{enforce_pkce, generate_verifier, pkce_challenge, verify_pkce};
 pub use session::{
     AUTHCODE_EXPIRY, INACTIVITY_TIMEOUT, REFRESH_EXPIRY, REFRESH_TOKEN_BYTES, RESET_TOKEN_EXPIRY,
     REUSE_WINDOW, RefreshDecision, SecretCheck, TICKET_EXPIRY, authcode_expiry,
-    client_secret_check, encode_error, redirect_matches, refresh_decision, refresh_expiry,
-    session_expiry, ticket_expiry,
+    client_secret_check, encode_error, percent_encode, redirect_matches, refresh_decision,
+    refresh_expiry, session_expiry, ticket_expiry,
 };
 pub use setup::OpaqueSetup;
 pub use totp::{generate_secret, setup_uri, verify_totp};

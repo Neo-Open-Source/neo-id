@@ -7,9 +7,7 @@ use auth_db::{
     Executor, create_refresh, create_session, delete_code, find_client, find_code, find_refresh,
     find_session, find_user_by_id, parse_refresh, revoke_refresh, touch_login, touch_session,
 };
-use serde_json::Value;
-
-use crate::authorize::{WireError, epoch, field, flag, optional};
+use crate::authorize::{WireError, app_id, epoch, field, flag, optional};
 
 #[derive(Debug, Clone)]
 pub enum Grant {
@@ -238,12 +236,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         if !flag(row, "isActive")? {
             return Err(WireError::InvalidClient);
         }
-        let app_id = row
-            .get("id")
-            .and_then(Value::as_str)
-            .or_else(|| row.get("clientId").and_then(Value::as_str))
-            .ok_or(WireError::ServerError)?
-            .to_string();
+        let app_id = app_id(row)?;
         Ok(Client {
             app_id,
             secret_hash: optional(row, "clientSecretHash"),

@@ -77,7 +77,7 @@ pub async fn rotate_refresh<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             .ok_or(Failure::Auth(AuthError::MalformedMessage))?
             .to_string(),
     };
-    let (access_token, id_token) = sign_token_pair(rng, params, &user, &session_id, now, 0, None)?;
+    let (access_token, id_token) = sign_token_pair(rng, params, &user, &session_id, now, 0)?;
     let refresh_token = generate_token(rng, auth_core::REFRESH_TOKEN_BYTES);
     db.run(create_refresh(
         &user.id,

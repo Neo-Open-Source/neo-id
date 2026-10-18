@@ -73,6 +73,23 @@ pub fn redirect_matches(registered: &[&str], incoming: &str) -> bool {
         .any(|uri| uri.trim().trim_end_matches('/') == normalized)
 }
 
+#[must_use]
+pub fn percent_encode(value: &str) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(char::from(byte));
+            }
+            _ => {
+                let _ = write!(out, "%{byte:02X}");
+            }
+        }
+    }
+    out
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SecretCheck {
     Skipped,

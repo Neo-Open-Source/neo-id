@@ -1,6 +1,4 @@
-use std::fmt::Write as _;
-
-use auth_core::{AuthError, verify_access, verify_id};
+use auth_core::{AuthError, percent_encode, verify_access, verify_id};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use auth_db::Kv as _;
 use auth_oidc::{
@@ -87,21 +85,6 @@ fn some_query(params: &std::collections::HashMap<String, String>, key: &str) -> 
     params.get(key).filter(|value| !value.is_empty()).cloned()
 }
 
-fn encode_redirect(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        match byte {
-            b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char);
-            }
-            _ => {
-                let _ = write!(out, "%{byte:02X}");
-            }
-        }
-    }
-    out
-}
-
 pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let cx = match load_cx(&ctx.env) {
         Ok(cx) => cx,
@@ -139,7 +122,7 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
                 .as_ref()
                 .map(|(_, _, auth_time)| *auth_time)
                 .filter(|auth_time| *auth_time > 0),
-            login_url: format!("/auth?redirect={}", encode_redirect(url.as_str())),
+            login_url: format!("/auth?redirect={}", percent_encode(url.as_str())),
         },
     )
     .await

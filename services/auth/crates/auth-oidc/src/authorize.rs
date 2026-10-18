@@ -1,7 +1,6 @@
 use auth_core::{AuthError, generate_token, redirect_matches};
 use auth_db::{Executor, create_code, find_client, find_connection};
 use serde_json::Value;
-use std::fmt::Write as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WireError {
@@ -311,12 +310,7 @@ fn validate_request(req: &AuthorizeRequest, row: &Value) -> Result<Validated, De
             )));
         }
     }
-    let service_app_id = row
-        .get("id")
-        .and_then(Value::as_str)
-        .or_else(|| row.get("clientId").and_then(Value::as_str))
-        .ok_or(WireError::InvalidClient)?
-        .to_string();
+    let service_app_id = app_id(row)?;
     let scopes = if requested.is_empty() {
         allowed
     } else {
@@ -389,6 +383,14 @@ pub async fn decide_consent<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     }
 }
 
+pub(crate) fn app_id(row: &Value) -> Result<String, WireError> {
+    row.get("id")
+        .and_then(Value::as_str)
+        .or_else(|| row.get("clientId").and_then(Value::as_str))
+        .map(str::to_string)
+        .ok_or(WireError::ServerError)
+}
+
 pub(crate) fn field<'a>(row: &'a Value, key: &str) -> Result<&'a str, WireError> {
     row.get(key)
         .and_then(Value::as_str)
@@ -428,27 +430,11 @@ pub(crate) fn string_list(row: &Value, key: &str) -> Result<Vec<String>, WireErr
         .ok_or(WireError::ServerError)
 }
 
-fn encode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(char::from(byte));
-            }
-            _ => {
-                out.push('%');
-                let _ = write!(out, "{byte:02X}");
-            }
-        }
-    }
-    out
-}
-
 fn push_param(url: &mut String, key: &str, value: &str) {
     url.push(if url.contains('?') { '&' } else { '?' });
     url.push_str(key);
     url.push('=');
-    url.push_str(&encode(value));
+    url.push_str(&auth_core::percent_encode(value));
 }
 
 fn approve_url(base: &str, code: &str, state: Option<&str>) -> String {

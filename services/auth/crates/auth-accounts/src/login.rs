@@ -148,7 +148,7 @@ pub async fn complete_login<E: Executor, R: rand::RngCore + rand::CryptoRng>(
         .and_then(|row| row.get("id"))
         .and_then(serde_json::Value::as_str)
         .ok_or(AuthError::MalformedMessage)?;
-    let (access_token, id_token) = sign_token_pair(rng, params, user, session_id, now, now, None)?;
+    let (access_token, id_token) = sign_token_pair(rng, params, user, session_id, now, now)?;
     let refresh_token = generate_token(rng, REFRESH_TOKEN_BYTES);
     db.run(create_refresh(
         &user.id,
@@ -177,7 +177,6 @@ pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
     session_id: &str,
     now: u64,
     auth_time: u64,
-    nonce: Option<&str>,
 ) -> Result<(String, String), AuthError> {
     let access_token = sign_access(
         params.private_pem,
@@ -201,7 +200,7 @@ pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
             issuer: params.issuer.to_string(),
             issued_at: now,
             auth_time,
-            nonce: nonce.map(String::from),
+            nonce: None,
             access_token: Some(access_token.clone()),
             jti: generate_id(rng),
         },

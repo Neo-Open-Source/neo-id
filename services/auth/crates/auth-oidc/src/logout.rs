@@ -32,25 +32,9 @@ pub async fn logout<E: Executor>(db: &E, req: LogoutRequest) -> Result<Logout, W
     let redirect_url = match req.state.filter(|state| !state.is_empty()) {
         Some(state) => {
             let separator = if target.contains('?') { '&' } else { '?' };
-            format!("{target}{separator}state={}", encode_state(&state))
+            format!("{target}{separator}state={}", auth_core::percent_encode(&state))
         }
         None => target,
     };
     Ok(Logout { redirect_url })
-}
-
-fn encode_state(state: &str) -> String {
-    use std::fmt::Write as _;
-    let mut out = String::with_capacity(state.len());
-    for byte in state.bytes() {
-        match byte {
-            b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char);
-            }
-            _ => {
-                let _ = write!(out, "%{byte:02X}");
-            }
-        }
-    }
-    out
 }
