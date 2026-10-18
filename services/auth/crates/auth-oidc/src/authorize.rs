@@ -1,5 +1,5 @@
 use auth_core::{AuthError, generate_token, redirect_matches};
-use auth_db::{Executor, create_code, find_client};
+use auth_db::{Executor, create_code, find_client, find_connection};
 use serde_json::Value;
 use std::fmt::Write as _;
 
@@ -59,6 +59,8 @@ pub struct AuthorizeRequest {
     pub scope: String,
     pub state: Option<String>,
     pub nonce: Option<String>,
+    pub prompt: Option<String>,
+    pub response_mode: Option<String>,
     pub code_challenge: Option<String>,
     pub code_challenge_method: Option<String>,
     pub user_id: Option<String>,
@@ -77,6 +79,11 @@ pub enum AuthorizeOutcome {
         service_app_id: String,
         nonce: Option<String>,
         scopes: Vec<String>,
+    },
+    Granted {
+        url: String,
+        code: String,
+        nonce: Option<String>,
     },
     Error {
         url: String,
@@ -112,7 +119,6 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     now: u64,
     req: AuthorizeRequest,
 ) -> Result<AuthorizeOutcome, WireError> {
-    let _ = now;
     if req.client_id.is_empty() || req.redirect_uri.is_empty() {
         return Err(WireError::InvalidRequest);
     }
@@ -126,70 +132,207 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     if !redirect_matches(&refs, &req.redirect_uri) {
         return Err(WireError::InvalidRequest);
     }
+    let Validated {
+        scopes,
+        service_app_id,
+    } = match validate_request(&req, row) {
+        Ok(validated) => validated,
+        Err(Denied::Wire(err)) => return Err(err),
+        Err(Denied::Redirect(outcome)) => return Ok(outcome),
+    };
     let state = req.state.clone();
+    let prompts: Vec<&str> = req
+        .prompt
+        .as_deref()
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect();
+    match req.user_id {
+        None => {
+            if prompts.contains(&"none") {
+                Ok(redirect_error(
+                    &req.redirect_uri,
+                    "login_required",
+                    "Authentication is required",
+                    state.as_deref(),
+                ))
+            } else {
+                Ok(AuthorizeOutcome::Login { url: req.login_url })
+            }
+        }
+        Some(user_id) => {
+            if prompts.contains(&"login") {
+                return Ok(AuthorizeOutcome::Login { url: req.login_url });
+            }
+            if prompts.contains(&"none") {
+                let consent = db.run(find_connection(&user_id, &service_app_id)).await?;
+                if consent.is_empty() {
+                    return Ok(redirect_error(
+                        &req.redirect_uri,
+                        "consent_required",
+                        "Consent is required",
+                        state.as_deref(),
+                    ));
+                }
+                let (url, code) = issue_code(
+                    db,
+                    rng,
+                    now,
+                    CodeGrant {
+                        service_app_id: &service_app_id,
+                        user_id: &user_id,
+                        session_id: req.session_id.as_deref(),
+                        redirect_uri: &req.redirect_uri,
+                        state: state.as_deref(),
+                        code_challenge: req.code_challenge.as_deref(),
+                    },
+                )
+                .await?;
+                return Ok(AuthorizeOutcome::Granted {
+                    url,
+                    code,
+                    nonce: req.nonce,
+                });
+            }
+            let state = state.unwrap_or_else(|| generate_token(rng, 16));
+            Ok(AuthorizeOutcome::Consent {
+                state,
+                redirect_uri: req.redirect_uri,
+                service_app_id,
+                nonce: req.nonce,
+                scopes,
+            })
+        }
+    }
+}
+
+struct CodeGrant<'a> {
+    service_app_id: &'a str,
+    user_id: &'a str,
+    session_id: Option<&'a str>,
+    redirect_uri: &'a str,
+    state: Option<&'a str>,
+    code_challenge: Option<&'a str>,
+}
+
+struct Validated {
+    scopes: Vec<String>,
+    service_app_id: String,
+}
+
+enum Denied {
+    Wire(WireError),
+    Redirect(AuthorizeOutcome),
+}
+
+impl From<WireError> for Denied {
+    fn from(err: WireError) -> Self {
+        Self::Wire(err)
+    }
+}
+
+fn redirect_error(
+    redirect_uri: &str,
+    error: &str,
+    description: &str,
+    state: Option<&str>,
+) -> AuthorizeOutcome {
+    AuthorizeOutcome::Error {
+        url: error_url(redirect_uri, error, description, state),
+    }
+}
+
+fn validate_request(req: &AuthorizeRequest, row: &Value) -> Result<Validated, Denied> {
+    let state = req.state.as_deref();
     if req.response_type.is_empty() {
-        return Ok(AuthorizeOutcome::Error {
-            url: error_url(
-                &req.redirect_uri,
-                WireError::InvalidRequest.as_str(),
-                "Missing response_type",
-                state.as_deref(),
-            ),
-        });
+        return Err(Denied::Redirect(redirect_error(
+            &req.redirect_uri,
+            WireError::InvalidRequest.as_str(),
+            "Missing response_type",
+            state,
+        )));
     }
     if req.response_type != "code" {
-        return Ok(AuthorizeOutcome::Error {
-            url: error_url(
-                &req.redirect_uri,
-                WireError::UnsupportedResponseType.as_str(),
-                "Only the authorization code flow is supported",
-                state.as_deref(),
-            ),
-        });
+        return Err(Denied::Redirect(redirect_error(
+            &req.redirect_uri,
+            WireError::UnsupportedResponseType.as_str(),
+            "Only the authorization code flow is supported",
+            state,
+        )));
     }
     let requested: Vec<&str> = req.scope.split_whitespace().collect();
     let allowed = string_list(row, "allowedScopes").unwrap_or_default();
-    if requested.iter().any(|scope| !allowed.iter().any(|entry| entry == scope)) {
-        return Ok(AuthorizeOutcome::Error {
-            url: error_url(
-                &req.redirect_uri,
-                WireError::InvalidScope.as_str(),
-                "Requested scope is not allowed for this client",
-                state.as_deref(),
-            ),
-        });
+    if requested
+        .iter()
+        .any(|scope| !allowed.iter().any(|entry| entry == scope))
+    {
+        return Err(Denied::Redirect(redirect_error(
+            &req.redirect_uri,
+            WireError::InvalidScope.as_str(),
+            "Requested scope is not allowed for this client",
+            state,
+        )));
     }
     if !requested.is_empty() && !requested.contains(&"openid") {
-        return Ok(AuthorizeOutcome::Error {
-            url: error_url(
-                &req.redirect_uri,
-                WireError::InvalidScope.as_str(),
-                "The openid scope is required",
-                state.as_deref(),
-            ),
-        });
+        return Err(Denied::Redirect(redirect_error(
+            &req.redirect_uri,
+            WireError::InvalidScope.as_str(),
+            "The openid scope is required",
+            state,
+        )));
     }
-    let scopes: Vec<String> = if requested.is_empty() {
+    if let Some(mode) = req.response_mode.as_deref().filter(|mode| !mode.is_empty()) {
+        if mode != "query" {
+            return Err(Denied::Redirect(redirect_error(
+                &req.redirect_uri,
+                WireError::InvalidRequest.as_str(),
+                "Unsupported response_mode",
+                state,
+            )));
+        }
+    }
+    let service_app_id = row
+        .get("id")
+        .and_then(Value::as_str)
+        .or_else(|| row.get("clientId").and_then(Value::as_str))
+        .ok_or(WireError::InvalidClient)?
+        .to_string();
+    let scopes = if requested.is_empty() {
         allowed
     } else {
-        requested.iter().map(|scope| (*scope).to_string()).collect()
+        requested
+            .iter()
+            .map(|scope| (*scope).to_string())
+            .collect()
     };
-    let state = req.state.unwrap_or_else(|| generate_token(rng, 16));
-    match req.user_id {
-        None => Ok(AuthorizeOutcome::Login { url: req.login_url }),
-        Some(_) => Ok(AuthorizeOutcome::Consent {
-            state,
-            redirect_uri: req.redirect_uri,
-            service_app_id: row
-                .get("id")
-                .and_then(Value::as_str)
-                .or_else(|| row.get("clientId").and_then(Value::as_str))
-                .ok_or(WireError::InvalidClient)?
-                .to_string(),
-            nonce: req.nonce,
-            scopes,
-        }),
-    }
+    Ok(Validated {
+        scopes,
+        service_app_id,
+    })
+}
+
+async fn issue_code<E: Executor, R: rand::RngCore + rand::CryptoRng>(
+    db: &E,
+    rng: &mut R,
+    now: u64,
+    grant: CodeGrant<'_>,
+) -> Result<(String, String), WireError> {
+    let code = generate_token(rng, 32);
+    let state = grant
+        .state
+        .map_or_else(|| generate_token(rng, 16), String::from);
+    db.run(create_code(
+        &code,
+        &state,
+        grant.service_app_id,
+        grant.redirect_uri,
+        grant.code_challenge,
+        grant.session_id,
+        grant.user_id,
+        auth_core::authcode_expiry(now),
+    ))
+    .await?;
+    Ok((approve_url(grant.redirect_uri, &code, grant.state), code))
 }
 
 pub async fn decide_consent<E: Executor, R: rand::RngCore + rand::CryptoRng>(
@@ -204,21 +347,22 @@ pub async fn decide_consent<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             code: None,
         }),
         ConsentChoice::Approved => {
-            let code = generate_token(rng, 32);
-            let state = req.state.clone().unwrap_or_else(|| generate_token(rng, 16));
-            db.run(create_code(
-                &code,
-                &state,
-                &req.service_app_id,
-                &req.redirect_uri,
-                req.code_challenge.as_deref(),
-                req.session_id.as_deref(),
-                &req.user_id,
-                auth_core::authcode_expiry(now),
-            ))
+            let (url, code) = issue_code(
+                db,
+                rng,
+                now,
+                CodeGrant {
+                    service_app_id: &req.service_app_id,
+                    user_id: &req.user_id,
+                    session_id: req.session_id.as_deref(),
+                    redirect_uri: &req.redirect_uri,
+                    state: req.state.as_deref(),
+                    code_challenge: req.code_challenge.as_deref(),
+                },
+            )
             .await?;
             Ok(Redirect {
-                url: approve_url(&req.redirect_uri, &code, req.state.as_deref()),
+                url,
                 code: Some(code),
             })
         }

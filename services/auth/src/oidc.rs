@@ -12,13 +12,33 @@ use worker::{Request, Response, Result, RouteContext};
 
 use super::{
     respond::{fail, no_store, ok},
-    routes::{Ctx, fail_status, form_or_json, header_opt, kv_store, load_cx, worker_rng},
+    routes::{
+        Ctx, cookie_value, fail_status, form_or_json, header_opt, kv_store, load_cx, worker_rng,
+    },
 };
 
 const NONCE_TTL: u64 = 600;
 
 fn nonce_key(code: &str) -> String {
     format!("acn:{code}")
+}
+
+async fn store_nonce(ctx: &RouteContext<()>, code: &str, nonce: &str) -> Result<(), AuthError> {
+    let store = crate::kv::StatesKv::new(kv_store(ctx)?);
+    store
+        .put(&nonce_key(code), nonce.as_bytes(), NONCE_TTL)
+        .await
+}
+
+async fn take_nonce(ctx: &RouteContext<()>, code: &str) -> Result<Option<String>, AuthError> {
+    let store = crate::kv::StatesKv::new(kv_store(ctx)?);
+    match store.get(&nonce_key(code)).await? {
+        Some(bytes) => {
+            store.delete(&nonce_key(code)).await?;
+            Ok(String::from_utf8(bytes).ok())
+        }
+        None => Ok(None),
+    }
 }
 
 fn basic_credentials(header: Option<&str>) -> Option<(String, String)> {
@@ -48,9 +68,10 @@ fn oauth_error(cx: &Ctx, err: WireError) -> Result<Response> {
 }
 
 fn logged_user(cx: &Ctx, req: &Request) -> Option<(String, Option<String>)> {
-    let header = header_opt(req, "authorization")?;
-    let presented = header.strip_prefix("Bearer ")?;
-    let claims = verify_access(&cx.app.public_pem, presented, &cx.app.issuer, cx.now).ok()?;
+    let presented = header_opt(req, "authorization")
+        .and_then(|header| header.strip_prefix("Bearer ").map(String::from))
+        .or_else(|| cookie_value(req, "neo_id_access"))?;
+    let claims = verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now).ok()?;
     Some((claims.sub, claims.session_id))
 }
 
@@ -103,6 +124,8 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             scope: required("scope"),
             state: some_query(&params, "state"),
             nonce: some_query(&params, "nonce"),
+            prompt: some_query(&params, "prompt"),
+            response_mode: some_query(&params, "response_mode"),
             code_challenge: some_query(&params, "code_challenge"),
             code_challenge_method: some_query(&params, "code_challenge_method"),
             user_id: user.as_ref().map(|(sub, _)| sub.clone()),
@@ -138,6 +161,17 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             Ok(target) => Response::redirect(target),
             Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
         },
+        Ok(auth_oidc::AuthorizeOutcome::Granted { url, code, nonce }) => {
+            if let Some(nonce) = nonce.as_deref() {
+                if let Err(err) = store_nonce(&ctx, &code, nonce).await {
+                    return fail(&cx.request_id, cx.now_ms, &err);
+                }
+            }
+            match url::Url::parse(&url) {
+                Ok(target) => Response::redirect(target),
+                Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+            }
+        }
         Err(err) => oauth_error(&cx, err),
     }
 }
@@ -195,13 +229,9 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
     {
         Ok(redirect) => {
             if let (Some(code), Some(nonce)) = (redirect.code.as_deref(), nonce.as_deref()) {
-                let store = match kv_store(&ctx) {
-                    Ok(store) => crate::kv::StatesKv::new(store),
-                    Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
-                };
-                let _ = store
-                    .put(&nonce_key(code), nonce.as_bytes(), NONCE_TTL)
-                    .await;
+                if let Err(err) = store_nonce(&ctx, code, nonce).await {
+                    return fail(&cx.request_id, cx.now_ms, &err);
+                }
             }
             match url::Url::parse(&redirect.url) {
                 Ok(target) => Response::redirect(target),
@@ -242,18 +272,9 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
             let nonce = if code.is_empty() {
                 None
             } else {
-                match kv_store(&ctx) {
-                    Ok(store) => {
-                        let store = crate::kv::StatesKv::new(store);
-                        match store.get(&nonce_key(&code)).await {
-                            Ok(Some(bytes)) => {
-                                let _ = store.delete(&nonce_key(&code)).await;
-                                String::from_utf8(bytes).ok()
-                            }
-                            _ => None,
-                        }
-                    }
-                    Err(_) => None,
+                match take_nonce(&ctx, &code).await {
+                    Ok(nonce) => nonce,
+                    Err(err) => return no_store(fail(&cx.request_id, cx.now_ms, &err)),
                 }
             };
             let (client_id, client_secret) =

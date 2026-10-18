@@ -285,7 +285,7 @@ pub(crate) async fn mint_response(
     }
 }
 
-fn cookie_value(req: &Request, name: &str) -> Option<String> {
+pub(crate) fn cookie_value(req: &Request, name: &str) -> Option<String> {
     req.headers()
         .get("cookie")
         .ok()

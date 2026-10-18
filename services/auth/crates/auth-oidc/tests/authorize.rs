@@ -17,6 +17,7 @@ const REDIRECT: &str = "https://app.example/cb";
 struct State {
     clients: Vec<Value>,
     codes: Vec<Value>,
+    connections: Vec<Value>,
     calls: Vec<String>,
 }
 
@@ -30,6 +31,7 @@ impl MockDb {
             state: Mutex::new(State {
                 clients,
                 codes: Vec::new(),
+                connections: Vec::new(),
                 calls: Vec::new(),
             }),
         }
@@ -51,6 +53,9 @@ impl MockDb {
                 .cloned()
                 .collect();
             return Ok(rows);
+        }
+        if query.sql.contains("FROM \"authorized_connections\"") {
+            return Ok(state.connections.clone());
         }
         if query.sql.contains("INSERT INTO \"oauth_states\"") {
             state.codes.push(json!({
@@ -112,6 +117,8 @@ fn authorize_req() -> AuthorizeRequest {
         scope: "openid profile email".to_string(),
         state: Some("s-1".to_string()),
         nonce: None,
+        prompt: None,
+        response_mode: None,
         code_challenge: None,
         code_challenge_method: None,
         user_id: Some("u-1".to_string()),
@@ -335,6 +342,82 @@ async fn granted_scopes_are_echoed() {
             assert_eq!(scopes, vec!["openid".to_string(), "email".to_string()]);
         }
         other => panic!("expected consent, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn prompt_none_without_session_is_login_required() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        user_id: None,
+        prompt: Some("none".to_string()),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Error { url } => assert!(url.contains("error=login_required")),
+        other => panic!("expected error redirect, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn prompt_login_forces_login() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        prompt: Some("login".to_string()),
+        ..authorize_req()
+    };
+    assert!(matches!(
+        outcome(&db, req).await.unwrap(),
+        AuthorizeOutcome::Login { .. }
+    ));
+}
+
+#[tokio::test]
+async fn prompt_none_without_consent_is_consent_required() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        prompt: Some("none".to_string()),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Error { url } => assert!(url.contains("error=consent_required")),
+        other => panic!("expected error redirect, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn prompt_none_with_prior_consent_grants_code() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    db.state
+        .lock()
+        .unwrap()
+        .connections
+        .push(json!({"id": "conn-1"}));
+    let req = AuthorizeRequest {
+        prompt: Some("none".to_string()),
+        nonce: Some("n-1".to_string()),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Granted { url, code, nonce } => {
+            assert!(url.contains("code="));
+            assert_ne!(code, "");
+            assert_eq!(nonce.as_deref(), Some("n-1"));
+        }
+        other => panic!("expected granted, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn response_mode_fragment_is_invalid_request() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        response_mode: Some("fragment".to_string()),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Error { url } => assert!(url.contains("error=invalid_request")),
+        other => panic!("expected error redirect, got {other:?}"),
     }
 }
 
