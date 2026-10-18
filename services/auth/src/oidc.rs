@@ -112,10 +112,6 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
     )
     .await
     {
-        Ok(auth_oidc::AuthorizeOutcome::Login { url }) => match url::Url::parse(&url) {
-            Ok(target) => Response::redirect(target),
-            Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
-        },
         Ok(auth_oidc::AuthorizeOutcome::Consent {
             state,
             redirect_uri,
@@ -135,6 +131,13 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             }),
             200,
         ),
+        Ok(
+            auth_oidc::AuthorizeOutcome::Login { url }
+            | auth_oidc::AuthorizeOutcome::Error { url },
+        ) => match url::Url::parse(&url) {
+            Ok(target) => Response::redirect(target),
+            Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+        },
         Err(err) => oauth_error(&cx, err),
     }
 }

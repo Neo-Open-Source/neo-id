@@ -10,6 +10,8 @@ pub enum WireError {
     InvalidGrant,
     UnauthorizedClient,
     UnsupportedGrantType,
+    UnsupportedResponseType,
+    InvalidScope,
     AccessDenied,
     ServerError,
 }
@@ -23,6 +25,8 @@ impl WireError {
             Self::InvalidGrant => "invalid_grant",
             Self::UnauthorizedClient => "unauthorized_client",
             Self::UnsupportedGrantType => "unsupported_grant_type",
+            Self::UnsupportedResponseType => "unsupported_response_type",
+            Self::InvalidScope => "invalid_scope",
             Self::AccessDenied => "access_denied",
             Self::ServerError => "server_error",
         }
@@ -74,6 +78,9 @@ pub enum AuthorizeOutcome {
         nonce: Option<String>,
         scopes: Vec<String>,
     },
+    Error {
+        url: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,7 +113,7 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     req: AuthorizeRequest,
 ) -> Result<AuthorizeOutcome, WireError> {
     let _ = now;
-    if req.response_type != "code" || req.client_id.is_empty() || req.redirect_uri.is_empty() {
+    if req.client_id.is_empty() || req.redirect_uri.is_empty() {
         return Err(WireError::InvalidRequest);
     }
     let rows = db.run(find_client(&req.client_id)).await?;
@@ -119,19 +126,53 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     if !redirect_matches(&refs, &req.redirect_uri) {
         return Err(WireError::InvalidRequest);
     }
-    let requested: Vec<&str> = req.scope.split_whitespace().collect();
-    if !requested.is_empty() && !requested.contains(&"openid") {
-        return Err(WireError::InvalidRequest);
+    let state = req.state.clone();
+    if req.response_type.is_empty() {
+        return Ok(AuthorizeOutcome::Error {
+            url: error_url(
+                &req.redirect_uri,
+                WireError::InvalidRequest.as_str(),
+                "Missing response_type",
+                state.as_deref(),
+            ),
+        });
     }
+    if req.response_type != "code" {
+        return Ok(AuthorizeOutcome::Error {
+            url: error_url(
+                &req.redirect_uri,
+                WireError::UnsupportedResponseType.as_str(),
+                "Only the authorization code flow is supported",
+                state.as_deref(),
+            ),
+        });
+    }
+    let requested: Vec<&str> = req.scope.split_whitespace().collect();
     let allowed = string_list(row, "allowedScopes").unwrap_or_default();
+    if requested.iter().any(|scope| !allowed.iter().any(|entry| entry == scope)) {
+        return Ok(AuthorizeOutcome::Error {
+            url: error_url(
+                &req.redirect_uri,
+                WireError::InvalidScope.as_str(),
+                "Requested scope is not allowed for this client",
+                state.as_deref(),
+            ),
+        });
+    }
+    if !requested.is_empty() && !requested.contains(&"openid") {
+        return Ok(AuthorizeOutcome::Error {
+            url: error_url(
+                &req.redirect_uri,
+                WireError::InvalidScope.as_str(),
+                "The openid scope is required",
+                state.as_deref(),
+            ),
+        });
+    }
     let scopes: Vec<String> = if requested.is_empty() {
         allowed
     } else {
-        requested
-            .iter()
-            .filter(|scope| allowed.iter().any(|entry| entry == *scope))
-            .map(|scope| (*scope).to_string())
-            .collect()
+        requested.iter().map(|scope| (*scope).to_string()).collect()
     };
     let state = req.state.unwrap_or_else(|| generate_token(rng, 16));
     match req.user_id {
@@ -255,12 +296,16 @@ fn approve_url(base: &str, code: &str, state: Option<&str>) -> String {
     url
 }
 
-fn deny_url(base: &str, state: Option<&str>) -> String {
+fn error_url(base: &str, error: &str, description: &str, state: Option<&str>) -> String {
     let mut url = base.to_string();
-    push_param(&mut url, "error", "access_denied");
-    push_param(&mut url, "error_description", "User denied access");
+    push_param(&mut url, "error", error);
+    push_param(&mut url, "error_description", description);
     if let Some(state) = state.filter(|state| !state.is_empty()) {
         push_param(&mut url, "state", state);
     }
     url
+}
+
+fn deny_url(base: &str, state: Option<&str>) -> String {
+    error_url(base, "access_denied", "User denied access", state)
 }

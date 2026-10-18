@@ -212,23 +212,25 @@ async fn disabled_client_is_access_denied() {
 }
 
 #[tokio::test]
-async fn unsupported_response_type_is_invalid_request() {
+async fn unsupported_response_type_redirects_error() {
     let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
     let req = AuthorizeRequest {
         response_type: "token".to_string(),
         ..authorize_req()
     };
-    assert_eq!(outcome(&db, req).await, Err(WireError::InvalidRequest));
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Error { url } => {
+            assert!(url.contains("error=unsupported_response_type"));
+            assert!(url.contains("state=s-1"));
+        }
+        other => panic!("expected error redirect, got {other:?}"),
+    }
 }
 
 #[tokio::test]
 async fn missing_fields_are_invalid_request() {
     let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
     for req in [
-        AuthorizeRequest {
-            response_type: String::new(),
-            ..authorize_req()
-        },
         AuthorizeRequest {
             client_id: String::new(),
             ..authorize_req()
@@ -239,6 +241,21 @@ async fn missing_fields_are_invalid_request() {
         },
     ] {
         assert_eq!(outcome(&db, req).await, Err(WireError::InvalidRequest));
+    }
+}
+
+#[tokio::test]
+async fn missing_response_type_redirects_invalid_request() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        response_type: String::new(),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Error { url } => {
+            assert!(url.contains("error=invalid_request"));
+        }
+        other => panic!("expected error redirect, got {other:?}"),
     }
 }
 
@@ -272,32 +289,52 @@ async fn consent_echoes_nonce_and_service_app_id() {
             assert_eq!(nonce.as_deref(), Some("n-9"));
             assert_eq!(service_app_id, APP_ID);
         }
-        other @ AuthorizeOutcome::Login { .. } => panic!("expected consent, got {other:?}"),
+        other => panic!("expected consent, got {other:?}"),
     }
 }
 
 #[tokio::test]
-async fn scope_without_openid_is_invalid_request() {
+async fn scope_without_openid_redirects_invalid_scope() {
     let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
     let req = AuthorizeRequest {
         scope: "profile email".to_string(),
         ..authorize_req()
     };
-    assert_eq!(outcome(&db, req).await, Err(WireError::InvalidRequest));
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Error { url } => {
+            assert!(url.contains("error=invalid_scope"));
+        }
+        other => panic!("expected error redirect, got {other:?}"),
+    }
 }
 
 #[tokio::test]
-async fn requested_scopes_intersect_registered() {
+async fn disallowed_scope_redirects_invalid_scope() {
     let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
     let req = AuthorizeRequest {
         scope: "openid admin".to_string(),
         ..authorize_req()
     };
     match outcome(&db, req).await.unwrap() {
-        AuthorizeOutcome::Consent { scopes, .. } => {
-            assert_eq!(scopes, vec!["openid".to_string()]);
+        AuthorizeOutcome::Error { url } => {
+            assert!(url.contains("error=invalid_scope"));
         }
-        other @ AuthorizeOutcome::Login { .. } => panic!("expected consent, got {other:?}"),
+        other => panic!("expected error redirect, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn granted_scopes_are_echoed() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        scope: "openid email".to_string(),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Consent { scopes, .. } => {
+            assert_eq!(scopes, vec!["openid".to_string(), "email".to_string()]);
+        }
+        other => panic!("expected consent, got {other:?}"),
     }
 }
 
@@ -374,6 +411,8 @@ fn wire_codes_match_oauth_strings() {
         (WireError::InvalidGrant, "invalid_grant"),
         (WireError::UnauthorizedClient, "unauthorized_client"),
         (WireError::UnsupportedGrantType, "unsupported_grant_type"),
+        (WireError::UnsupportedResponseType, "unsupported_response_type"),
+        (WireError::InvalidScope, "invalid_scope"),
         (WireError::AccessDenied, "access_denied"),
         (WireError::ServerError, "server_error"),
     ] {
