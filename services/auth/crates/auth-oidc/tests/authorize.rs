@@ -496,7 +496,10 @@ fn wire_codes_match_oauth_strings() {
         (WireError::InvalidGrant, "invalid_grant"),
         (WireError::UnauthorizedClient, "unauthorized_client"),
         (WireError::UnsupportedGrantType, "unsupported_grant_type"),
-        (WireError::UnsupportedResponseType, "unsupported_response_type"),
+        (
+            WireError::UnsupportedResponseType,
+            "unsupported_response_type",
+        ),
         (WireError::InvalidScope, "invalid_scope"),
         (WireError::AccessDenied, "access_denied"),
         (WireError::ServerError, "server_error"),

@@ -734,7 +734,12 @@ async fn refresh_rotates_and_links_parent() {
 async fn confidential_client_must_present_secret() {
     let (db, mut rng) = harness();
     assert_eq!(
-        exchange(&db, &mut rng, code_grant("authcode-1", Some(VERIFIER), None)).await,
+        exchange(
+            &db,
+            &mut rng,
+            code_grant("authcode-1", Some(VERIFIER), None)
+        )
+        .await,
         Err(WireError::InvalidClient)
     );
     assert_eq!(

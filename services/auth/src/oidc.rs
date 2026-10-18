@@ -1,11 +1,11 @@
 use auth_core::{AuthError, percent_encode, verify_access, verify_id};
-use base64::{Engine, engine::general_purpose::STANDARD};
 use auth_db::Kv as _;
 use auth_oidc::{
     AuthorizeRequest, ConsentChoice, ConsentRequest, Grant, LogoutRequest, RegisterRequest,
     TokenRequest, UserInfoRequest, WireError, authorize, decide_consent, logout, register, token,
     userinfo,
 };
+use base64::{Engine, engine::general_purpose::STANDARD};
 use worker::{Request, Response, Result, RouteContext};
 
 use super::{
@@ -147,8 +147,7 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             200,
         ),
         Ok(
-            auth_oidc::AuthorizeOutcome::Login { url }
-            | auth_oidc::AuthorizeOutcome::Error { url },
+            auth_oidc::AuthorizeOutcome::Login { url } | auth_oidc::AuthorizeOutcome::Error { url },
         ) => match url::Url::parse(&url) {
             Ok(target) => Response::redirect(target),
             Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
@@ -295,34 +294,36 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    no_store(match token(
-        &cx.db,
-        &mut rng,
-        cx.now,
-        &cx.app.private_pem,
-        &cx.app.issuer,
-        TokenRequest {
-            grant,
-            device: header_opt(&req, "user-agent"),
-            ip: header_opt(&req, "cf-connecting-ip"),
+    no_store(
+        match token(
+            &cx.db,
+            &mut rng,
+            cx.now,
+            &cx.app.private_pem,
+            &cx.app.issuer,
+            TokenRequest {
+                grant,
+                device: header_opt(&req, "user-agent"),
+                ip: header_opt(&req, "cf-connecting-ip"),
+            },
+        )
+        .await
+        {
+            Ok(tokens) => ok(
+                &cx.request_id,
+                cx.now_ms,
+                &serde_json::json!({
+                    "access_token": tokens.access_token,
+                    "token_type": "Bearer",
+                    "expires_in": tokens.expires_in,
+                    "refresh_token": tokens.refresh_token,
+                    "id_token": tokens.id_token,
+                }),
+                200,
+            ),
+            Err(err) => oauth_error(&cx, err),
         },
     )
-    .await
-    {
-        Ok(tokens) => ok(
-            &cx.request_id,
-            cx.now_ms,
-            &serde_json::json!({
-                "access_token": tokens.access_token,
-                "token_type": "Bearer",
-                "expires_in": tokens.expires_in,
-                "refresh_token": tokens.refresh_token,
-                "id_token": tokens.id_token,
-            }),
-            200,
-        ),
-        Err(err) => oauth_error(&cx, err),
-    })
 }
 
 pub async fn userinfo_route(req: Request, ctx: RouteContext<()>) -> Result<Response> {
@@ -338,8 +339,7 @@ pub async fn userinfo_route(req: Request, ctx: RouteContext<()>) -> Result<Respo
     let Ok(claims) = verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now) else {
         return unauthorized(&cx.request_id, cx.now_ms, "Invalid access token");
     };
-    match userinfo(&cx.db, UserInfoRequest { sub: claims.sub }).await
-    {
+    match userinfo(&cx.db, UserInfoRequest { sub: claims.sub }).await {
         Ok(info) => ok(
             &cx.request_id,
             cx.now_ms,

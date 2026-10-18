@@ -314,10 +314,7 @@ fn validate_request(req: &AuthorizeRequest, row: &Value) -> Result<Validated, De
     let scopes = if requested.is_empty() {
         allowed
     } else {
-        requested
-            .iter()
-            .map(|scope| (*scope).to_string())
-            .collect()
+        requested.iter().map(|scope| (*scope).to_string()).collect()
     };
     Ok(Validated {
         scopes,

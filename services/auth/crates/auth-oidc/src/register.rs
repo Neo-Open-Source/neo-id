@@ -47,7 +47,11 @@ pub async fn register<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     {
         return Err(WireError::InvalidRequest);
     }
-    let scope = vec!["openid".to_string(), "profile".to_string(), "email".to_string()];
+    let scope = vec![
+        "openid".to_string(),
+        "profile".to_string(),
+        "email".to_string(),
+    ];
     let grants = vec![
         "authorization_code".to_string(),
         "refresh_token".to_string(),

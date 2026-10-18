@@ -1,3 +1,4 @@
+use crate::authorize::{WireError, app_id, epoch, field, flag, optional};
 use auth_core::{
     ACCESS_TOKEN_TTL, AccessInput, IdInput, RefreshDecision, SecretCheck, client_secret_check,
     encode_error, enforce_pkce, generate_id, generate_token, hash_token, refresh_decision,
@@ -7,7 +8,6 @@ use auth_db::{
     Executor, create_refresh, create_session, delete_code, find_client, find_code, find_refresh,
     find_session, find_user_by_id, parse_refresh, revoke_refresh, touch_login, touch_session,
 };
-use crate::authorize::{WireError, app_id, epoch, field, flag, optional};
 
 #[derive(Debug, Clone)]
 pub enum Grant {
