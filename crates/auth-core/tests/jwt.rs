@@ -1,12 +1,30 @@
 use auth_core::{
-    ACCESS_TOKEN_TTL, AccessInput, AuthError, ID_TOKEN_TTL, IdInput, at_hash, sign_access, sign_id,
-    verify_access, verify_id,
+    ACCESS_TOKEN_TTL, AccessInput, AuthError, ID_TOKEN_TTL, IdInput, SigningAlg, SigningKey,
+    VerifyKey, at_hash, sign_access, sign_id, verify_access, verify_id,
 };
 
 const PRIVATE_PEM: &str = include_str!("data/test-rsa.pem");
 const PUBLIC_PEM: &str = include_str!("data/test-rsa.pub.pem");
+const EC_PRIVATE_PEM: &str = include_str!("data/test-ec.pem");
+const EC_PUBLIC_PEM: &str = include_str!("data/test-ec.pub.pem");
 const ISSUER: &str = "https://id.neome.uk";
 const NOW: u64 = 1_800_000_000;
+
+fn rsa_signing() -> SigningKey {
+    SigningKey::new(SigningAlg::Rs256, PRIVATE_PEM.as_bytes().to_vec())
+}
+
+fn rsa_verifying() -> VerifyKey {
+    VerifyKey::new(SigningAlg::Rs256, PUBLIC_PEM.as_bytes().to_vec())
+}
+
+fn ec_signing() -> SigningKey {
+    SigningKey::new(SigningAlg::Es256, EC_PRIVATE_PEM.as_bytes().to_vec())
+}
+
+fn ec_verifying() -> VerifyKey {
+    VerifyKey::new(SigningAlg::Es256, EC_PUBLIC_PEM.as_bytes().to_vec())
+}
 
 fn access_input() -> AccessInput {
     AccessInput {
@@ -22,10 +40,18 @@ fn access_input() -> AccessInput {
     }
 }
 
+fn header_alg(token: &str) -> String {
+    let decoded = base64_decode_url(token.split('.').next().unwrap_or_default());
+    serde_json::from_slice::<serde_json::Value>(&decoded)
+        .ok()
+        .and_then(|header| header["alg"].as_str().map(String::from))
+        .unwrap_or_default()
+}
+
 #[test]
 fn access_roundtrip_checks_claims() {
-    let token = sign_access(PRIVATE_PEM.as_bytes(), &access_input()).unwrap();
-    let claims = verify_access(PUBLIC_PEM.as_bytes(), &token, ISSUER, NOW + 100).unwrap();
+    let token = sign_access(&rsa_signing(), &access_input()).unwrap();
+    let claims = verify_access(&rsa_verifying(), &token, ISSUER, NOW + 100).unwrap();
     assert_eq!(claims.sub, "user-1");
     assert_eq!(claims.email, "alice@example.com");
     assert_eq!(claims.role, "user");
@@ -36,6 +62,50 @@ fn access_roundtrip_checks_claims() {
         u64::try_from(claims.exp_unix - claims.iat_unix).unwrap_or(0),
         ACCESS_TOKEN_TTL
     );
+}
+
+#[test]
+fn es256_roundtrip_and_header_algorithm() {
+    let token = sign_access(&ec_signing(), &access_input()).unwrap();
+    assert_eq!(header_alg(&token), "ES256");
+    let claims = verify_access(&ec_verifying(), &token, ISSUER, NOW + 100).unwrap();
+    assert_eq!(claims.sub, "user-1");
+    assert_eq!(claims.scope.as_deref(), Some("openid profile"));
+}
+
+#[test]
+fn rs256_token_is_rejected_by_es256_key_and_vice_versa() {
+    let rsa_token = sign_access(&rsa_signing(), &access_input()).unwrap();
+    assert_eq!(header_alg(&rsa_token), "RS256");
+    assert!(matches!(
+        verify_access(&ec_verifying(), &rsa_token, ISSUER, NOW + 1),
+        Err(AuthError::InvalidCredentials)
+    ));
+    let ec_token = sign_access(&ec_signing(), &access_input()).unwrap();
+    assert!(matches!(
+        verify_access(&rsa_verifying(), &ec_token, ISSUER, NOW + 1),
+        Err(AuthError::InvalidCredentials)
+    ));
+}
+
+#[test]
+fn es256_id_token_is_verifiable() {
+    let input = IdInput {
+        sub: "user-1".to_string(),
+        email: "alice@example.com".to_string(),
+        audience: "client-9".to_string(),
+        issuer: ISSUER.to_string(),
+        issued_at: NOW,
+        auth_time: NOW,
+        nonce: Some("n-1".to_string()),
+        access_token: None,
+        jti: "jti-ec".to_string(),
+    };
+    let token = sign_id(&ec_signing(), &input).unwrap();
+    let claims = verify_id(&ec_verifying(), &token, ISSUER, NOW + 1).unwrap();
+    assert_eq!(claims.sub, "user-1");
+    assert_eq!(claims.aud, "client-9");
+    assert_eq!(claims.nonce.as_deref(), Some("n-1"));
 }
 
 #[test]
@@ -52,30 +122,25 @@ fn at_hash_is_left_half_of_sha256_base64url() {
 
 #[test]
 fn expired_is_invalid_credentials() {
-    let token = sign_access(PRIVATE_PEM.as_bytes(), &access_input()).unwrap();
+    let token = sign_access(&rsa_signing(), &access_input()).unwrap();
     assert!(matches!(
-        verify_access(
-            PUBLIC_PEM.as_bytes(),
-            &token,
-            ISSUER,
-            NOW + ACCESS_TOKEN_TTL + 1
-        ),
+        verify_access(&rsa_verifying(), &token, ISSUER, NOW + ACCESS_TOKEN_TTL + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
 
 #[test]
 fn wrong_issuer_is_invalid_credentials() {
-    let token = sign_access(PRIVATE_PEM.as_bytes(), &access_input()).unwrap();
+    let token = sign_access(&rsa_signing(), &access_input()).unwrap();
     assert!(matches!(
-        verify_access(PUBLIC_PEM.as_bytes(), &token, "https://evil.test", NOW + 1),
+        verify_access(&rsa_verifying(), &token, "https://evil.test", NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
 
 #[test]
 fn tampered_payload_is_invalid_credentials() {
-    let token = sign_access(PRIVATE_PEM.as_bytes(), &access_input()).unwrap();
+    let token = sign_access(&rsa_signing(), &access_input()).unwrap();
     let mut tampered = token.clone();
     let start = token.find('.').unwrap() + 1;
     let marker = if token.as_bytes().get(start) == Some(&b'A') {
@@ -86,7 +151,7 @@ fn tampered_payload_is_invalid_credentials() {
     tampered.replace_range(start..=start, &marker.to_string());
     assert_ne!(token, tampered);
     assert!(matches!(
-        verify_access(PUBLIC_PEM.as_bytes(), &tampered, ISSUER, NOW + 1),
+        verify_access(&rsa_verifying(), &tampered, ISSUER, NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
@@ -96,7 +161,7 @@ fn garbage_is_malformed() {
     for token in ["abc", "a.b", "a.b.c"] {
         assert!(
             matches!(
-                verify_access(PUBLIC_PEM.as_bytes(), token, ISSUER, NOW),
+                verify_access(&rsa_verifying(), token, ISSUER, NOW),
                 Err(AuthError::MalformedMessage)
             ),
             "{token}"
@@ -106,8 +171,9 @@ fn garbage_is_malformed() {
 
 #[test]
 fn bad_key_is_internal() {
+    let broken = VerifyKey::new(SigningAlg::Rs256, b"nope".to_vec());
     assert!(matches!(
-        verify_access(b"nope", "a.b.c", ISSUER, NOW),
+        verify_access(&broken, "a.b.c", ISSUER, NOW),
         Err(AuthError::Internal)
     ));
 }
@@ -125,7 +191,7 @@ fn id_token_carries_audience_and_name() {
         access_token: None,
         jti: "jti-2".to_string(),
     };
-    let token = sign_id(PRIVATE_PEM.as_bytes(), &input).unwrap();
+    let token = sign_id(&rsa_signing(), &input).unwrap();
     let payload: serde_json::Value = {
         let parts: Vec<&str> = token.split('.').collect();
         let decoded = base64_decode_url(parts[1]);
@@ -154,22 +220,17 @@ fn verify_id_checks_signature_issuer_and_expiry() {
         access_token: None,
         jti: "jti-9".to_string(),
     };
-    let token = sign_id(PRIVATE_PEM.as_bytes(), &input).unwrap();
-    let claims = verify_id(PUBLIC_PEM.as_bytes(), &token, ISSUER, NOW + 1).unwrap();
+    let token = sign_id(&rsa_signing(), &input).unwrap();
+    let claims = verify_id(&rsa_verifying(), &token, ISSUER, NOW + 1).unwrap();
     assert_eq!(claims.sub, "user-1");
     assert_eq!(claims.nonce.as_deref(), Some("n-1"));
     assert_eq!(claims.auth_time_unix, Some(i64::try_from(NOW).unwrap()));
     assert!(matches!(
-        verify_id(
-            PUBLIC_PEM.as_bytes(),
-            &token,
-            ISSUER,
-            NOW + ID_TOKEN_TTL + 1
-        ),
+        verify_id(&rsa_verifying(), &token, ISSUER, NOW + ID_TOKEN_TTL + 1),
         Err(AuthError::InvalidCredentials)
     ));
     assert!(matches!(
-        verify_id(PUBLIC_PEM.as_bytes(), &token, "https://evil.test", NOW + 1),
+        verify_id(&rsa_verifying(), &token, "https://evil.test", NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
@@ -188,7 +249,7 @@ fn zero_auth_time_and_empty_scope_are_omitted() {
         jti: "jti-0".to_string(),
     };
     let payload: serde_json::Value = {
-        let token = sign_id(PRIVATE_PEM.as_bytes(), &id).unwrap();
+        let token = sign_id(&rsa_signing(), &id).unwrap();
         let parts: Vec<&str> = token.split('.').collect();
         serde_json::from_slice(&base64_decode_url(parts[1])).unwrap()
     };
@@ -205,8 +266,8 @@ fn zero_auth_time_and_empty_scope_are_omitted() {
         scope: String::new(),
         jti: "jti-0".to_string(),
     };
-    let token = sign_access(PRIVATE_PEM.as_bytes(), &access).unwrap();
-    let claims = verify_access(PUBLIC_PEM.as_bytes(), &token, ISSUER, NOW + 1).unwrap();
+    let token = sign_access(&rsa_signing(), &access).unwrap();
+    let claims = verify_access(&rsa_verifying(), &token, ISSUER, NOW + 1).unwrap();
     assert_eq!(claims.auth_time_unix, None);
     assert_eq!(claims.scope, None);
 }

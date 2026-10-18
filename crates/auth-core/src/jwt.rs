@@ -9,8 +9,121 @@ use crate::error::AuthError;
 pub const ACCESS_TOKEN_TTL: u64 = 900;
 pub const ID_TOKEN_TTL: u64 = 3600;
 
-// Static key id, mirrored in the JWKS document. Rotation adds a second id.
+// Static key ids, mirrored in the JWKS document. Rotation adds a second id per alg.
 pub const KEY_ID: &str = "neo-auth-rs256";
+pub const EC_KEY_ID: &str = "neo-auth-es256";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SigningAlg {
+    Rs256,
+    Es256,
+}
+
+impl SigningAlg {
+    #[must_use]
+    pub fn kid(self) -> &'static str {
+        match self {
+            Self::Rs256 => KEY_ID,
+            Self::Es256 => EC_KEY_ID,
+        }
+    }
+
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Rs256 => "RS256",
+            Self::Es256 => "ES256",
+        }
+    }
+
+    fn jwa(self) -> Algorithm {
+        match self {
+            Self::Rs256 => Algorithm::RS256,
+            Self::Es256 => Algorithm::ES256,
+        }
+    }
+}
+
+pub struct SigningKey {
+    alg: SigningAlg,
+    pem: Vec<u8>,
+}
+
+impl SigningKey {
+    #[must_use]
+    pub fn new(alg: SigningAlg, pem: impl Into<Vec<u8>>) -> Self {
+        Self {
+            alg,
+            pem: pem.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn alg(&self) -> SigningAlg {
+        self.alg
+    }
+
+    fn encoding(&self) -> Result<EncodingKey, AuthError> {
+        match self.alg {
+            SigningAlg::Rs256 => {
+                EncodingKey::from_rsa_pem(&self.pem).map_err(|_| AuthError::Internal)
+            }
+            SigningAlg::Es256 => {
+                EncodingKey::from_ec_pem(&self.pem).map_err(|_| AuthError::Internal)
+            }
+        }
+    }
+}
+
+impl core::fmt::Debug for SigningKey {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("SigningKey")
+            .field("alg", &self.alg)
+            .finish_non_exhaustive()
+    }
+}
+
+pub struct VerifyKey {
+    alg: SigningAlg,
+    pem: Vec<u8>,
+}
+
+impl VerifyKey {
+    #[must_use]
+    pub fn new(alg: SigningAlg, pem: impl Into<Vec<u8>>) -> Self {
+        Self {
+            alg,
+            pem: pem.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn alg(&self) -> SigningAlg {
+        self.alg
+    }
+
+    fn decoding(&self) -> Result<DecodingKey, AuthError> {
+        match self.alg {
+            SigningAlg::Rs256 => {
+                DecodingKey::from_rsa_pem(&self.pem).map_err(|_| AuthError::Internal)
+            }
+            SigningAlg::Es256 => {
+                DecodingKey::from_ec_pem(&self.pem).map_err(|_| AuthError::Internal)
+            }
+        }
+    }
+}
+
+impl core::fmt::Debug for VerifyKey {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("VerifyKey")
+            .field("alg", &self.alg)
+            .finish_non_exhaustive()
+    }
+}
 
 pub struct AccessInput {
     pub sub: String,
@@ -36,9 +149,9 @@ pub struct IdInput {
     pub jti: String,
 }
 
-fn header() -> Header {
-    let mut header = Header::new(Algorithm::RS256);
-    header.kid = Some(KEY_ID.to_string());
+fn header(alg: SigningAlg) -> Header {
+    let mut header = Header::new(alg.jwa());
+    header.kid = Some(alg.kid().to_string());
     header
 }
 
@@ -48,8 +161,7 @@ pub fn at_hash(access_token: &str) -> String {
     URL_SAFE_NO_PAD.encode(&digest[..16])
 }
 
-pub fn sign_access(private_pem: &[u8], input: &AccessInput) -> Result<String, AuthError> {
-    let key = EncodingKey::from_rsa_pem(private_pem).map_err(|_| AuthError::Internal)?;
+pub fn sign_access(key: &SigningKey, input: &AccessInput) -> Result<String, AuthError> {
     let claims = AccessClaims {
         sub: input.sub.clone(),
         email: input.email.clone(),
@@ -63,11 +175,10 @@ pub fn sign_access(private_pem: &[u8], input: &AccessInput) -> Result<String, Au
         auth_time_unix: (input.auth_time > 0).then(|| i64::try_from(input.auth_time).unwrap_or(0)),
         scope: (!input.scope.is_empty()).then(|| input.scope.clone()),
     };
-    encode(&header(), &claims, &key).map_err(|_| AuthError::Internal)
+    encode(&header(key.alg), &claims, &key.encoding()?).map_err(|_| AuthError::Internal)
 }
 
-pub fn sign_id(private_pem: &[u8], input: &IdInput) -> Result<String, AuthError> {
-    let key = EncodingKey::from_rsa_pem(private_pem).map_err(|_| AuthError::Internal)?;
+pub fn sign_id(key: &SigningKey, input: &IdInput) -> Result<String, AuthError> {
     let claims = IdTokenClaims {
         sub: input.sub.clone(),
         email: input.email.clone(),
@@ -81,21 +192,20 @@ pub fn sign_id(private_pem: &[u8], input: &IdInput) -> Result<String, AuthError>
         at_hash: input.access_token.as_deref().map(at_hash),
         auth_time_unix: (input.auth_time > 0).then(|| i64::try_from(input.auth_time).unwrap_or(0)),
     };
-    encode(&header(), &claims, &key).map_err(|_| AuthError::Internal)
+    encode(&header(key.alg), &claims, &key.encoding()?).map_err(|_| AuthError::Internal)
 }
 
 pub fn verify_access(
-    public_pem: &[u8],
+    key: &VerifyKey,
     token: &str,
     issuer: &str,
     now: u64,
 ) -> Result<AccessClaims, AuthError> {
-    let key = DecodingKey::from_rsa_pem(public_pem).map_err(|_| AuthError::Internal)?;
-    let mut validation = Validation::new(Algorithm::RS256);
+    let mut validation = Validation::new(key.alg.jwa());
     validation.validate_exp = false;
     validation.set_issuer(&[issuer]);
     validation.set_required_spec_claims(&["exp", "iss", "sub"]);
-    let claims = decode::<AccessClaims>(token, &key, &validation)
+    let claims = decode::<AccessClaims>(token, &key.decoding()?, &validation)
         .map(|data| data.claims)
         .map_err(map_jwt_error)?;
     if claims.exp_unix <= i64::try_from(now).unwrap_or(i64::MAX) {
@@ -105,18 +215,17 @@ pub fn verify_access(
 }
 
 pub fn verify_id(
-    public_pem: &[u8],
+    key: &VerifyKey,
     token: &str,
     issuer: &str,
     now: u64,
 ) -> Result<IdTokenClaims, AuthError> {
-    let key = DecodingKey::from_rsa_pem(public_pem).map_err(|_| AuthError::Internal)?;
-    let mut validation = Validation::new(Algorithm::RS256);
+    let mut validation = Validation::new(key.alg.jwa());
     validation.validate_exp = false;
     validation.validate_aud = false;
     validation.set_issuer(&[issuer]);
     validation.set_required_spec_claims(&["exp", "iss", "sub"]);
-    let claims = decode::<IdTokenClaims>(token, &key, &validation)
+    let claims = decode::<IdTokenClaims>(token, &key.decoding()?, &validation)
         .map(|data| data.claims)
         .map_err(map_jwt_error)?;
     if claims.exp_unix <= i64::try_from(now).unwrap_or(i64::MAX) {

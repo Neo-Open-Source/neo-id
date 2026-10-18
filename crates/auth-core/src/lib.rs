@@ -9,6 +9,7 @@ mod client;
 mod codes;
 mod email;
 mod error;
+mod jwk;
 mod jwt;
 mod opaque;
 mod pkce;
@@ -30,9 +31,10 @@ pub use email::{
     valid_code_format,
 };
 pub use error::AuthError;
+pub use jwk::{es256 as es256_jwk, rs256 as rs256_jwk};
 pub use jwt::{
-    ACCESS_TOKEN_TTL, AccessInput, ID_TOKEN_TTL, IdInput, KEY_ID, at_hash, sign_access, sign_id,
-    verify_access, verify_id,
+    ACCESS_TOKEN_TTL, AccessInput, EC_KEY_ID, ID_TOKEN_TTL, IdInput, KEY_ID, SigningAlg,
+    SigningKey, VerifyKey, at_hash, sign_access, sign_id, verify_access, verify_id,
 };
 pub use opaque::{CredentialId, Envelope, LoginState, SessionKey};
 pub use opaque::{login_finish, login_response, register_response, register_store};

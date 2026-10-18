@@ -1,7 +1,7 @@
 use auth_core::{
     AccessInput, AuthError, CredentialId, Envelope, IdInput, OpaqueSetup, REFRESH_TOKEN_BYTES,
-    generate_id, generate_token, hash_token, login_response, refresh_expiry, session_expiry,
-    sign_access, sign_id,
+    SigningKey, generate_id, generate_token, hash_token, login_response, refresh_expiry,
+    session_expiry, sign_access, sign_id,
 };
 use auth_db::{
     Executor, create_refresh, create_session, find_envelope, find_user_by_email, find_user_by_id,
@@ -93,7 +93,7 @@ fn parse_user(user: &serde_json::Value) -> Result<LoginUser, AuthError> {
 }
 
 pub struct MintParams<'a> {
-    pub private_pem: &'a [u8],
+    pub signing: &'a SigningKey,
     pub issuer: &'a str,
     pub device: Option<&'a str>,
     pub ip: Option<&'a str>,
@@ -198,7 +198,7 @@ pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
     auth_time: u64,
 ) -> Result<(String, String), AuthError> {
     let access_token = sign_access(
-        params.private_pem,
+        params.signing,
         &AccessInput {
             sub: user.id.clone(),
             email: user.email.clone(),
@@ -212,7 +212,7 @@ pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
         },
     )?;
     let id_token = sign_id(
-        params.private_pem,
+        params.signing,
         &IdInput {
             sub: user.id.clone(),
             email: user.email.clone(),

@@ -2,7 +2,6 @@ use auth_core::{AuthError, CredentialId, register_response};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use db::{Executor, Kv as _};
 use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
-use rsa::{RsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyParts};
 use worker::{Env, Request, Response, Result, RouteContext, Router};
 
 use crate::{
@@ -71,7 +70,7 @@ async fn discovery(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
             "subject_types_supported": ["public"],
-            "id_token_signing_alg_values_supported": ["RS256"],
+            "id_token_signing_alg_values_supported": ["RS256", "ES256"],
             "scopes_supported": ["openid", "profile", "email"],
             "claims_supported": ["iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "email", "email_verified", "name", "given_name", "family_name", "picture"],
             "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
@@ -84,29 +83,16 @@ async fn discovery(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
     )
 }
 
-fn rsa_jwk(public_pem: &[u8]) -> Result<serde_json::Value, AuthError> {
-    let text = String::from_utf8(public_pem.to_vec()).map_err(|_| AuthError::Internal)?;
-    let key = RsaPublicKey::from_public_key_pem(&text).map_err(|_| AuthError::Internal)?;
-    Ok(serde_json::json!({
-        "kty": "RSA",
-        "n": URL_SAFE_NO_PAD.encode(key.n().to_bytes_be()),
-        "e": URL_SAFE_NO_PAD.encode(key.e().to_bytes_be()),
-        "alg": "RS256",
-        "use": "sig",
-        "kid": auth_core::KEY_ID,
-    }))
-}
-
 async fn jwks(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let cx = match load_cx(&ctx.env) {
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    match rsa_jwk(&cx.app.public_pem) {
-        Ok(key) => ok(
+    match cx.app.jwks() {
+        Ok(keys) => ok(
             &cx.request_id,
             cx.now_ms,
-            &serde_json::json!({"keys": [key]}),
+            &serde_json::json!({"keys": keys}),
             200,
         ),
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
@@ -274,7 +260,7 @@ pub(crate) fn authed_from(
         .and_then(|value| value.strip_prefix("Bearer ").map(String::from))
         .or_else(|| cookie.map(String::from))
         .ok_or(AuthError::InvalidCredentials)?;
-    match auth_core::verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now) {
+    match auth_core::verify_access(&cx.app.verify, &presented, &cx.app.issuer, cx.now) {
         Ok(claims) => Ok(claims.sub),
         Err(err) => Err(err),
     }
@@ -289,7 +275,7 @@ pub(crate) async fn mint_response(
     let device = header_opt(req, "user-agent");
     let ip = header_opt(req, "cf-connecting-ip");
     let params = auth_accounts::MintParams {
-        private_pem: &cx.app.private_pem,
+        signing: &cx.app.signing,
         issuer: &cx.app.issuer,
         device: device.as_deref(),
         ip: ip.as_deref(),
@@ -557,7 +543,7 @@ async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     let device = header_opt(&req, "user-agent");
     let ip = header_opt(&req, "cf-connecting-ip");
     let params = auth_accounts::MintParams {
-        private_pem: &cx.app.private_pem,
+        signing: &cx.app.signing,
         issuer: &cx.app.issuer,
         device: device.as_deref(),
         ip: ip.as_deref(),
@@ -617,7 +603,7 @@ async fn refresh_route(mut req: Request, ctx: RouteContext<()>) -> Result<Respon
     let device = header_opt(&req, "user-agent");
     let ip = header_opt(&req, "cf-connecting-ip");
     let params = auth_accounts::MintParams {
-        private_pem: &cx.app.private_pem,
+        signing: &cx.app.signing,
         issuer: &cx.app.issuer,
         device: device.as_deref(),
         ip: ip.as_deref(),
@@ -659,7 +645,7 @@ async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     };
     if !presented.is_empty() {
         if let Ok(claims) =
-            auth_core::verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now)
+            auth_core::verify_access(&cx.app.verify, &presented, &cx.app.issuer, cx.now)
         {
             if let Some(session_id) = claims.session_id {
                 let _ = auth_accounts::end_session(&cx.db, &session_id, cx.now).await;
@@ -753,8 +739,8 @@ pub fn router() -> Router<'static, ()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        AuthError, authed_from, body_field, cookie_value, create_user, form_to_object, rsa_jwk,
-        state_key, verified_user,
+        AuthError, authed_from, body_field, cookie_value, create_user, form_to_object, state_key,
+        verified_user,
     };
     use db::Query;
     use std::collections::VecDeque;
@@ -863,7 +849,7 @@ mod tests {
 
     #[test]
     fn rsa_jwk_exposes_rs256_metadata() {
-        let jwk = rsa_jwk(TEST_PUB_PEM).unwrap();
+        let jwk = auth_core::rs256_jwk(TEST_PUB_PEM).unwrap();
         assert_eq!(jwk["kty"], "RSA");
         assert_eq!(jwk["alg"], "RS256");
         assert_eq!(jwk["use"], "sig");
@@ -884,6 +870,31 @@ mod tests {
         );
         assert!(authed_from(&cx, None, None).is_err());
         assert!(authed_from(&cx, Some("Bearer x"), None).is_err());
+    }
+
+    #[test]
+    fn jwks_lists_configured_keys() {
+        let rsa = crate::test_support::test_ctx(1_800_000_000);
+        let keys = rsa.app.jwks().unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0]["alg"], "RS256");
+
+        let ec = crate::test_support::test_ctx_with(1_800_000_000, auth_core::SigningAlg::Es256);
+        let keys = ec.app.jwks().unwrap();
+        assert_eq!(keys.len(), 2);
+        assert_eq!(keys[0]["alg"], "RS256");
+        assert_eq!(keys[1]["alg"], "ES256");
+        assert_eq!(keys[1]["crv"], "P-256");
+    }
+
+    #[test]
+    fn authed_from_verifies_es256_tokens() {
+        let cx = crate::test_support::test_ctx_with(1_800_000_000, auth_core::SigningAlg::Es256);
+        let token = crate::test_support::test_access_token(&cx);
+        assert_eq!(
+            authed_from(&cx, Some(&format!("Bearer {token}")), None).unwrap(),
+            "u1"
+        );
     }
 
     #[tokio::test]

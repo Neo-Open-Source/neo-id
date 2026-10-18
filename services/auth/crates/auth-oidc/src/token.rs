@@ -1,6 +1,6 @@
 use crate::authorize::{WireError, app_id, epoch, field, flag, optional};
 use auth_core::{
-    ACCESS_TOKEN_TTL, AccessInput, AuthError, IdInput, RefreshDecision, SecretCheck,
+    ACCESS_TOKEN_TTL, AccessInput, AuthError, IdInput, RefreshDecision, SecretCheck, SigningKey,
     client_secret_check, encode_error, enforce_pkce, generate_id, generate_token, hash_token,
     refresh_decision, refresh_expiry, session_expiry, sign_access, sign_id,
 };
@@ -59,7 +59,7 @@ pub async fn token<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     db: &E,
     rng: &mut R,
     now: u64,
-    private_pem: &[u8],
+    signing: &SigningKey,
     issuer: &str,
     req: TokenRequest,
 ) -> Result<Tokens, WireError> {
@@ -68,7 +68,7 @@ pub async fn token<E: Executor, R: rand::RngCore + rand::CryptoRng>(
         db,
         rng,
         now,
-        private_pem,
+        signing,
         issuer,
         device: device.as_deref(),
         ip: ip.as_deref(),
@@ -109,7 +109,7 @@ struct TokenCall<'a, E, R> {
     db: &'a E,
     rng: &'a mut R,
     now: u64,
-    private_pem: &'a [u8],
+    signing: &'a SigningKey,
     issuer: &'a str,
     device: Option<&'a str>,
     ip: Option<&'a str>,
@@ -345,7 +345,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         scope: &str,
     ) -> Result<(String, String), WireError> {
         let access = sign_access(
-            self.private_pem,
+            self.signing,
             &AccessInput {
                 sub: subject.user_id.clone(),
                 email: subject.email.clone(),
@@ -360,7 +360,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         )?;
         let id = if scope.split_whitespace().any(|entry| entry == "openid") {
             sign_id(
-                self.private_pem,
+                self.signing,
                 &IdInput {
                     sub: subject.user_id.clone(),
                     email: subject.email.clone(),

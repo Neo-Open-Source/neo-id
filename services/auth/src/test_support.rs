@@ -1,4 +1,4 @@
-use auth_core::OpaqueSetup;
+use auth_core::{OpaqueSetup, SigningAlg, SigningKey, VerifyKey};
 use rand_chacha::ChaCha8Rng;
 use rand_core::SeedableRng;
 
@@ -8,15 +8,35 @@ use crate::routes::Ctx;
 
 const PRIVATE_PEM: &str = include_str!("../../../crates/auth-core/tests/data/test-rsa.pem");
 const PUBLIC_PEM: &str = include_str!("../../../crates/auth-core/tests/data/test-rsa.pub.pem");
+const EC_PRIVATE_PEM: &str = include_str!("../../../crates/auth-core/tests/data/test-ec.pem");
+const EC_PUBLIC_PEM: &str = include_str!("../../../crates/auth-core/tests/data/test-ec.pub.pem");
 
 pub(crate) const TEST_ISSUER: &str = "https://id.neome.uk";
 
 pub(crate) fn test_ctx(now: u64) -> Ctx {
+    test_ctx_with(now, SigningAlg::Rs256)
+}
+
+pub(crate) fn test_ctx_with(now: u64, alg: SigningAlg) -> Ctx {
     let setup = OpaqueSetup::generate(&mut ChaCha8Rng::seed_from_u64(7));
+    let (signing, verify, es256_public_pem) = match alg {
+        SigningAlg::Es256 => (
+            SigningKey::new(SigningAlg::Es256, EC_PRIVATE_PEM.as_bytes().to_vec()),
+            VerifyKey::new(SigningAlg::Es256, EC_PUBLIC_PEM.as_bytes().to_vec()),
+            Some(EC_PUBLIC_PEM.as_bytes().to_vec()),
+        ),
+        _ => (
+            SigningKey::new(SigningAlg::Rs256, PRIVATE_PEM.as_bytes().to_vec()),
+            VerifyKey::new(SigningAlg::Rs256, PUBLIC_PEM.as_bytes().to_vec()),
+            None,
+        ),
+    };
     let app = AppEnv {
         endpoint: "https://db.example/sql".to_string(),
-        private_pem: PRIVATE_PEM.as_bytes().to_vec(),
-        public_pem: PUBLIC_PEM.as_bytes().to_vec(),
+        signing,
+        verify,
+        rsa_public_pem: PUBLIC_PEM.as_bytes().to_vec(),
+        es256_public_pem,
         setup,
         issuer: TEST_ISSUER.to_string(),
         mail_url: None,
@@ -40,7 +60,7 @@ pub(crate) fn test_ctx(now: u64) -> Ctx {
 
 pub(crate) fn test_access_token(cx: &Ctx) -> String {
     auth_core::sign_access(
-        &cx.app.private_pem,
+        &cx.app.signing,
         &auth_core::AccessInput {
             sub: "u1".to_string(),
             email: "a@b.c".to_string(),

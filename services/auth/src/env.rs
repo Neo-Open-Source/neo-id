@@ -1,11 +1,13 @@
-use auth_core::{AuthError, OpaqueSetup};
+use auth_core::{AuthError, OpaqueSetup, SigningAlg, SigningKey, VerifyKey};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use worker::Env;
 
 pub struct AppEnv {
     pub endpoint: String,
-    pub private_pem: Vec<u8>,
-    pub public_pem: Vec<u8>,
+    pub signing: SigningKey,
+    pub verify: VerifyKey,
+    pub rsa_public_pem: Vec<u8>,
+    pub es256_public_pem: Option<Vec<u8>>,
     pub setup: OpaqueSetup,
     pub issuer: String,
     pub mail_url: Option<String>,
@@ -19,8 +21,24 @@ pub struct AppEnv {
     pub rp_origin: String,
 }
 
+impl AppEnv {
+    pub fn jwks(&self) -> Result<Vec<serde_json::Value>, AuthError> {
+        let mut keys = vec![auth_core::rs256_jwk(&self.rsa_public_pem)?];
+        if let Some(public) = self.es256_public_pem.as_deref() {
+            keys.push(auth_core::es256_jwk(public)?);
+        }
+        Ok(keys)
+    }
+}
+
 fn unescape_pem(raw: &str) -> Vec<u8> {
     raw.replace("\\n", "\n").into_bytes()
+}
+
+fn secret_pem(env: &Env, name: &str) -> Option<Vec<u8>> {
+    env.secret(name)
+        .ok()
+        .map(|value| unescape_pem(&value.to_string()))
 }
 
 pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
@@ -34,11 +52,23 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
             .map_err(|_| AuthError::Internal)?
             .to_string(),
     );
-    let public_pem = unescape_pem(
+    let rsa_public_pem = unescape_pem(
         &env.secret("JWT_PUBLIC_KEY")
             .map_err(|_| AuthError::Internal)?
             .to_string(),
     );
+    let es256_private_pem = secret_pem(env, "JWT_ES256_PRIVATE_KEY");
+    let es256_public_pem = secret_pem(env, "JWT_ES256_PUBLIC_KEY");
+    let (signing, verify) = match (es256_private_pem, es256_public_pem.as_deref()) {
+        (Some(private), Some(public)) => (
+            SigningKey::new(SigningAlg::Es256, private),
+            VerifyKey::new(SigningAlg::Es256, public.to_vec()),
+        ),
+        _ => (
+            SigningKey::new(SigningAlg::Rs256, private_pem),
+            VerifyKey::new(SigningAlg::Rs256, rsa_public_pem.clone()),
+        ),
+    };
     let setup_raw = URL_SAFE_NO_PAD
         .decode(
             env.secret("OPRF_SETUP")
@@ -76,8 +106,10 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
         .map_or("https://id.neome.uk".to_string(), |value| value.to_string());
     Ok(AppEnv {
         endpoint,
-        private_pem,
-        public_pem,
+        signing,
+        verify,
+        rsa_public_pem,
+        es256_public_pem,
         setup: OpaqueSetup::try_from_bytes(&setup_raw)?,
         issuer,
         mail_url,

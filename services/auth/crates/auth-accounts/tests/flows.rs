@@ -4,16 +4,20 @@ use auth_accounts::{
     Availability, Failure, LoginUser, MintParams, check_email, complete_login, end_all_sessions,
     end_session, lite_account, lite_methods, rotate_refresh, start_login,
 };
-use auth_core::{AuthError, OpaqueSetup};
+use auth_core::{AuthError, OpaqueSetup, SigningAlg, SigningKey};
 use common::{Scripted, refresh_row, run, session_row, user_row};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use std::sync::LazyLock;
 
 const PRIVATE_PEM: &str = include_str!("../../../../../crates/auth-core/tests/data/test-rsa.pem");
 
+static SIGNING: LazyLock<SigningKey> =
+    LazyLock::new(|| SigningKey::new(SigningAlg::Rs256, PRIVATE_PEM.as_bytes().to_vec()));
+
 fn params() -> MintParams<'static> {
     MintParams {
-        private_pem: PRIVATE_PEM.as_bytes(),
+        signing: &SIGNING,
         issuer: "https://id.neome.uk",
         device: None,
         ip: None,

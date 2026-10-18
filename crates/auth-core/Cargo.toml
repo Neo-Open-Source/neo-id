@@ -13,9 +13,11 @@ bcrypt = "0.19"
 hex = "0.4"
 jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto", "use_pem"] }
 opaque-ke = { version = "4", features = ["argon2"] }
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "pem"] }
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 rand = { version = "0.8", default-features = false }
 hmac = { version = "0.12", default-features = false }
+rsa = { version = "0.9", default-features = false, features = ["pem"] }
 serde = { version = "1", features = ["derive"] }
 serde_cbor_2 = { version = "0.13", optional = true }
 serde_json = "1"

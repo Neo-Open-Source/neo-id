@@ -1,4 +1,6 @@
-use auth_core::{AuthError, hash_token, pkce_challenge, verify_access};
+use auth_core::{
+    AuthError, SigningAlg, SigningKey, VerifyKey, hash_token, pkce_challenge, verify_access,
+};
 use auth_db::{Executor, Query};
 use auth_oidc::{
     Grant, LogoutRequest, TokenRequest, Tokens, UserInfoRequest, WireError, logout, token, userinfo,
@@ -20,6 +22,14 @@ const SECRET: &str = "topsecret";
 const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 const USER_ID: &str = "u-1";
 const SESSION_ID: &str = "sess-1";
+
+fn signing() -> SigningKey {
+    SigningKey::new(SigningAlg::Rs256, PRIVATE_PEM.as_bytes().to_vec())
+}
+
+fn verifying() -> VerifyKey {
+    VerifyKey::new(SigningAlg::Rs256, PUBLIC_PEM.as_bytes().to_vec())
+}
 
 struct State {
     clients: Vec<Value>,
@@ -392,7 +402,7 @@ async fn exchange(
     rng: &mut ChaCha8Rng,
     req: TokenRequest,
 ) -> Result<Tokens, WireError> {
-    token(db, rng, NOW, PRIVATE_PEM.as_bytes(), ISSUER, req).await
+    token(db, rng, NOW, &signing(), ISSUER, req).await
 }
 
 fn id_payload(id_token: &str) -> Value {
@@ -413,13 +423,7 @@ async fn code_flow_issues_bearer_set() {
     .unwrap();
     assert_eq!(tokens.expires_in, 900);
     assert_eq!(tokens.session_id, SESSION_ID);
-    let claims = verify_access(
-        PUBLIC_PEM.as_bytes(),
-        &tokens.access_token,
-        ISSUER,
-        NOW + 10,
-    )
-    .unwrap();
+    let claims = verify_access(&verifying(), &tokens.access_token, ISSUER, NOW + 10).unwrap();
     assert_eq!(claims.sub, USER_ID);
     assert_eq!(claims.session_id.as_deref(), Some(SESSION_ID));
     assert_eq!(claims.scope.as_deref(), Some("openid"));
@@ -443,13 +447,7 @@ async fn id_token_omitted_without_openid_scope() {
     }
     let tokens = exchange(&db, &mut rng, req).await.unwrap();
     assert_eq!(tokens.id_token, "");
-    let claims = verify_access(
-        PUBLIC_PEM.as_bytes(),
-        &tokens.access_token,
-        ISSUER,
-        NOW + 10,
-    )
-    .unwrap();
+    let claims = verify_access(&verifying(), &tokens.access_token, ISSUER, NOW + 10).unwrap();
     assert_eq!(claims.scope.as_deref(), Some("profile"));
 }
 
