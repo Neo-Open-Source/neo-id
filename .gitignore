@@ -18,5 +18,8 @@ apps/*/dist/
 .env.prod
 .env*.local
 
+# opencode
+.opencode/
+
 # OS
 .DS_Store
