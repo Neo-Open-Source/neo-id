@@ -75,7 +75,7 @@ fn logged_user_from(
     let presented = header
         .and_then(|value| value.strip_prefix("Bearer ").map(String::from))
         .or_else(|| cookie.map(String::from))?;
-    let claims = verify_access(&cx.app.verify, &presented, &cx.app.issuer, cx.now).ok()?;
+    let claims = verify_access(&cx.app.verify_keys, &presented, &cx.app.issuer, cx.now).ok()?;
     let auth_time = claims
         .auth_time_unix
         .and_then(|value| u64::try_from(value).ok())
@@ -435,7 +435,7 @@ pub async fn userinfo_route(req: Request, ctx: RouteContext<()>) -> Result<Respo
     else {
         return unauthorized(&cx.request_id, cx.now_ms, "Missing access token");
     };
-    let Ok(claims) = verify_access(&cx.app.verify, &presented, &cx.app.issuer, cx.now) else {
+    let Ok(claims) = verify_access(&cx.app.verify_keys, &presented, &cx.app.issuer, cx.now) else {
         return unauthorized(&cx.request_id, cx.now_ms, "Invalid access token");
     };
     let request = UserInfoRequest {
@@ -461,7 +461,7 @@ pub async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     let field = |key: &str| logout_field(&params, &body, key);
     let user_id = field("user_id").or_else(|| {
         field("id_token_hint").and_then(|token| {
-            verify_id(&cx.app.verify, &token, &cx.app.issuer, cx.now)
+            verify_id(&cx.app.verify_keys, &token, &cx.app.issuer, cx.now)
                 .ok()
                 .map(|claims| claims.sub)
         })

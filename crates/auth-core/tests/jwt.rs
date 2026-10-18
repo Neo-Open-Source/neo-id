@@ -1,6 +1,6 @@
 use auth_core::{
-    ACCESS_TOKEN_TTL, AccessInput, AuthError, ID_TOKEN_TTL, IdInput, SigningAlg, SigningKey,
-    VerifyKey, at_hash, sign_access, sign_id, verify_access, verify_id,
+    ACCESS_TOKEN_TTL, AccessInput, AuthError, ID_TOKEN_TTL, IdInput, KeyRing, SigningAlg,
+    SigningKey, VerifyKey, at_hash, sign_access, sign_id, verify_access, verify_id,
 };
 
 const PRIVATE_PEM: &str = include_str!("data/test-rsa.pem");
@@ -24,6 +24,18 @@ fn ec_signing() -> SigningKey {
 
 fn ec_verifying() -> VerifyKey {
     VerifyKey::new(SigningAlg::Es256, EC_PUBLIC_PEM.as_bytes().to_vec())
+}
+
+fn rsa_ring() -> KeyRing {
+    KeyRing::new(vec![rsa_verifying()])
+}
+
+fn ec_ring() -> KeyRing {
+    KeyRing::new(vec![ec_verifying()])
+}
+
+fn hybrid_ring() -> KeyRing {
+    KeyRing::new(vec![rsa_verifying(), ec_verifying()])
 }
 
 fn access_input() -> AccessInput {
@@ -59,7 +71,7 @@ fn header_field(token: &str, field: &str) -> String {
 #[test]
 fn access_roundtrip_checks_claims() {
     let token = sign_access(&rsa_signing(), &access_input()).unwrap();
-    let claims = verify_access(&rsa_verifying(), &token, ISSUER, NOW + 100).unwrap();
+    let claims = verify_access(&rsa_ring(), &token, ISSUER, NOW + 100).unwrap();
     assert_eq!(claims.sub, "user-1");
     assert_eq!(claims.email, "alice@example.com");
     assert_eq!(claims.role, "user");
@@ -77,7 +89,7 @@ fn es256_roundtrip_and_header_algorithm() {
     let token = sign_access(&ec_signing(), &access_input()).unwrap();
     assert_eq!(header_alg(&token), "ES256");
     assert_eq!(header_kid(&token), "neo-auth-es256");
-    let claims = verify_access(&ec_verifying(), &token, ISSUER, NOW + 100).unwrap();
+    let claims = verify_access(&ec_ring(), &token, ISSUER, NOW + 100).unwrap();
     assert_eq!(claims.sub, "user-1");
     assert_eq!(claims.scope.as_deref(), Some("openid profile"));
 }
@@ -105,14 +117,33 @@ fn rs256_token_is_rejected_by_es256_key_and_vice_versa() {
     let rsa_token = sign_access(&rsa_signing(), &access_input()).unwrap();
     assert_eq!(header_alg(&rsa_token), "RS256");
     assert!(matches!(
-        verify_access(&ec_verifying(), &rsa_token, ISSUER, NOW + 1),
+        verify_access(&ec_ring(), &rsa_token, ISSUER, NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
     let ec_token = sign_access(&ec_signing(), &access_input()).unwrap();
     assert!(matches!(
-        verify_access(&rsa_verifying(), &ec_token, ISSUER, NOW + 1),
+        verify_access(&rsa_ring(), &ec_token, ISSUER, NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
+}
+
+#[test]
+fn hybrid_ring_accepts_both_algorithms_during_rotation() {
+    let rsa_token = sign_access(&rsa_signing(), &access_input()).unwrap();
+    let ec_token = sign_access(&ec_signing(), &access_input()).unwrap();
+    let ring = hybrid_ring();
+    assert_eq!(
+        verify_access(&ring, &rsa_token, ISSUER, NOW + 1)
+            .unwrap()
+            .sub,
+        "user-1"
+    );
+    assert_eq!(
+        verify_access(&ring, &ec_token, ISSUER, NOW + 1)
+            .unwrap()
+            .sub,
+        "user-1"
+    );
 }
 
 #[test]
@@ -129,10 +160,18 @@ fn es256_id_token_is_verifiable() {
         jti: "jti-ec".to_string(),
     };
     let token = sign_id(&ec_signing(), &input).unwrap();
-    let claims = verify_id(&ec_verifying(), &token, ISSUER, NOW + 1).unwrap();
+    let claims = verify_id(&ec_ring(), &token, ISSUER, NOW + 1).unwrap();
     assert_eq!(claims.sub, "user-1");
     assert_eq!(claims.aud, "client-9");
     assert_eq!(claims.nonce.as_deref(), Some("n-1"));
+}
+
+#[test]
+fn key_ring_debug_reports_size_without_key_material() {
+    let debug = format!("{:?}", hybrid_ring());
+    assert!(debug.contains("KeyRing"));
+    assert!(debug.contains("len: 2"));
+    assert!(!debug.contains("PUBLIC KEY"));
 }
 
 #[test]
@@ -151,7 +190,7 @@ fn at_hash_is_left_half_of_sha256_base64url() {
 fn expired_is_invalid_credentials() {
     let token = sign_access(&rsa_signing(), &access_input()).unwrap();
     assert!(matches!(
-        verify_access(&rsa_verifying(), &token, ISSUER, NOW + ACCESS_TOKEN_TTL + 1),
+        verify_access(&rsa_ring(), &token, ISSUER, NOW + ACCESS_TOKEN_TTL + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
@@ -160,7 +199,7 @@ fn expired_is_invalid_credentials() {
 fn wrong_issuer_is_invalid_credentials() {
     let token = sign_access(&rsa_signing(), &access_input()).unwrap();
     assert!(matches!(
-        verify_access(&rsa_verifying(), &token, "https://evil.test", NOW + 1),
+        verify_access(&rsa_ring(), &token, "https://evil.test", NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
@@ -178,7 +217,7 @@ fn tampered_payload_is_invalid_credentials() {
     tampered.replace_range(start..=start, &marker.to_string());
     assert_ne!(token, tampered);
     assert!(matches!(
-        verify_access(&rsa_verifying(), &tampered, ISSUER, NOW + 1),
+        verify_access(&rsa_ring(), &tampered, ISSUER, NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
@@ -188,7 +227,7 @@ fn garbage_is_malformed() {
     for token in ["abc", "a.b", "a.b.c"] {
         assert!(
             matches!(
-                verify_access(&rsa_verifying(), token, ISSUER, NOW),
+                verify_access(&rsa_ring(), token, ISSUER, NOW),
                 Err(AuthError::MalformedMessage)
             ),
             "{token}"
@@ -198,9 +237,10 @@ fn garbage_is_malformed() {
 
 #[test]
 fn bad_key_is_internal() {
-    let broken = VerifyKey::new(SigningAlg::Rs256, b"nope".to_vec());
+    let token = sign_access(&rsa_signing(), &access_input()).unwrap();
+    let broken = KeyRing::new(vec![VerifyKey::new(SigningAlg::Rs256, b"nope".to_vec())]);
     assert!(matches!(
-        verify_access(&broken, "a.b.c", ISSUER, NOW),
+        verify_access(&broken, &token, ISSUER, NOW + 1),
         Err(AuthError::Internal)
     ));
 }
@@ -248,16 +288,16 @@ fn verify_id_checks_signature_issuer_and_expiry() {
         jti: "jti-9".to_string(),
     };
     let token = sign_id(&rsa_signing(), &input).unwrap();
-    let claims = verify_id(&rsa_verifying(), &token, ISSUER, NOW + 1).unwrap();
+    let claims = verify_id(&rsa_ring(), &token, ISSUER, NOW + 1).unwrap();
     assert_eq!(claims.sub, "user-1");
     assert_eq!(claims.nonce.as_deref(), Some("n-1"));
     assert_eq!(claims.auth_time_unix, Some(i64::try_from(NOW).unwrap()));
     assert!(matches!(
-        verify_id(&rsa_verifying(), &token, ISSUER, NOW + ID_TOKEN_TTL + 1),
+        verify_id(&rsa_ring(), &token, ISSUER, NOW + ID_TOKEN_TTL + 1),
         Err(AuthError::InvalidCredentials)
     ));
     assert!(matches!(
-        verify_id(&rsa_verifying(), &token, "https://evil.test", NOW + 1),
+        verify_id(&rsa_ring(), &token, "https://evil.test", NOW + 1),
         Err(AuthError::InvalidCredentials)
     ));
 }
@@ -294,7 +334,7 @@ fn zero_auth_time_and_empty_scope_are_omitted() {
         jti: "jti-0".to_string(),
     };
     let token = sign_access(&rsa_signing(), &access).unwrap();
-    let claims = verify_access(&rsa_verifying(), &token, ISSUER, NOW + 1).unwrap();
+    let claims = verify_access(&rsa_ring(), &token, ISSUER, NOW + 1).unwrap();
     assert_eq!(claims.auth_time_unix, None);
     assert_eq!(claims.scope, None);
 }

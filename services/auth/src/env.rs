@@ -1,11 +1,11 @@
-use auth_core::{AuthError, OpaqueSetup, SigningAlg, SigningKey, VerifyKey};
+use auth_core::{AuthError, KeyRing, OpaqueSetup, SigningAlg, SigningKey, VerifyKey};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use worker::Env;
 
 pub struct AppEnv {
     pub endpoint: String,
     pub signing: SigningKey,
-    pub verify: VerifyKey,
+    pub verify_keys: KeyRing,
     pub rsa_public_pem: Vec<u8>,
     pub es256_public_pem: Option<Vec<u8>>,
     pub setup: OpaqueSetup,
@@ -41,6 +41,29 @@ fn secret_pem(env: &Env, name: &str) -> Option<Vec<u8>> {
         .map(|value| unescape_pem(&value.to_string()))
 }
 
+fn signing_alg(choice: Option<&str>) -> Result<SigningAlg, AuthError> {
+    match choice.map(str::to_uppercase).as_deref() {
+        None | Some("RS256") => Ok(SigningAlg::Rs256),
+        Some("ES256") => Ok(SigningAlg::Es256),
+        Some(_) => Err(AuthError::Internal),
+    }
+}
+
+fn build_signing(
+    requested: SigningAlg,
+    rsa_private: Vec<u8>,
+    es256_private: Option<Vec<u8>>,
+) -> Result<SigningKey, AuthError> {
+    match requested {
+        SigningAlg::Es256 => Ok(SigningKey::new(
+            SigningAlg::Es256,
+            es256_private.ok_or(AuthError::Internal)?,
+        )),
+        SigningAlg::Rs256 => Ok(SigningKey::new(SigningAlg::Rs256, rsa_private)),
+        _ => Err(AuthError::Internal),
+    }
+}
+
 pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
     let database_url = env
         .var("DATABASE_URL")
@@ -59,16 +82,18 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
     );
     let es256_private_pem = secret_pem(env, "JWT_ES256_PRIVATE_KEY");
     let es256_public_pem = secret_pem(env, "JWT_ES256_PUBLIC_KEY");
-    let (signing, verify) = match (es256_private_pem, es256_public_pem.as_deref()) {
-        (Some(private), Some(public)) => (
-            SigningKey::new(SigningAlg::Es256, private),
-            VerifyKey::new(SigningAlg::Es256, public.to_vec()),
-        ),
-        _ => (
-            SigningKey::new(SigningAlg::Rs256, private_pem),
-            VerifyKey::new(SigningAlg::Rs256, rsa_public_pem.clone()),
-        ),
-    };
+    let requested = signing_alg(
+        env.var("JWT_SIGNING_ALG")
+            .map(|value| value.to_string())
+            .ok()
+            .as_deref(),
+    )?;
+    let signing = build_signing(requested, private_pem, es256_private_pem)?;
+    let mut keys = vec![VerifyKey::new(SigningAlg::Rs256, rsa_public_pem.clone())];
+    if let Some(public) = es256_public_pem.as_deref() {
+        keys.push(VerifyKey::new(SigningAlg::Es256, public.to_vec()));
+    }
+    let verify_keys = KeyRing::new(keys);
     let setup_raw = URL_SAFE_NO_PAD
         .decode(
             env.secret("OPRF_SETUP")
@@ -107,7 +132,7 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
     Ok(AppEnv {
         endpoint,
         signing,
-        verify,
+        verify_keys,
         rsa_public_pem,
         es256_public_pem,
         setup: OpaqueSetup::try_from_bytes(&setup_raw)?,
@@ -126,11 +151,30 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
 
 #[cfg(test)]
 mod tests {
-    use super::unescape_pem;
+    use super::{build_signing, signing_alg, unescape_pem};
+    use auth_core::SigningAlg;
 
     #[test]
     fn unescape_pem_replaces_literal_newlines() {
         assert_eq!(unescape_pem("a\\nb"), b"a\nb".to_vec());
         assert_eq!(unescape_pem("plain"), b"plain".to_vec());
+    }
+
+    #[test]
+    fn signing_alg_defaults_rs256_and_fails_closed() {
+        assert_eq!(signing_alg(None).unwrap(), SigningAlg::Rs256);
+        assert_eq!(signing_alg(Some("rs256")).unwrap(), SigningAlg::Rs256);
+        assert_eq!(signing_alg(Some("ES256")).unwrap(), SigningAlg::Es256);
+        assert!(signing_alg(Some("")).is_err());
+        assert!(signing_alg(Some("HS256")).is_err());
+    }
+
+    #[test]
+    fn build_signing_selects_requested_key_or_fails() {
+        let rsa = build_signing(SigningAlg::Rs256, b"rsa".to_vec(), Some(b"ec".to_vec())).unwrap();
+        assert_eq!(rsa.alg(), SigningAlg::Rs256);
+        let ec = build_signing(SigningAlg::Es256, b"rsa".to_vec(), Some(b"ec".to_vec())).unwrap();
+        assert_eq!(ec.alg(), SigningAlg::Es256);
+        assert!(build_signing(SigningAlg::Es256, b"rsa".to_vec(), None).is_err());
     }
 }

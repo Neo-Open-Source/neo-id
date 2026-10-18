@@ -125,6 +125,40 @@ impl core::fmt::Debug for VerifyKey {
     }
 }
 
+// Overlapping key set: verification accepts any configured key so tokens signed
+// before a signing-algorithm switch keep validating until they expire.
+pub struct KeyRing {
+    keys: Vec<VerifyKey>,
+}
+
+impl KeyRing {
+    #[must_use]
+    pub fn new(keys: Vec<VerifyKey>) -> Self {
+        Self { keys }
+    }
+
+    fn candidates(&self, alg: SigningAlg) -> impl Iterator<Item = &VerifyKey> {
+        self.keys.iter().filter(move |key| key.alg == alg)
+    }
+}
+
+impl core::fmt::Debug for KeyRing {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("KeyRing")
+            .field("len", &self.keys.len())
+            .finish()
+    }
+}
+
+fn signing_alg(alg: Algorithm) -> Option<SigningAlg> {
+    match alg {
+        Algorithm::RS256 => Some(SigningAlg::Rs256),
+        Algorithm::ES256 => Some(SigningAlg::Es256),
+        _ => None,
+    }
+}
+
 pub struct AccessInput {
     pub sub: String,
     pub email: String,
@@ -196,6 +230,42 @@ pub fn sign_id(key: &SigningKey, input: &IdInput) -> Result<String, AuthError> {
 }
 
 pub fn verify_access(
+    keys: &KeyRing,
+    token: &str,
+    issuer: &str,
+    now: u64,
+) -> Result<AccessClaims, AuthError> {
+    let header = jsonwebtoken::decode_header(token).map_err(map_jwt_error)?;
+    let alg = signing_alg(header.alg).ok_or(AuthError::InvalidCredentials)?;
+    let mut last = AuthError::InvalidCredentials;
+    for key in keys.candidates(alg) {
+        match decode_access(key, token, issuer, now) {
+            Ok(claims) => return Ok(claims),
+            Err(err) => last = err,
+        }
+    }
+    Err(last)
+}
+
+pub fn verify_id(
+    keys: &KeyRing,
+    token: &str,
+    issuer: &str,
+    now: u64,
+) -> Result<IdTokenClaims, AuthError> {
+    let header = jsonwebtoken::decode_header(token).map_err(map_jwt_error)?;
+    let alg = signing_alg(header.alg).ok_or(AuthError::InvalidCredentials)?;
+    let mut last = AuthError::InvalidCredentials;
+    for key in keys.candidates(alg) {
+        match decode_id(key, token, issuer, now) {
+            Ok(claims) => return Ok(claims),
+            Err(err) => last = err,
+        }
+    }
+    Err(last)
+}
+
+fn decode_access(
     key: &VerifyKey,
     token: &str,
     issuer: &str,
@@ -214,7 +284,7 @@ pub fn verify_access(
     Ok(claims)
 }
 
-pub fn verify_id(
+fn decode_id(
     key: &VerifyKey,
     token: &str,
     issuer: &str,

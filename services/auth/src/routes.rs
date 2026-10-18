@@ -269,7 +269,7 @@ pub(crate) fn authed_from(
         .and_then(|value| value.strip_prefix("Bearer ").map(String::from))
         .or_else(|| cookie.map(String::from))
         .ok_or(AuthError::InvalidCredentials)?;
-    match auth_core::verify_access(&cx.app.verify, &presented, &cx.app.issuer, cx.now) {
+    match auth_core::verify_access(&cx.app.verify_keys, &presented, &cx.app.issuer, cx.now) {
         Ok(claims) => Ok(claims.sub),
         Err(err) => Err(err),
     }
@@ -664,7 +664,7 @@ async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     };
     if present(&presented) {
         if let Ok(claims) =
-            auth_core::verify_access(&cx.app.verify, &presented, &cx.app.issuer, cx.now)
+            auth_core::verify_access(&cx.app.verify_keys, &presented, &cx.app.issuer, cx.now)
         {
             if let Some(session_id) = claims.session_id {
                 let _ = auth_accounts::end_session(&cx.db, &session_id, cx.now).await;

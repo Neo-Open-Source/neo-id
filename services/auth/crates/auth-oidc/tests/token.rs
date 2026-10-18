@@ -1,5 +1,6 @@
 use auth_core::{
-    AuthError, SigningAlg, SigningKey, VerifyKey, hash_token, pkce_challenge, verify_access,
+    AuthError, KeyRing, SigningAlg, SigningKey, VerifyKey, hash_token, pkce_challenge,
+    verify_access,
 };
 use auth_db::{Executor, Query};
 use auth_oidc::{
@@ -27,8 +28,11 @@ fn signing() -> SigningKey {
     SigningKey::new(SigningAlg::Rs256, PRIVATE_PEM.as_bytes().to_vec())
 }
 
-fn verifying() -> VerifyKey {
-    VerifyKey::new(SigningAlg::Rs256, PUBLIC_PEM.as_bytes().to_vec())
+fn verifying() -> KeyRing {
+    KeyRing::new(vec![VerifyKey::new(
+        SigningAlg::Rs256,
+        PUBLIC_PEM.as_bytes().to_vec(),
+    )])
 }
 
 struct State {

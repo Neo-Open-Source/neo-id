@@ -1,4 +1,4 @@
-use auth_core::{OpaqueSetup, SigningAlg, SigningKey, VerifyKey};
+use auth_core::{KeyRing, OpaqueSetup, SigningAlg, SigningKey, VerifyKey};
 use rand_chacha::ChaCha8Rng;
 use rand_core::SeedableRng;
 
@@ -19,22 +19,27 @@ pub(crate) fn test_ctx(now: u64) -> Ctx {
 
 pub(crate) fn test_ctx_with(now: u64, alg: SigningAlg) -> Ctx {
     let setup = OpaqueSetup::generate(&mut ChaCha8Rng::seed_from_u64(7));
-    let (signing, verify, es256_public_pem) = match alg {
+    let (signing, es256_public_pem) = match alg {
         SigningAlg::Es256 => (
             SigningKey::new(SigningAlg::Es256, EC_PRIVATE_PEM.as_bytes().to_vec()),
-            VerifyKey::new(SigningAlg::Es256, EC_PUBLIC_PEM.as_bytes().to_vec()),
             Some(EC_PUBLIC_PEM.as_bytes().to_vec()),
         ),
         _ => (
             SigningKey::new(SigningAlg::Rs256, PRIVATE_PEM.as_bytes().to_vec()),
-            VerifyKey::new(SigningAlg::Rs256, PUBLIC_PEM.as_bytes().to_vec()),
             None,
         ),
     };
+    let mut keys = vec![VerifyKey::new(
+        SigningAlg::Rs256,
+        PUBLIC_PEM.as_bytes().to_vec(),
+    )];
+    if let Some(public) = es256_public_pem.as_ref() {
+        keys.push(VerifyKey::new(SigningAlg::Es256, public.clone()));
+    }
     let app = AppEnv {
         endpoint: "https://db.example/sql".to_string(),
         signing,
-        verify,
+        verify_keys: KeyRing::new(keys),
         rsa_public_pem: PUBLIC_PEM.as_bytes().to_vec(),
         es256_public_pem,
         setup,

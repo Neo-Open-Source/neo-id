@@ -33,7 +33,7 @@ pub use email::{
 pub use error::AuthError;
 pub use jwk::{es256 as es256_jwk, rs256 as rs256_jwk};
 pub use jwt::{
-    ACCESS_TOKEN_TTL, AccessInput, EC_KEY_ID, ID_TOKEN_TTL, IdInput, KEY_ID, SigningAlg,
+    ACCESS_TOKEN_TTL, AccessInput, EC_KEY_ID, ID_TOKEN_TTL, IdInput, KEY_ID, KeyRing, SigningAlg,
     SigningKey, VerifyKey, at_hash, sign_access, sign_id, verify_access, verify_id,
 };
 pub use opaque::{CredentialId, Envelope, LoginState, SessionKey};
