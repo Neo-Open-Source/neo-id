@@ -11,7 +11,7 @@ use auth_oidc::{
 use worker::{Request, Response, Result, RouteContext};
 
 use super::{
-    respond::{fail, no_store, ok},
+    respond::{fail, no_store, ok, unauthorized},
     routes::{
         Ctx, cookie_value, fail_status, form_or_json, header_opt, kv_store, load_cx, worker_rng,
     },
@@ -338,15 +338,13 @@ pub async fn userinfo_route(req: Request, ctx: RouteContext<()>) -> Result<Respo
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    let Some(header) = header_opt(&req, "authorization") else {
-        return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
+    let Some(presented) = header_opt(&req, "authorization")
+        .and_then(|header| header.strip_prefix("Bearer ").map(String::from))
+    else {
+        return unauthorized(&cx.request_id, cx.now_ms, "Missing access token");
     };
-    let Some(presented) = header.strip_prefix("Bearer ") else {
-        return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage);
-    };
-    let claims = match verify_access(&cx.app.public_pem, presented, &cx.app.issuer, cx.now) {
-        Ok(claims) => claims,
-        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    let Ok(claims) = verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now) else {
+        return unauthorized(&cx.request_id, cx.now_ms, "Invalid access token");
     };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,

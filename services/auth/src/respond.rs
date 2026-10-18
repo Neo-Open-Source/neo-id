@@ -29,6 +29,16 @@ pub fn fail(request_id: &str, now_ms: u64, err: &AuthError) -> Result<Response> 
     .map(|response| response.with_status(status))
 }
 
+pub fn unauthorized(request_id: &str, now_ms: u64, description: &str) -> Result<Response> {
+    let mut response = fail(request_id, now_ms, &AuthError::InvalidCredentials)?;
+    let value = format!("Bearer error=\"invalid_token\", error_description=\"{description}\"");
+    response
+        .headers_mut()
+        .append("www-authenticate", &value)
+        .map_err(|_| worker::Error::RustError("header append failed".to_string()))?;
+    Ok(response)
+}
+
 fn cookie(name: &str, value: &str, max_age: u64) -> String {
     format!("{name}={value}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Lax")
 }
