@@ -31,6 +31,11 @@
 
 <svelte:head>
   <title>NeoID</title>
+  <style>
+    body > noscript {
+      display: none !important;
+    }
+  </style>
   {#if captchaMode === 'altcha'}
     <script>
       (function () {

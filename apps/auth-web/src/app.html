@@ -53,10 +53,10 @@
     <div style="display: contents">%sveltekit.body%</div>
     <div
       id="neo-legacy"
-      style="display: none; max-width: 24rem; margin: 8vh auto 0; padding: 0 1rem; font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif; color: #111"
+      style="display: none; max-width: 24rem; margin: 8vh auto 0; padding: 0 1rem; font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif; color: var(--content, #111)"
     >
       <h1 style="font-size: 1.5rem">NeoID</h1>
-      <p style="color: #444">Your browser is too old for the full sign-in page.</p>
+      <p style="color: var(--muted, #444)">Your browser is too old for the full sign-in page.</p>
       <p><a href="/lite">Continue on the lite page</a></p>
     </div>
     <script>
@@ -76,10 +76,10 @@
     </script>
     <noscript>
       <div
-        style="max-width: 24rem; margin: 8vh auto 0; padding: 0 1rem; font-family: Arial, Arial, sans-serif; color: #111"
+        style="max-width: 24rem; margin: 8vh auto 0; padding: 0 1rem; font-family: Arial, Arial, sans-serif; color: var(--content, #111)"
       >
         <h1 style="font-size: 1.5rem">NeoID</h1>
-        <p style="color: #444">JavaScript is disabled in your browser.</p>
+        <p style="color: var(--muted, #444)">JavaScript is disabled in your browser.</p>
         <p><a href="/lite">Continue on the lite page</a></p>
       </div>
     </noscript>
