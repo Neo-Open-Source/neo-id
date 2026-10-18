@@ -15,13 +15,7 @@ pub struct Logout {
     pub redirect_url: String,
 }
 
-pub async fn logout<E: Executor, R: rand::RngCore + rand::CryptoRng>(
-    db: &E,
-    rng: &mut R,
-    now: u64,
-    req: LogoutRequest,
-) -> Result<Logout, WireError> {
-    let _ = (rng as &mut R, now);
+pub async fn logout<E: Executor>(db: &E, req: LogoutRequest) -> Result<Logout, WireError> {
     match (req.session_id, req.user_id) {
         (Some(session_id), _) => {
             db.run(deactivate_session(&session_id)).await?;

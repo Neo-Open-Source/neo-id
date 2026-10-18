@@ -355,17 +355,7 @@ pub async fn userinfo_route(req: Request, ctx: RouteContext<()>) -> Result<Respo
     let Ok(claims) = verify_access(&cx.app.public_pem, &presented, &cx.app.issuer, cx.now) else {
         return unauthorized(&cx.request_id, cx.now_ms, "Invalid access token");
     };
-    let mut rng = match worker_rng() {
-        Ok(rng) => rng,
-        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-    };
-    match userinfo(
-        &cx.db,
-        &mut rng,
-        cx.now,
-        UserInfoRequest { sub: claims.sub },
-    )
-    .await
+    match userinfo(&cx.db, UserInfoRequest { sub: claims.sub }).await
     {
         Ok(info) => ok(
             &cx.request_id,
@@ -400,10 +390,6 @@ pub async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Res
                 .map(String::from)
         })
     };
-    let mut rng = match worker_rng() {
-        Ok(rng) => rng,
-        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-    };
     let user_id = field("user_id").or_else(|| {
         field("id_token_hint").and_then(|token| {
             verify_id(&cx.app.public_pem, &token, &cx.app.issuer, cx.now)
@@ -413,8 +399,6 @@ pub async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     });
     match logout(
         &cx.db,
-        &mut rng,
-        cx.now,
         LogoutRequest {
             session_id: field("session_id"),
             user_id,

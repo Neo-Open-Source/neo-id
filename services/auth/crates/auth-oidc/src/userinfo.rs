@@ -19,13 +19,7 @@ pub struct UserInfo {
     pub picture: Option<String>,
 }
 
-pub async fn userinfo<E: Executor, R: rand::RngCore + rand::CryptoRng>(
-    db: &E,
-    rng: &mut R,
-    now: u64,
-    req: UserInfoRequest,
-) -> Result<UserInfo, WireError> {
-    let _ = (rng as &mut R, now);
+pub async fn userinfo<E: Executor>(db: &E, req: UserInfoRequest) -> Result<UserInfo, WireError> {
     let rows = db.run(find_user_by_id(&req.sub)).await?;
     let row = rows.first().ok_or(WireError::InvalidRequest)?;
     if field(row, "status")? == "banned" {

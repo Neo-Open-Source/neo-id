@@ -899,11 +899,9 @@ async fn refresh_without_live_session_fails_closed() {
 
 #[tokio::test]
 async fn userinfo_returns_openid_profile() {
-    let (db, mut rng) = harness();
+    let (db, _rng) = harness();
     let profile = userinfo(
         &db,
-        &mut rng,
-        NOW,
         UserInfoRequest {
             sub: USER_ID.to_string(),
         },
@@ -924,11 +922,9 @@ async fn userinfo_returns_openid_profile() {
 
 #[tokio::test]
 async fn userinfo_unknown_or_banned() {
-    let (db, mut rng) = harness();
+    let (db, _rng) = harness();
     let missing = userinfo(
         &db,
-        &mut rng,
-        NOW,
         UserInfoRequest {
             sub: "ghost".to_string(),
         },
@@ -941,8 +937,6 @@ async fn userinfo_unknown_or_banned() {
     }
     let banned = userinfo(
         &db,
-        &mut rng,
-        NOW,
         UserInfoRequest {
             sub: USER_ID.to_string(),
         },
@@ -953,11 +947,9 @@ async fn userinfo_unknown_or_banned() {
 
 #[tokio::test]
 async fn logout_ends_session_or_user_or_nothing() {
-    let (db, mut rng) = harness();
+    let (db, _rng) = harness();
     let session = logout(
         &db,
-        &mut rng,
-        NOW,
         LogoutRequest {
             session_id: Some(SESSION_ID.to_string()),
             user_id: Some(USER_ID.to_string()),
@@ -970,11 +962,9 @@ async fn logout_ends_session_or_user_or_nothing() {
     assert_eq!(session.redirect_url, "/");
     assert!(!db.session_active(SESSION_ID));
 
-    let (db, mut rng) = harness();
+    let (db, _rng) = harness();
     let user = logout(
         &db,
-        &mut rng,
-        NOW,
         LogoutRequest {
             session_id: None,
             user_id: Some(USER_ID.to_string()),
@@ -987,11 +977,9 @@ async fn logout_ends_session_or_user_or_nothing() {
     assert_eq!(user.redirect_url, "https://app.example/bye");
     assert!(!db.session_active(SESSION_ID));
 
-    let (db, mut rng) = harness();
+    let (db, _rng) = harness();
     let anonymous = logout(
         &db,
-        &mut rng,
-        NOW,
         LogoutRequest {
             session_id: None,
             user_id: None,
@@ -1007,11 +995,9 @@ async fn logout_ends_session_or_user_or_nothing() {
 
 #[tokio::test]
 async fn logout_appends_state_to_redirect() {
-    let (db, mut rng) = harness();
+    let (db, _rng) = harness();
     let done = logout(
         &db,
-        &mut rng,
-        NOW,
         LogoutRequest {
             session_id: Some(SESSION_ID.to_string()),
             user_id: None,
