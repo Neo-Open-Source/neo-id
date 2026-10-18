@@ -1,0 +1,13 @@
+[package]
+name = "db"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+auth-core = { version = "0.1.0", path = "../auth-core", default-features = false }
+serde_json = "1"
+
+[lints]
+workspace = true
