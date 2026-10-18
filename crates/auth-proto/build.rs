@@ -17,6 +17,22 @@ fn main() {
         ("auth.v1.AltchaParameters.key_signature", "keySignature"),
         ("auth.v1.AltchaParameters.memory_cost", "memoryCost"),
         ("auth.v1.AltchaSolution.derived_key", "derivedKey"),
+        ("auth.v1.LoginFinishResponse.mfa_required", "mfaRequired"),
+        ("auth.v1.LoginFinishResponse.mfa_methods", "mfaMethods"),
+        (
+            "auth.v1.LoginFinishResponse.passkey_available",
+            "passkeyAvailable",
+        ),
+        ("auth.v1.LoginFinishResponse.email_hint", "emailHint"),
+        ("auth.v1.LoginFinishResponse.access_token", "accessToken"),
+        ("auth.v1.LoginFinishResponse.refresh_token", "refreshToken"),
+        ("auth.v1.LoginFinishResponse.id_token", "idToken"),
+        ("auth.v1.LiteStartResponse.mfa_methods", "mfaMethods"),
+        (
+            "auth.v1.LiteStartResponse.passkey_available",
+            "passkeyAvailable",
+        ),
+        ("auth.v1.LiteStartResponse.email_hint", "emailHint"),
     ] {
         config.field_attribute(field, format!("#[serde(rename = \"{name}\")]"));
     }
@@ -39,6 +55,13 @@ fn main() {
         "auth.v1.AltchaParameters.parallelism",
         "auth.v1.AltchaChallenge.signature",
         "auth.v1.AltchaSolution.time",
+        "auth.v1.LoginFinishResponse.attempt_id",
+        "auth.v1.LoginFinishResponse.passkey_available",
+        "auth.v1.LoginFinishResponse.email_hint",
+        "auth.v1.LoginFinishResponse.access_token",
+        "auth.v1.LoginFinishResponse.refresh_token",
+        "auth.v1.LoginFinishResponse.id_token",
+        "auth.v1.LiteStartResponse.email_hint",
     ] {
         config.field_attribute(field, "#[serde(skip_serializing_if = \"Option::is_none\")]");
     }
@@ -54,6 +77,7 @@ fn main() {
                 "auth/v1/mfa.proto",
                 "auth/v1/device.proto",
                 "auth/v1/captcha.proto",
+                "auth/v1/auth.proto",
             ]
             .map(|name| format!("{root}/{name}")),
             &[root],

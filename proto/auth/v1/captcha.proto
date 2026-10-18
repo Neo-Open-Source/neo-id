@@ -34,3 +34,9 @@ message AltchaPayload {
   AltchaChallenge challenge = 1;
   AltchaSolution solution = 2;
 }
+
+// Raster (PNG) challenge for the no-JS lite flow. `image` is base64 PNG.
+message LiteCaptchaChallenge {
+  string id = 1;
+  string image = 2;
+}

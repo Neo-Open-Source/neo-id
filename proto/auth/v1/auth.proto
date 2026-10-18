@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// Browser login / register / password flow responses. The SvelteKit client
+// reads these via fromJson; JSON names that must stay camelCase for wire parity
+// are pinned in auth-proto/build.rs.
+
+message LoginStartResponse {
+  string attempt_id = 1;
+  string response = 2;
+}
+
+// Either an MFA challenge (mfa_required = true) or minted tokens. The `user`
+// object present on the token wire is intentionally not part of this contract.
+message LoginFinishResponse {
+  bool mfa_required = 1;
+  optional string attempt_id = 2;
+  repeated string mfa_methods = 3;
+  optional bool passkey_available = 4;
+  optional string email_hint = 5;
+  optional string access_token = 6;
+  optional string refresh_token = 7;
+  optional string id_token = 8;
+}
+
+message RegisterStartResponse {
+  string status = 1;
+  string user_id = 2;
+  string response = 3;
+}
+
+message PasswordResetResponse {
+  string user_id = 1;
+  string reset_grant = 2;
+}
+
+// Result of POST /api/v1/auth/lite/start (no-JS email-code login). An unknown
+// account yields an all-empty reply so the endpoint never leaks existence.
+message LiteStartResponse {
+  string attempt_id = 1;
+  repeated string mfa_methods = 2;
+  bool passkey_available = 3;
+  optional string email_hint = 4;
+  bool sent = 5;
+}
+
+message ProfileResponse {
+  string id = 1;
+  string email = 2;
+  string role = 3;
+  string status = 4;
+}
+
+// Location returned by the consent endpoint once the user decides.
+message ConsentResponse {
+  string redirect = 1;
+}
+
+// Consent-required outcome of POST /api/v1/oauth2/authorize (unwrapped by the
+// SvelteKit proxy into the /oauth/consent page query).
+message AuthorizeConsentResponse {
+  bool consent_required = 1;
+  string state = 2;
+  string redirect_uri = 3;
+  string service_app_id = 4;
+  optional string nonce = 5;
+  repeated string scopes = 6;
+}
+
+// Acknowledgement bodies for fire-and-forget mutations. Distinct messages keep
+// the wire keys stable (`sent`, `verified`, ...).
+message SentResponse {
+  bool sent = 1;
+}
+
+message VerifiedResponse {
+  bool verified = 1;
+}
+
+message ChangedResponse {
+  bool changed = 1;
+}
+
+message ApprovedResponse {
+  bool approved = 1;
+}
+
+message EnabledResponse {
+  bool enabled = 1;
+}
+
+message RevokedResponse {
+  bool revoked = 1;
+}

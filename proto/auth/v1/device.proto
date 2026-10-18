@@ -14,3 +14,20 @@ message DeviceAuthorization {
   // When set, only this user may approve (binds QR to a pending login).
   string expected_user_id = 8;
 }
+
+// Wire response for POST /api/v1/device/token before a session is minted.
+// Internal polling endpoint: expected "pending"/"expired" states are 200, not
+// 400, so they never surface as browser console errors.
+message DeviceTokenStatus {
+  string status = 1;
+}
+
+// Wire response for POST /api/v1/device/authorize (snake_case on the wire).
+message DeviceAuthorizationResponse {
+  string device_code = 1;
+  string user_code = 2;
+  string verification_uri = 3;
+  string verification_uri_complete = 4;
+  uint32 expires_in = 5;
+  uint32 interval = 6;
+}
