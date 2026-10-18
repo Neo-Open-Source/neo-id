@@ -109,7 +109,9 @@ fn authorize_req() -> AuthorizeRequest {
         response_type: "code".to_string(),
         client_id: CLIENT_ID.to_string(),
         redirect_uri: REDIRECT.to_string(),
+        scope: "openid profile email".to_string(),
         state: Some("s-1".to_string()),
+        nonce: None,
         code_challenge: None,
         code_challenge_method: None,
         user_id: Some("u-1".to_string()),
@@ -143,6 +145,8 @@ async fn consent_for_signed_in_user() {
         AuthorizeOutcome::Consent {
             state: "s-1".to_string(),
             redirect_uri: REDIRECT.to_string(),
+            service_app_id: APP_ID.to_string(),
+            nonce: None,
             scopes: vec![
                 "openid".to_string(),
                 "profile".to_string(),
@@ -253,6 +257,51 @@ async fn state_is_generated_when_missing() {
 }
 
 #[tokio::test]
+async fn consent_echoes_nonce_and_service_app_id() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        nonce: Some("n-9".to_string()),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Consent {
+            nonce,
+            service_app_id,
+            ..
+        } => {
+            assert_eq!(nonce.as_deref(), Some("n-9"));
+            assert_eq!(service_app_id, APP_ID);
+        }
+        other @ AuthorizeOutcome::Login { .. } => panic!("expected consent, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn scope_without_openid_is_invalid_request() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        scope: "profile email".to_string(),
+        ..authorize_req()
+    };
+    assert_eq!(outcome(&db, req).await, Err(WireError::InvalidRequest));
+}
+
+#[tokio::test]
+async fn requested_scopes_intersect_registered() {
+    let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
+    let req = AuthorizeRequest {
+        scope: "openid admin".to_string(),
+        ..authorize_req()
+    };
+    match outcome(&db, req).await.unwrap() {
+        AuthorizeOutcome::Consent { scopes, .. } => {
+            assert_eq!(scopes, vec!["openid".to_string()]);
+        }
+        other @ AuthorizeOutcome::Login { .. } => panic!("expected consent, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn approve_creates_code_and_redirects_with_state() {
     let db = MockDb::with_clients(vec![client(true, &[REDIRECT])]);
     let result = decide_consent(
@@ -266,6 +315,7 @@ async fn approve_creates_code_and_redirects_with_state() {
     assert!(result.url.starts_with(REDIRECT));
     assert!(result.url.contains("code="));
     assert!(result.url.contains("state=s-7"));
+    assert!(result.code.is_some());
     let codes = db.codes();
     assert_eq!(codes.len(), 1);
     assert_eq!(codes[0].get("state").and_then(Value::as_str), Some("s-7"));

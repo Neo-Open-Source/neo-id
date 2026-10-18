@@ -5,7 +5,7 @@ use auth_core::{
 };
 use auth_db::{
     Executor, create_refresh, create_session, find_envelope, find_user_by_email, find_user_by_id,
-    touch_login,
+    passkeys_by_user, touch_login,
 };
 use auth_proto::auth::v1::TokenPair;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -32,6 +32,32 @@ pub async fn load_user_by_id<E: Executor>(db: &E, user_id: &str) -> Result<Login
     let users = db.run(find_user_by_id(user_id)).await?;
     let user = users.first().ok_or(AuthError::InvalidCredentials)?;
     parse_user(user)
+}
+
+pub async fn lite_login_user<E: Executor>(
+    db: &E,
+    email: &str,
+) -> Result<Option<LoginUser>, AuthError> {
+    let users = db.run(find_user_by_email(email)).await?;
+    let Some(row) = users.first() else {
+        return Ok(None);
+    };
+    let enabled = |key: &str| {
+        row.get(key)
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+    };
+    if enabled("totpEnabled") || enabled("emailMfaEnabled") {
+        return Ok(None);
+    }
+    let user = parse_user(row)?;
+    if !db.run(find_envelope(&user.id)).await?.is_empty() {
+        return Ok(None);
+    }
+    if !db.run(passkeys_by_user(&user.id)).await?.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(user))
 }
 
 fn parse_user(user: &serde_json::Value) -> Result<LoginUser, AuthError> {
@@ -122,6 +148,37 @@ pub async fn complete_login<E: Executor, R: rand::RngCore + rand::CryptoRng>(
         .and_then(|row| row.get("id"))
         .and_then(serde_json::Value::as_str)
         .ok_or(AuthError::MalformedMessage)?;
+    let (access_token, id_token) = sign_token_pair(rng, params, user, session_id, now, now, None)?;
+    let refresh_token = generate_token(rng, REFRESH_TOKEN_BYTES);
+    db.run(create_refresh(
+        &user.id,
+        session_id,
+        &hash_token(&refresh_token),
+        None,
+        params.device,
+        params.ip,
+        refresh_expiry(now),
+    ))
+    .await?;
+    db.run(touch_login(&user.id, params.ip, now)).await?;
+    Ok(TokenPair {
+        access_token,
+        refresh_token,
+        id_token,
+        session_id: session_id.to_string(),
+        expires_in: auth_core::ACCESS_TOKEN_TTL,
+    })
+}
+
+pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
+    rng: &mut R,
+    params: &MintParams<'_>,
+    user: &LoginUser,
+    session_id: &str,
+    now: u64,
+    auth_time: u64,
+    nonce: Option<&str>,
+) -> Result<(String, String), AuthError> {
     let access_token = sign_access(
         params.private_pem,
         &AccessInput {
@@ -142,26 +199,11 @@ pub async fn complete_login<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             audience: params.audience.map(String::from),
             issuer: params.issuer.to_string(),
             issued_at: now,
+            auth_time,
+            nonce: nonce.map(String::from),
+            access_token: Some(access_token.clone()),
             jti: generate_id(rng),
         },
     )?;
-    let refresh_token = generate_token(rng, REFRESH_TOKEN_BYTES);
-    db.run(create_refresh(
-        &user.id,
-        session_id,
-        &hash_token(&refresh_token),
-        None,
-        params.device,
-        params.ip,
-        refresh_expiry(now),
-    ))
-    .await?;
-    db.run(touch_login(&user.id, params.ip, now)).await?;
-    Ok(TokenPair {
-        access_token,
-        refresh_token,
-        id_token,
-        session_id: session_id.to_string(),
-        expires_in: auth_core::ACCESS_TOKEN_TTL,
-    })
+    Ok((access_token, id_token))
 }

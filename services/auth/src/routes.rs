@@ -64,12 +64,15 @@ async fn discovery(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
             "token_endpoint": format!("{issuer}/api/v1/oauth2/token"),
             "userinfo_endpoint": format!("{issuer}/api/v1/oauth2/userinfo"),
             "jwks_uri": format!("{issuer}/.well-known/jwks.json"),
+            "registration_endpoint": format!("{issuer}/api/v1/oauth2/register"),
+            "end_session_endpoint": format!("{issuer}/api/v1/oauth2/logout"),
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": ["RS256"],
             "scopes_supported": ["openid", "profile", "email"],
+            "claims_supported": ["iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "email", "email_verified", "name", "given_name", "family_name", "picture"],
             "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
         }),
         200,
@@ -85,6 +88,7 @@ fn rsa_jwk(public_pem: &[u8]) -> Result<serde_json::Value, AuthError> {
         "e": URL_SAFE_NO_PAD.encode(key.e().to_bytes_be()),
         "alg": "RS256",
         "use": "sig",
+        "kid": auth_core::KEY_ID,
     }))
 }
 
@@ -211,6 +215,27 @@ pub(crate) async fn json_body(req: &mut Request) -> Result<serde_json::Value, Au
     }
 }
 
+pub(crate) async fn form_or_json(req: &mut Request) -> Result<serde_json::Value, AuthError> {
+    let form = header_opt(req, "content-type")
+        .is_some_and(|value| value.starts_with("application/x-www-form-urlencoded"));
+    if !form {
+        return json_body(req).await;
+    }
+    let text = req.text().await.map_err(|_| AuthError::MalformedMessage)?;
+    Ok(form_to_object(&text))
+}
+
+pub(crate) fn form_to_object(text: &str) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (key, value) in url::form_urlencoded::parse(text.as_bytes()) {
+        map.insert(
+            key.into_owned(),
+            serde_json::Value::String(value.into_owned()),
+        );
+    }
+    serde_json::Value::Object(map)
+}
+
 pub(crate) fn authed(cx: &Ctx, req: &Request) -> Result<String, AuthError> {
     let Some(header) = header_opt(req, "authorization") else {
         return Err(AuthError::InvalidCredentials);
@@ -323,9 +348,9 @@ async fn login_start(mut req: Request, ctx: RouteContext<()>) -> Result<Response
     .await
     {
         Ok(challenge) => {
-            let state_id = cx.request_id.clone();
+            let attempt_id = auth_core::generate_id(&mut rng);
             if store
-                .put(&state_key(&state_id), &challenge.state, 300)
+                .put(&state_key(&attempt_id), &challenge.state, 300)
                 .await
                 .is_err()
             {
@@ -335,7 +360,7 @@ async fn login_start(mut req: Request, ctx: RouteContext<()>) -> Result<Response
                 &cx.request_id,
                 cx.now_ms,
                 &serde_json::json!({
-                    "state_id": state_id,
+                    "attempt_id": attempt_id,
                     "response": URL_SAFE_NO_PAD.encode(challenge.response),
                 }),
                 200,
@@ -345,8 +370,8 @@ async fn login_start(mut req: Request, ctx: RouteContext<()>) -> Result<Response
     }
 }
 
-fn state_key(state_id: &str) -> String {
-    format!("login:{state_id}")
+fn state_key(attempt_id: &str) -> String {
+    format!("login:{attempt_id}")
 }
 
 pub(crate) fn header_opt(req: &Request, name: &str) -> Option<String> {
@@ -414,6 +439,41 @@ async fn verified_user<E: auth_db::Executor>(
     }))
 }
 
+async fn begin_mfa(
+    cx: &Ctx,
+    store: &crate::kv::StatesKv,
+    attempt_id: &str,
+    verified: &VerifiedUser,
+) -> Result<Response> {
+    let challenge = auth_accounts::MfaChallenge {
+        user_id: verified.id.clone(),
+        email: verified.email.clone(),
+        role: verified.role.clone(),
+        totp: verified.methods.contains(&"totp"),
+        email_mfa: verified.email_mfa,
+        passkey: verified.passkeys > 0,
+    };
+    if auth_accounts::store_challenge(store, attempt_id, &challenge)
+        .await
+        .is_err()
+    {
+        return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
+    }
+    ok(
+        &cx.request_id,
+        cx.now_ms,
+        &serde_json::json!({
+            "mfaRequired": true,
+            "attempt_id": attempt_id,
+            "mfaMethods": verified.methods,
+            "passkeyAvailable": verified.passkeys > 0,
+            "emailHint": verified.email_mfa.then_some(verified.email.clone()),
+            "user": {"id": verified.id, "email": verified.email, "role": verified.role},
+        }),
+        200,
+    )
+}
+
 async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let store = match kv_store(&ctx) {
         Ok(store) => crate::kv::StatesKv::new(store),
@@ -427,13 +487,13 @@ async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
         Ok(body) => body,
         Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
     };
-    let state_id = body_field(&body, "state_id");
-    let state_bytes = match store.get(&state_key(state_id)).await {
+    let attempt_id = body_field(&body, "attempt_id");
+    let state_bytes = match store.get(&state_key(attempt_id)).await {
         Ok(Some(bytes)) => bytes,
         Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let _ = store.delete(&state_key(state_id)).await;
+    let _ = store.delete(&state_key(attempt_id)).await;
     let Ok(final_bytes) = URL_SAFE_NO_PAD.decode(body_field(&body, "finalization")) else {
         return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage);
     };
@@ -457,18 +517,7 @@ async fn login_finish(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
     if !verified.methods.is_empty() {
-        return ok(
-            &cx.request_id,
-            cx.now_ms,
-            &serde_json::json!({
-                "mfaRequired": true,
-                "mfaMethods": verified.methods,
-                "passkeyAvailable": verified.passkeys > 0,
-                "emailHint": verified.email_mfa.then_some(verified.email.clone()),
-                "user": {"id": verified.id, "email": verified.email, "role": verified.role},
-            }),
-            200,
-        );
+        return begin_mfa(&cx, &store, attempt_id, &verified).await;
     }
     let device = header_opt(&req, "user-agent");
     let ip = header_opt(&req, "cf-connecting-ip");
@@ -603,6 +652,7 @@ pub fn router() -> Router<'static, ()> {
         )
         .post_async("/api/v1/oauth2/token", crate::oidc::token_route)
         .get_async("/api/v1/oauth2/userinfo", crate::oidc::userinfo_route)
+        .get_async("/api/v1/oauth2/logout", crate::oidc::logout_route)
         .post_async("/api/v1/oauth2/logout", crate::oidc::logout_route)
         .post_async("/api/v1/oauth2/register", crate::oidc::register_route)
         .post_async("/api/v1/mfa/email/request", crate::mfa::email_request)
@@ -657,4 +707,26 @@ pub fn router() -> Router<'static, ()> {
             "/api/v1/user/password/change",
             crate::account::password_change,
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::form_to_object;
+
+    #[test]
+    fn form_to_object_decodes_oauth_params() {
+        let value = form_to_object(
+            "grant_type=authorization_code&code=a%2Bb&redirect_uri=https%3A%2F%2Fapp%2Fcb&scope=openid+profile",
+        );
+        assert_eq!(value["grant_type"], "authorization_code");
+        assert_eq!(value["code"], "a+b");
+        assert_eq!(value["redirect_uri"], "https://app/cb");
+        assert_eq!(value["scope"], "openid profile");
+    }
+
+    #[test]
+    fn form_to_object_collapses_duplicate_keys_last_wins() {
+        let value = form_to_object("a=1&a=2");
+        assert_eq!(value["a"], "2");
+    }
 }

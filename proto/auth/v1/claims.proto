@@ -12,6 +12,9 @@ message IDTokenClaims {
   int64 iat_unix = 6;
   int64 exp_unix = 7;
   string jti = 8;
+  optional string nonce = 9;
+  optional string at_hash = 10;
+  optional int64 auth_time_unix = 11;
 }
 
 // Access token claims. Signed by this OP, verified statelessly by resources.

@@ -59,3 +59,13 @@ pub fn cleared_cookies(response: Result<Response>) -> Result<Response> {
         .map_err(|_| worker::Error::RustError("cookie append failed".to_string()))?;
     Ok(response)
 }
+
+pub fn no_store(response: Result<Response>) -> Result<Response> {
+    let mut response = response?;
+    let headers = response.headers_mut();
+    headers
+        .append("cache-control", "no-store")
+        .and(headers.append("pragma", "no-cache"))
+        .map_err(|_| worker::Error::RustError("header append failed".to_string()))?;
+    Ok(response)
+}

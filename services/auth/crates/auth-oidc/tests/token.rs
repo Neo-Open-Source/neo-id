@@ -367,6 +367,7 @@ fn code_grant(code: &str, verifier: Option<&str>, secret: Option<&str>) -> Token
             client_id: CLIENT_ID.to_string(),
             client_secret: secret.map(str::to_string),
             code_verifier: verifier.map(str::to_string),
+            nonce: None,
         },
         device: Some("test-browser".to_string()),
         ip: Some("10.0.0.1".to_string()),
@@ -428,6 +429,22 @@ async fn code_flow_issues_bearer_set() {
     assert_eq!(stored.len(), 1);
     let debug = format!("{tokens:?}");
     assert!(!debug.contains(&tokens.refresh_token));
+}
+
+#[tokio::test]
+async fn id_token_reflects_nonce_and_access_token_hash() {
+    let (db, mut rng) = harness();
+    let mut req = code_grant("authcode-1", Some(VERIFIER), Some(SECRET));
+    if let Grant::Code { nonce, .. } = &mut req.grant {
+        *nonce = Some("nonce-abc".to_string());
+    }
+    let tokens = exchange(&db, &mut rng, req).await.unwrap();
+    let payload = id_payload(&tokens.id_token);
+    assert_eq!(payload["nonce"], json!("nonce-abc"));
+    assert_eq!(
+        payload["at_hash"],
+        json!(auth_core::at_hash(&tokens.access_token))
+    );
 }
 
 #[tokio::test]
@@ -534,6 +551,7 @@ async fn redirect_mismatch_or_expired_code_is_invalid_grant() {
             client_id: CLIENT_ID.to_string(),
             client_secret: Some(SECRET.to_string()),
             code_verifier: Some(VERIFIER.to_string()),
+            nonce: None,
         },
         device: None,
         ip: None,
@@ -549,6 +567,7 @@ async fn redirect_mismatch_or_expired_code_is_invalid_grant() {
             client_id: CLIENT_ID.to_string(),
             client_secret: Some(SECRET.to_string()),
             code_verifier: Some(VERIFIER.to_string()),
+            nonce: None,
         },
         device: None,
         ip: None,
@@ -637,6 +656,7 @@ async fn public_client_without_pkce_is_invalid_grant() {
             client_id: "spa".to_string(),
             client_secret: None,
             code_verifier: None,
+            nonce: None,
         },
         device: None,
         ip: None,
@@ -652,6 +672,7 @@ async fn public_client_without_pkce_is_invalid_grant() {
             client_id: "spa".to_string(),
             client_secret: None,
             code_verifier: Some(VERIFIER.to_string()),
+            nonce: None,
         },
         device: None,
         ip: None,
@@ -892,6 +913,7 @@ async fn logout_ends_session_or_user_or_nothing() {
             session_id: Some(SESSION_ID.to_string()),
             user_id: Some(USER_ID.to_string()),
             post_logout_redirect: None,
+            state: None,
         },
     )
     .await
@@ -908,6 +930,7 @@ async fn logout_ends_session_or_user_or_nothing() {
             session_id: None,
             user_id: Some(USER_ID.to_string()),
             post_logout_redirect: Some("https://app.example/bye".to_string()),
+            state: None,
         },
     )
     .await
@@ -924,12 +947,35 @@ async fn logout_ends_session_or_user_or_nothing() {
             session_id: None,
             user_id: None,
             post_logout_redirect: Some("  ".to_string()),
+            state: None,
         },
     )
     .await
     .unwrap();
     assert_eq!(anonymous.redirect_url, "/");
     assert_eq!(db.calls(), Vec::<String>::new());
+}
+
+#[tokio::test]
+async fn logout_appends_state_to_redirect() {
+    let (db, mut rng) = harness();
+    let done = logout(
+        &db,
+        &mut rng,
+        NOW,
+        LogoutRequest {
+            session_id: Some(SESSION_ID.to_string()),
+            user_id: None,
+            post_logout_redirect: Some("https://app.example/bye?x=1".to_string()),
+            state: Some("st ate".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        done.redirect_url,
+        "https://app.example/bye?x=1&state=st%20ate"
+    );
 }
 
 #[test]

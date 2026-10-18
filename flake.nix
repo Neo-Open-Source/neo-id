@@ -17,7 +17,8 @@
             openssl
             buf
             protobuf
-            nodejs_22
+            nodejs_24
+            bun
             wrangler
             just
           ];

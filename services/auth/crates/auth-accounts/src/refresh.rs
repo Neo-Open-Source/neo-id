@@ -1,6 +1,6 @@
 use auth_core::{
-    AccessInput, AuthError, IdInput, RefreshDecision, encode_error, generate_id, generate_token,
-    hash_token, refresh_decision, refresh_expiry, session_expiry, sign_access, sign_id,
+    AuthError, RefreshDecision, encode_error, generate_token, hash_token, refresh_decision,
+    refresh_expiry, session_expiry,
 };
 use auth_db::{
     Executor, create_refresh, find_refresh, find_session, find_user_by_id, parse_refresh,
@@ -9,7 +9,7 @@ use auth_db::{
 
 use super::{
     Failure,
-    login::{LoginUser, MintParams},
+    login::{LoginUser, MintParams, sign_token_pair},
 };
 use auth_proto::auth::v1::TokenPair;
 
@@ -77,29 +77,7 @@ pub async fn rotate_refresh<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             .ok_or(Failure::Auth(AuthError::MalformedMessage))?
             .to_string(),
     };
-    let access_token = sign_access(
-        params.private_pem,
-        &AccessInput {
-            sub: user.id.clone(),
-            email: user.email.clone(),
-            role: user.role.clone(),
-            session_id: Some(session_id.clone()),
-            issuer: params.issuer.to_string(),
-            issued_at: now,
-            jti: generate_id(rng),
-        },
-    )?;
-    let id_token = sign_id(
-        params.private_pem,
-        &IdInput {
-            sub: user.id.clone(),
-            email: user.email.clone(),
-            audience: params.audience.map(String::from),
-            issuer: params.issuer.to_string(),
-            issued_at: now,
-            jti: generate_id(rng),
-        },
-    )?;
+    let (access_token, id_token) = sign_token_pair(rng, params, &user, &session_id, now, 0, None)?;
     let refresh_token = generate_token(rng, auth_core::REFRESH_TOKEN_BYTES);
     db.run(create_refresh(
         &user.id,

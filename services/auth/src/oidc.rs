@@ -1,6 +1,7 @@
 use std::fmt::Write as _;
 
-use auth_core::{AuthError, verify_access};
+use auth_core::{AuthError, verify_access, verify_id};
+use auth_db::Kv as _;
 use auth_oidc::{
     AuthorizeRequest, ConsentChoice, ConsentRequest, Grant, LogoutRequest, RegisterRequest,
     TokenRequest, UserInfoRequest, WireError, authorize, decide_consent, logout, register, token,
@@ -9,9 +10,15 @@ use auth_oidc::{
 use worker::{Request, Response, Result, RouteContext};
 
 use super::{
-    respond::{fail, ok},
-    routes::{Ctx, header_opt, load_cx, worker_rng},
+    respond::{fail, no_store, ok},
+    routes::{Ctx, form_or_json, header_opt, kv_store, load_cx, worker_rng},
 };
+
+const NONCE_TTL: u64 = 600;
+
+fn nonce_key(code: &str) -> String {
+    format!("acn:{code}")
+}
 
 fn oauth_error(cx: &Ctx, err: WireError) -> Result<Response> {
     let (status, code) = match err {
@@ -77,7 +84,9 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
             response_type: required("response_type"),
             client_id: required("client_id"),
             redirect_uri: required("redirect_uri"),
+            scope: required("scope"),
             state: some_query(&params, "state"),
+            nonce: some_query(&params, "nonce"),
             code_challenge: some_query(&params, "code_challenge"),
             code_challenge_method: some_query(&params, "code_challenge_method"),
             user_id: user.as_ref().map(|(sub, _)| sub.clone()),
@@ -94,6 +103,8 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
         Ok(auth_oidc::AuthorizeOutcome::Consent {
             state,
             redirect_uri,
+            service_app_id,
+            nonce,
             scopes,
         }) => ok(
             &cx.request_id,
@@ -102,6 +113,8 @@ pub async fn authorize_route(req: Request, ctx: RouteContext<()>) -> Result<Resp
                 "consent_required": true,
                 "state": state,
                 "redirect_uri": redirect_uri,
+                "service_app_id": service_app_id,
+                "nonce": nonce,
                 "scopes": scopes,
             }),
             200,
@@ -140,6 +153,7 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
         let value = field(key);
         if value.is_empty() { None } else { Some(value) }
     };
+    let nonce = optional("nonce");
     match decide_consent(
         &cx.db,
         &mut rng,
@@ -160,10 +174,21 @@ pub async fn consent_route(mut req: Request, ctx: RouteContext<()>) -> Result<Re
     )
     .await
     {
-        Ok(redirect) => match url::Url::parse(&redirect.url) {
-            Ok(target) => Response::redirect(target),
-            Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
-        },
+        Ok(redirect) => {
+            if let (Some(code), Some(nonce)) = (redirect.code.as_deref(), nonce.as_deref()) {
+                let store = match kv_store(&ctx) {
+                    Ok(store) => crate::kv::StatesKv::new(store),
+                    Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+                };
+                let _ = store
+                    .put(&nonce_key(code), nonce.as_bytes(), NONCE_TTL)
+                    .await;
+            }
+            match url::Url::parse(&redirect.url) {
+                Ok(target) => Response::redirect(target),
+                Err(_) => fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+            }
+        }
         Err(err) => oauth_error(&cx, err),
     }
 }
@@ -173,9 +198,9 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
-    let body: serde_json::Value = match req.json().await {
+    let body: serde_json::Value = match form_or_json(&mut req).await {
         Ok(body) => body,
-        Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
+        Err(err) => return no_store(fail(&cx.request_id, cx.now_ms, &err)),
     };
     let field = |key: &str| {
         body.get(key)
@@ -188,24 +213,45 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
         if value.is_empty() { None } else { Some(value) }
     };
     let grant = match field("grant_type").as_str() {
-        "authorization_code" => Grant::Code {
-            code: field("code"),
-            redirect_uri: field("redirect_uri"),
-            client_id: field("client_id"),
-            client_secret: optional("client_secret"),
-            code_verifier: optional("code_verifier"),
-        },
+        "authorization_code" => {
+            let code = field("code");
+            let nonce = if code.is_empty() {
+                None
+            } else {
+                match kv_store(&ctx) {
+                    Ok(store) => {
+                        let store = crate::kv::StatesKv::new(store);
+                        match store.get(&nonce_key(&code)).await {
+                            Ok(Some(bytes)) => {
+                                let _ = store.delete(&nonce_key(&code)).await;
+                                String::from_utf8(bytes).ok()
+                            }
+                            _ => None,
+                        }
+                    }
+                    Err(_) => None,
+                }
+            };
+            Grant::Code {
+                code,
+                redirect_uri: field("redirect_uri"),
+                client_id: field("client_id"),
+                client_secret: optional("client_secret"),
+                code_verifier: optional("code_verifier"),
+                nonce,
+            }
+        }
         "refresh_token" => Grant::Refresh {
             refresh_token: field("refresh_token"),
             client_id: field("client_id"),
         },
-        _ => return oauth_error(&cx, WireError::UnsupportedGrantType),
+        _ => return no_store(oauth_error(&cx, WireError::UnsupportedGrantType)),
     };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    match token(
+    no_store(match token(
         &cx.db,
         &mut rng,
         cx.now,
@@ -232,7 +278,7 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
             200,
         ),
         Err(err) => oauth_error(&cx, err),
-    }
+    })
 }
 
 pub async fn userinfo_route(req: Request, ctx: RouteContext<()>) -> Result<Response> {
@@ -285,29 +331,36 @@ pub async fn logout_route(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         Ok(cx) => cx,
         Err(err) => return fail("unknown", 0, &err),
     };
+    let params = req.url().map(|url| query_pairs(&url)).unwrap_or_default();
     let body: serde_json::Value = req.json().await.unwrap_or(serde_json::Value::Null);
     let field = |key: &str| {
-        body.get(key)
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default()
-            .to_string()
-    };
-    let optional = |key: &str| {
-        let value = field(key);
-        if value.is_empty() { None } else { Some(value) }
+        some_query(&params, key).or_else(|| {
+            body.get(key)
+                .and_then(serde_json::Value::as_str)
+                .filter(|value| !value.is_empty())
+                .map(String::from)
+        })
     };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    let user_id = field("user_id").or_else(|| {
+        field("id_token_hint").and_then(|token| {
+            verify_id(&cx.app.public_pem, &token, &cx.app.issuer, cx.now)
+                .ok()
+                .map(|claims| claims.sub)
+        })
+    });
     match logout(
         &cx.db,
         &mut rng,
         cx.now,
         LogoutRequest {
-            session_id: optional("session_id"),
-            user_id: optional("user_id"),
-            post_logout_redirect: optional("post_logout_redirect_uri"),
+            session_id: field("session_id"),
+            user_id,
+            post_logout_redirect: field("post_logout_redirect_uri"),
+            state: field("state"),
         },
     )
     .await

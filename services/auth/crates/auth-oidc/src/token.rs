@@ -19,6 +19,7 @@ pub enum Grant {
         client_id: String,
         client_secret: Option<String>,
         code_verifier: Option<String>,
+        nonce: Option<String>,
     },
     Refresh {
         refresh_token: String,
@@ -77,6 +78,7 @@ pub async fn token<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             client_id,
             client_secret,
             code_verifier,
+            nonce,
         } => {
             call.exchange_code(
                 &code,
@@ -84,6 +86,7 @@ pub async fn token<E: Executor, R: rand::RngCore + rand::CryptoRng>(
                 &client_id,
                 client_secret.as_deref(),
                 code_verifier.as_deref(),
+                nonce.as_deref(),
             )
             .await
         }
@@ -123,6 +126,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         client_id: &str,
         client_secret: Option<&str>,
         code_verifier: Option<&str>,
+        nonce: Option<&str>,
     ) -> Result<Tokens, WireError> {
         let client = self.client(client_id).await?;
         match client_secret_check(client.secret_hash.as_deref(), client_secret) {
@@ -142,7 +146,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         self.db.run(delete_code(code)).await?;
         let subject = self.subject(&user_id).await?;
         let session = self.session(&user_id, session_id.as_deref()).await?;
-        let (access_token, id_token) = self.mint(&subject, &session, client_id)?;
+        let (access_token, id_token) = self.mint(&subject, &session, client_id, nonce)?;
         let refresh_token = self.store_refresh(&user_id, &session, None).await?;
         self.db
             .run(touch_login(&user_id, self.ip, self.now))
@@ -201,7 +205,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
             ))
             .await?;
         let subject = self.subject(&user_id).await?;
-        let (access_token, id_token) = self.mint(&subject, &session, client_id)?;
+        let (access_token, id_token) = self.mint(&subject, &session, client_id, None)?;
         let refresh_token = self
             .store_refresh(&user_id, &session, Some(&token_id))
             .await?;
@@ -314,6 +318,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         subject: &Subject,
         session_id: &str,
         audience: &str,
+        nonce: Option<&str>,
     ) -> Result<(String, String), WireError> {
         let access = sign_access(
             self.private_pem,
@@ -335,6 +340,9 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
                 audience: Some(audience.to_string()),
                 issuer: self.issuer.to_string(),
                 issued_at: self.now,
+                auth_time: self.now,
+                nonce: nonce.map(String::from),
+                access_token: Some(access.clone()),
                 jti: generate_id(&mut *self.rng),
             },
         )?;

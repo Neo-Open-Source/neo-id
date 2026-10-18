@@ -52,7 +52,9 @@ pub struct AuthorizeRequest {
     pub response_type: String,
     pub client_id: String,
     pub redirect_uri: String,
+    pub scope: String,
     pub state: Option<String>,
+    pub nonce: Option<String>,
     pub code_challenge: Option<String>,
     pub code_challenge_method: Option<String>,
     pub user_id: Option<String>,
@@ -68,6 +70,8 @@ pub enum AuthorizeOutcome {
     Consent {
         state: String,
         redirect_uri: String,
+        service_app_id: String,
+        nonce: Option<String>,
         scopes: Vec<String>,
     },
 }
@@ -92,6 +96,7 @@ pub struct ConsentRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Redirect {
     pub url: String,
+    pub code: Option<String>,
 }
 
 pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
@@ -114,13 +119,34 @@ pub async fn authorize<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     if !redirect_matches(&refs, &req.redirect_uri) {
         return Err(WireError::InvalidRequest);
     }
+    let requested: Vec<&str> = req.scope.split_whitespace().collect();
+    if !requested.is_empty() && !requested.contains(&"openid") {
+        return Err(WireError::InvalidRequest);
+    }
+    let allowed = string_list(row, "allowedScopes").unwrap_or_default();
+    let scopes: Vec<String> = if requested.is_empty() {
+        allowed
+    } else {
+        requested
+            .iter()
+            .filter(|scope| allowed.iter().any(|entry| entry == *scope))
+            .map(|scope| (*scope).to_string())
+            .collect()
+    };
     let state = req.state.unwrap_or_else(|| generate_token(rng, 16));
     match req.user_id {
         None => Ok(AuthorizeOutcome::Login { url: req.login_url }),
         Some(_) => Ok(AuthorizeOutcome::Consent {
             state,
             redirect_uri: req.redirect_uri,
-            scopes: string_list(row, "allowedScopes").unwrap_or_default(),
+            service_app_id: row
+                .get("id")
+                .and_then(Value::as_str)
+                .or_else(|| row.get("clientId").and_then(Value::as_str))
+                .ok_or(WireError::InvalidClient)?
+                .to_string(),
+            nonce: req.nonce,
+            scopes,
         }),
     }
 }
@@ -134,6 +160,7 @@ pub async fn decide_consent<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     match req.choice {
         ConsentChoice::Denied => Ok(Redirect {
             url: deny_url(&req.redirect_uri, req.state.as_deref()),
+            code: None,
         }),
         ConsentChoice::Approved => {
             let code = generate_token(rng, 32);
@@ -151,6 +178,7 @@ pub async fn decide_consent<E: Executor, R: rand::RngCore + rand::CryptoRng>(
             .await?;
             Ok(Redirect {
                 url: approve_url(&req.redirect_uri, &code, req.state.as_deref()),
+                code: Some(code),
             })
         }
     }

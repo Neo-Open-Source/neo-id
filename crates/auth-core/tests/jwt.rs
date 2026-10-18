@@ -1,6 +1,6 @@
 use auth_core::{
     ACCESS_TOKEN_TTL, AccessInput, AuthError, ID_TOKEN_TTL, IdInput, sign_access, sign_id,
-    verify_access,
+    verify_access, verify_id,
 };
 
 const PRIVATE_PEM: &str = include_str!("data/test-rsa.pem");
@@ -61,7 +61,14 @@ fn wrong_issuer_is_invalid_credentials() {
 fn tampered_payload_is_invalid_credentials() {
     let token = sign_access(PRIVATE_PEM.as_bytes(), &access_input()).unwrap();
     let mut tampered = token.clone();
-    tampered.replace_range(40..41, "A");
+    let start = token.find('.').unwrap() + 1;
+    let marker = if token.as_bytes().get(start) == Some(&b'A') {
+        'B'
+    } else {
+        'A'
+    };
+    tampered.replace_range(start..=start, &marker.to_string());
+    assert_ne!(token, tampered);
     assert!(matches!(
         verify_access(PUBLIC_PEM.as_bytes(), &tampered, ISSUER, NOW + 1),
         Err(AuthError::InvalidCredentials)
@@ -97,6 +104,9 @@ fn id_token_carries_audience_and_name() {
         audience: Some("client-9".to_string()),
         issuer: ISSUER.to_string(),
         issued_at: NOW,
+        auth_time: NOW,
+        nonce: Some("n-1".to_string()),
+        access_token: None,
         jti: "jti-2".to_string(),
     };
     let token = sign_id(PRIVATE_PEM.as_bytes(), &with_aud).unwrap();
@@ -124,6 +134,39 @@ fn id_token_carries_audience_and_name() {
         serde_json::from_slice(&base64_decode_url(parts[1])).unwrap()
     };
     assert!(payload.get("aud").is_none());
+}
+
+#[test]
+fn verify_id_checks_signature_issuer_and_expiry() {
+    let input = IdInput {
+        sub: "user-1".to_string(),
+        email: "alice@example.com".to_string(),
+        audience: Some("client-9".to_string()),
+        issuer: ISSUER.to_string(),
+        issued_at: NOW,
+        auth_time: NOW,
+        nonce: Some("n-1".to_string()),
+        access_token: None,
+        jti: "jti-9".to_string(),
+    };
+    let token = sign_id(PRIVATE_PEM.as_bytes(), &input).unwrap();
+    let claims = verify_id(PUBLIC_PEM.as_bytes(), &token, ISSUER, NOW + 1).unwrap();
+    assert_eq!(claims.sub, "user-1");
+    assert_eq!(claims.nonce.as_deref(), Some("n-1"));
+    assert_eq!(claims.auth_time_unix, Some(i64::try_from(NOW).unwrap()));
+    assert!(matches!(
+        verify_id(
+            PUBLIC_PEM.as_bytes(),
+            &token,
+            ISSUER,
+            NOW + ID_TOKEN_TTL + 1
+        ),
+        Err(AuthError::InvalidCredentials)
+    ));
+    assert!(matches!(
+        verify_id(PUBLIC_PEM.as_bytes(), &token, "https://evil.test", NOW + 1),
+        Err(AuthError::InvalidCredentials)
+    ));
 }
 
 fn base64_decode_url(s: &str) -> Vec<u8> {

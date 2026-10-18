@@ -7,7 +7,9 @@ use super::routes::Ctx;
 use super::{
     mail::mailer,
     respond::{fail, ok},
-    routes::{authed, body_field, fail_status, json_body, load_cx, mint_response, worker_rng},
+    routes::{
+        authed, body_field, fail_status, json_body, kv_store, load_cx, mint_response, worker_rng,
+    },
 };
 #[cfg(feature = "passkeys")]
 use auth_db::Kv as _;
@@ -21,15 +23,34 @@ pub async fn email_request(mut req: Request, ctx: RouteContext<()>) -> Result<Re
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let email = body_field(&body, "email");
-    let user = auth_accounts::load_user(&cx.db, email).await.ok();
-    let Some(user) = user else {
-        return ok(
-            &cx.request_id,
-            cx.now_ms,
-            &serde_json::json!({"sent": true}),
-            200,
-        );
+    let attempt_id = body_field(&body, "attempt_id");
+    let user = if attempt_id.is_empty() {
+        match auth_accounts::lite_login_user(&cx.db, body_field(&body, "email")).await {
+            Ok(Some(user)) => user,
+            Ok(None) => {
+                return ok(
+                    &cx.request_id,
+                    cx.now_ms,
+                    &serde_json::json!({"sent": true}),
+                    200,
+                );
+            }
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        }
+    } else {
+        let store = match kv_store(&ctx) {
+            Ok(store) => crate::kv::StatesKv::new(store),
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        };
+        match auth_accounts::load_challenge(&store, attempt_id).await {
+            Ok(Some(challenge)) => auth_accounts::LoginUser {
+                id: challenge.user_id,
+                email: challenge.email,
+                role: challenge.role,
+            },
+            Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        }
     };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
@@ -72,11 +93,42 @@ pub async fn email_verify(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let Ok(user) = auth_accounts::load_user(&cx.db, body_field(&body, "email")).await else {
-        return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
-    };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let attempt_id = body_field(&body, "attempt_id");
+    if attempt_id.is_empty() {
+        let user = match auth_accounts::lite_login_user(&cx.db, body_field(&body, "email")).await {
+            Ok(Some(user)) => user,
+            Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        };
+        return match auth_accounts::verify_email_code(
+            &cx.db,
+            &user.id,
+            "mfa_login",
+            body_field(&body, "code"),
+            cx.now,
+        )
+        .await
+        {
+            Ok(true) => mint_response(&cx, &req, &mut rng, &user).await,
+            Ok(false) => fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+            Err(err) => fail(&cx.request_id, cx.now_ms, &err),
+        };
+    }
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let user = match auth_accounts::load_challenge(&store, attempt_id).await {
+        Ok(Some(challenge)) => auth_accounts::LoginUser {
+            id: challenge.user_id,
+            email: challenge.email,
+            role: challenge.role,
+        },
+        Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
     match auth_accounts::verify_email_code(
@@ -88,8 +140,14 @@ pub async fn email_verify(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     )
     .await
     {
-        Ok(true) => mint_response(&cx, &req, &mut rng, &user).await,
-        Ok(false) => fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Ok(true) => {
+            let _ = auth_accounts::clear_challenge(&store, attempt_id).await;
+            mint_response(&cx, &req, &mut rng, &user).await
+        }
+        Ok(false) => {
+            let _ = auth_accounts::fail_attempt(&store, attempt_id).await;
+            fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials)
+        }
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
     }
 }
@@ -173,16 +231,33 @@ pub async fn totp_verify(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let Ok(user) = auth_accounts::load_user(&cx.db, body_field(&body, "email")).await else {
-        return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
-    };
     let mut rng = match worker_rng() {
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    let attempt_id = body_field(&body, "attempt_id");
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let user = match auth_accounts::load_challenge(&store, attempt_id).await {
+        Ok(Some(challenge)) => auth_accounts::LoginUser {
+            id: challenge.user_id,
+            email: challenge.email,
+            role: challenge.role,
+        },
+        Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
     match auth_accounts::totp_check(&cx.db, &user.id, body_field(&body, "code"), cx.now).await {
-        Ok(true) => mint_response(&cx, &req, &mut rng, &user).await,
-        Ok(false) => fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Ok(true) => {
+            let _ = auth_accounts::clear_challenge(&store, attempt_id).await;
+            mint_response(&cx, &req, &mut rng, &user).await
+        }
+        Ok(false) => {
+            let _ = auth_accounts::fail_attempt(&store, attempt_id).await;
+            fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials)
+        }
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
     }
 }

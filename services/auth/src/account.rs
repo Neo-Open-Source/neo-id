@@ -5,7 +5,9 @@ use worker::{Request, Response, Result, RouteContext};
 use super::{
     mail::mailer,
     respond::{fail, ok},
-    routes::{Ctx, authed, body_field, json_body, kv_store, load_cx, worker_rng},
+    routes::{
+        Ctx, authed, body_field, fail_status, header_opt, json_body, kv_store, load_cx, worker_rng,
+    },
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 
@@ -291,6 +293,19 @@ pub async fn password_forgot(mut req: Request, ctx: RouteContext<()>) -> Result<
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+    };
+    let bucket = format!(
+        "rl:forgot:{}",
+        body_field(&body, "email").trim().to_lowercase()
+    );
+    match auth_accounts::rate_limit_allow(&store, &bucket, 5, 3600).await {
+        Ok(true) => {}
+        Ok(false) => return fail_status(&cx, 429, "RATE_LIMITED", "Too many requests"),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
     match auth_accounts::forgot_password(&cx.db, &mut rng, body_field(&body, "email"), cx.now).await
     {
         Ok(auth_accounts::ForgotOutcome::Emailed(ticket)) => {
@@ -341,13 +356,22 @@ pub async fn password_reset(mut req: Request, ctx: RouteContext<()>) -> Result<R
         Ok(rng) => rng,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+    };
+    let bucket = format!(
+        "rl:pwreset:{}",
+        header_opt(&req, "cf-connecting-ip").unwrap_or_default()
+    );
+    match auth_accounts::rate_limit_allow(&store, &bucket, 10, 3600).await {
+        Ok(true) => {}
+        Ok(false) => return fail_status(&cx, 429, "RATE_LIMITED", "Too many requests"),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
     match auth_accounts::reset_password(&cx.db, body_field(&body, "ticket"), cx.now).await {
         Ok(Some(user_id)) => {
             let grant = auth_core::generate_id(&mut rng);
-            let store = match kv_store(&ctx) {
-                Ok(store) => crate::kv::StatesKv::new(store),
-                Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
-            };
             if store
                 .put(&format!("pwdreset:{grant}"), user_id.as_bytes(), 600)
                 .await

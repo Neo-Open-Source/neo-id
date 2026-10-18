@@ -1,6 +1,7 @@
 use auth_core::{AuthError, RESET_TOKEN_EXPIRY, generate_token, hash_token};
 use auth_db::{
-    Executor, clear_reset_token, find_by_reset_hash, find_user_by_email, set_reset_token,
+    Executor, clear_reset_token, deactivate_user_sessions, find_by_reset_hash, find_user_by_email,
+    revoke_user_refreshes, set_reset_token,
 };
 
 pub enum ForgotOutcome {
@@ -47,5 +48,8 @@ pub async fn reset_password<E: Executor>(
         .ok_or(AuthError::MalformedMessage)?
         .to_string();
     db.run(clear_reset_token(&id)).await?;
+    db.run(revoke_user_refreshes(&id, "password_reset", now))
+        .await?;
+    db.run(deactivate_user_sessions(&id)).await?;
     Ok(Some(id))
 }

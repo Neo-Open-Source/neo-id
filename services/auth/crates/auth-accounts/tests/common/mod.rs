@@ -1,7 +1,8 @@
 #![allow(dead_code, reason = "shared fixtures: each test binary uses a subset")]
 
 use auth_core::AuthError;
-use auth_db::{Executor, Query};
+use auth_db::{Executor, Kv, Query};
+use std::collections::HashMap;
 use std::collections::VecDeque;
 
 pub struct Scripted {
@@ -48,6 +49,46 @@ impl Executor for Scripted {
 
 pub fn run<F: Future<Output = T>, T>(future: F) -> T {
     futures::executor::block_on(future)
+}
+
+#[derive(Default)]
+pub struct MemKv {
+    store: std::sync::Mutex<HashMap<String, Vec<u8>>>,
+}
+
+impl MemKv {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.store.lock().unwrap().len()
+    }
+}
+
+impl Kv for MemKv {
+    fn get(&self, key: &str) -> impl Future<Output = Result<Option<Vec<u8>>, AuthError>> {
+        let value = self.store.lock().unwrap().get(key).cloned();
+        async move { Ok(value) }
+    }
+
+    fn put(
+        &self,
+        key: &str,
+        value: &[u8],
+        _ttl_secs: u64,
+    ) -> impl Future<Output = Result<(), AuthError>> {
+        self.store
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), value.to_vec());
+        async move { Ok(()) }
+    }
+
+    fn delete(&self, key: &str) -> impl Future<Output = Result<(), AuthError>> {
+        self.store.lock().unwrap().remove(key);
+        async move { Ok(()) }
+    }
 }
 
 pub fn user_row() -> serde_json::Value {

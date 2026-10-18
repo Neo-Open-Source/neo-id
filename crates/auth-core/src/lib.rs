@@ -4,6 +4,7 @@
 )]
 
 mod ciphersuite;
+mod client;
 mod codes;
 mod email;
 mod error;
@@ -17,6 +18,7 @@ mod totp;
 mod webauthn;
 
 pub use ciphersuite::NeoSuite;
+pub use client::{login_finalize, login_request, register_request, register_upload};
 pub use codes::{constant_time_equal, generate_code, generate_id, generate_token, hash_token};
 pub use email::{
     CODE_EXPIRY, CODE_LENGTH, RESEND_COOLDOWN, mask, normalize, resend_remaining_s,
@@ -24,7 +26,8 @@ pub use email::{
 };
 pub use error::AuthError;
 pub use jwt::{
-    ACCESS_TOKEN_TTL, AccessInput, ID_TOKEN_TTL, IdInput, sign_access, sign_id, verify_access,
+    ACCESS_TOKEN_TTL, AccessInput, ID_TOKEN_TTL, IdInput, KEY_ID, at_hash, sign_access, sign_id,
+    verify_access, verify_id,
 };
 pub use opaque::{CredentialId, Envelope, LoginState, SessionKey};
 pub use opaque::{login_finish, login_response, register_response, register_store};

@@ -208,6 +208,46 @@ fn login_handshake_session_keys_match() {
 }
 
 #[test]
+fn lite_login_only_for_passwordless_accounts() {
+    let allowed = Scripted::feed(vec![vec![user_row()], vec![], vec![]]);
+    assert!(
+        run(auth_accounts::lite_login_user(&allowed, "a@b.c"))
+            .unwrap()
+            .is_some()
+    );
+
+    let with_password = Scripted::feed(vec![
+        vec![user_row()],
+        vec![serde_json::json!({"envelope": "x"})],
+    ]);
+    assert!(
+        run(auth_accounts::lite_login_user(&with_password, "a@b.c"))
+            .unwrap()
+            .is_none()
+    );
+
+    let with_totp = Scripted::feed(vec![vec![serde_json::json!({
+        "id": "u1", "email": "a@b.c", "role": "user", "totpEnabled": true
+    })]]);
+    assert!(
+        run(auth_accounts::lite_login_user(&with_totp, "a@b.c"))
+            .unwrap()
+            .is_none()
+    );
+
+    let with_passkey = Scripted::feed(vec![
+        vec![user_row()],
+        vec![],
+        vec![serde_json::json!({"id": "p1"})],
+    ]);
+    assert!(
+        run(auth_accounts::lite_login_user(&with_passkey, "a@b.c"))
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
 fn logout_deactivates() {
     let db = Scripted::feed(vec![vec![], vec![]]);
     run(end_session(&db, "s1", 1000)).unwrap();
