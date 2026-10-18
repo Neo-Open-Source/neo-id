@@ -25,7 +25,7 @@ pub struct AccessInput {
 pub struct IdInput {
     pub sub: String,
     pub email: String,
-    pub audience: Option<String>,
+    pub audience: String,
     pub issuer: String,
     pub issued_at: u64,
     pub auth_time: u64,
@@ -68,8 +68,7 @@ pub fn sign_id(private_pem: &[u8], input: &IdInput) -> Result<String, AuthError>
         sub: input.sub.clone(),
         email: input.email.clone(),
         name: input.email.clone(),
-        aud: input.audience.clone(),
-        iss: input.issuer.clone(),
+        aud: input.audience.clone(),        iss: input.issuer.clone(),
         iat_unix: i64::try_from(input.issued_at).unwrap_or(0),
         exp_unix: i64::try_from(input.issued_at.saturating_add(ID_TOKEN_TTL)).unwrap_or(i64::MAX),
         jti: input.jti.clone(),

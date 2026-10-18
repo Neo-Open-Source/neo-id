@@ -348,7 +348,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
             &IdInput {
                 sub: subject.user_id.clone(),
                 email: subject.email.clone(),
-                audience: Some(audience.to_string()),
+                audience: audience.to_string(),
                 issuer: self.issuer.to_string(),
                 issued_at: self.now,
                 auth_time: self.now,

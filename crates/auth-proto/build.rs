@@ -14,7 +14,6 @@ fn main() {
     }
     for field in [
         "auth.v1.AccessClaims.session_id",
-        "auth.v1.IDTokenClaims.aud",
         "auth.v1.IDTokenClaims.nonce",
         "auth.v1.IDTokenClaims.at_hash",
         "auth.v1.IDTokenClaims.auth_time_unix",

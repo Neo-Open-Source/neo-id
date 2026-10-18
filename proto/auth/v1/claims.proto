@@ -7,7 +7,7 @@ message IDTokenClaims {
   string sub = 1;
   string email = 2;
   string name = 3;
-  optional string aud = 4;
+  string aud = 4;
   string iss = 5;
   int64 iat_unix = 6;
   int64 exp_unix = 7;

@@ -98,10 +98,10 @@ fn bad_key_is_internal() {
 
 #[test]
 fn id_token_carries_audience_and_name() {
-    let with_aud = IdInput {
+    let input = IdInput {
         sub: "user-1".to_string(),
         email: "alice@example.com".to_string(),
-        audience: Some("client-9".to_string()),
+        audience: "client-9".to_string(),
         issuer: ISSUER.to_string(),
         issued_at: NOW,
         auth_time: NOW,
@@ -109,31 +109,20 @@ fn id_token_carries_audience_and_name() {
         access_token: None,
         jti: "jti-2".to_string(),
     };
-    let token = sign_id(PRIVATE_PEM.as_bytes(), &with_aud).unwrap();
+    let token = sign_id(PRIVATE_PEM.as_bytes(), &input).unwrap();
     let payload: serde_json::Value = {
         let parts: Vec<&str> = token.split('.').collect();
         let decoded = base64_decode_url(parts[1]);
         serde_json::from_slice(&decoded).unwrap()
     };
     assert_eq!(payload["aud"], "client-9");
+    assert_eq!(payload["nonce"], "n-1");
     assert_eq!(payload["name"], "alice@example.com");
     assert_eq!(
         u64::try_from(payload["exp"].as_i64().unwrap() - payload["iat"].as_i64().unwrap())
             .unwrap_or(0),
         ID_TOKEN_TTL
     );
-
-    let no_aud = IdInput {
-        audience: None,
-        jti: "jti-3".to_string(),
-        ..with_aud
-    };
-    let token = sign_id(PRIVATE_PEM.as_bytes(), &no_aud).unwrap();
-    let payload: serde_json::Value = {
-        let parts: Vec<&str> = token.split('.').collect();
-        serde_json::from_slice(&base64_decode_url(parts[1])).unwrap()
-    };
-    assert!(payload.get("aud").is_none());
 }
 
 #[test]
@@ -141,7 +130,7 @@ fn verify_id_checks_signature_issuer_and_expiry() {
     let input = IdInput {
         sub: "user-1".to_string(),
         email: "alice@example.com".to_string(),
-        audience: Some("client-9".to_string()),
+        audience: "client-9".to_string(),
         issuer: ISSUER.to_string(),
         issued_at: NOW,
         auth_time: NOW,

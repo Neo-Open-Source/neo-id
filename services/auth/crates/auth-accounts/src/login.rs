@@ -196,7 +196,7 @@ pub(crate) fn sign_token_pair<R: rand::RngCore + rand::CryptoRng>(
         &IdInput {
             sub: user.id.clone(),
             email: user.email.clone(),
-            audience: params.audience.map(String::from),
+            audience: params.audience.unwrap_or(params.issuer).to_string(),
             issuer: params.issuer.to_string(),
             issued_at: now,
             auth_time,
