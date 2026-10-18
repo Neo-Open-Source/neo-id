@@ -119,6 +119,14 @@ mod tests {
             Brand::sanitize(None, Some("#111111"), None).button_text(),
             "#ffffff"
         );
+        assert_eq!(
+            Brand::sanitize(None, Some("#808080"), None).button_text(),
+            "#111111"
+        );
+        assert_eq!(
+            Brand::sanitize(None, Some("#7f7f7f"), None).button_text(),
+            "#ffffff"
+        );
     }
 
     #[test]
