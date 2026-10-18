@@ -24,6 +24,7 @@ pub enum Grant {
     Refresh {
         refresh_token: String,
         client_id: String,
+        client_secret: Option<String>,
     },
 }
 
@@ -93,7 +94,11 @@ pub async fn token<E: Executor, R: rand::RngCore + rand::CryptoRng>(
         Grant::Refresh {
             refresh_token,
             client_id,
-        } => call.redeem_refresh(&refresh_token, &client_id).await,
+            client_secret,
+        } => {
+            call.redeem_refresh(&refresh_token, &client_id, client_secret.as_deref())
+                .await
+        }
     }
 }
 
@@ -141,7 +146,7 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         let user_id = field(row, "userId")?.to_string();
         let session_id = optional(row, "sessionId");
         let challenge = optional(row, "codeChallenge").or_else(|| optional(row, "codeVerifier"));
-        let public = client.secret_hash.is_none() || client_secret.is_none();
+        let public = client.secret_hash.is_none();
         enforce_pkce(challenge.as_deref(), public, code_verifier)?;
         self.db.run(delete_code(code)).await?;
         let subject = self.subject(&user_id).await?;
@@ -164,7 +169,13 @@ impl<E: Executor, R: rand::RngCore + rand::CryptoRng> TokenCall<'_, E, R> {
         &mut self,
         presented: &str,
         client_id: &str,
+        client_secret: Option<&str>,
     ) -> Result<Tokens, WireError> {
+        let client = self.client(client_id).await?;
+        match client_secret_check(client.secret_hash.as_deref(), client_secret) {
+            SecretCheck::Skipped | SecretCheck::Valid => {}
+            SecretCheck::Invalid => return Err(WireError::InvalidClient),
+        }
         let rows = self.db.run(find_refresh(&hash_token(presented))).await?;
         let row = rows.first().ok_or(WireError::InvalidGrant)?;
         let token_id = field(row, "id")?.to_string();

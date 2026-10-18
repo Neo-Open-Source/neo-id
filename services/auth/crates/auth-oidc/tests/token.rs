@@ -379,6 +379,7 @@ fn refresh_grant(raw: &str) -> TokenRequest {
         grant: Grant::Refresh {
             refresh_token: raw.to_string(),
             client_id: CLIENT_ID.to_string(),
+            client_secret: Some(SECRET.to_string()),
         },
         device: None,
         ip: None,
@@ -730,6 +731,54 @@ async fn refresh_rotates_and_links_parent() {
 }
 
 #[tokio::test]
+async fn confidential_client_must_present_secret() {
+    let (db, mut rng) = harness();
+    assert_eq!(
+        exchange(&db, &mut rng, code_grant("authcode-1", Some(VERIFIER), None)).await,
+        Err(WireError::InvalidClient)
+    );
+    assert_eq!(
+        exchange(
+            &db,
+            &mut rng,
+            code_grant("authcode-1", Some(VERIFIER), Some("wrong"))
+        )
+        .await,
+        Err(WireError::InvalidClient)
+    );
+    let mut req = refresh_grant("refresh-1");
+    if let Grant::Refresh { client_secret, .. } = &mut req.grant {
+        *client_secret = None;
+    }
+    assert_eq!(
+        exchange(&db, &mut rng, req).await,
+        Err(WireError::InvalidClient)
+    );
+}
+
+#[tokio::test]
+async fn public_client_refresh_needs_no_secret() {
+    let (db, mut rng) = harness();
+    {
+        let mut state = db.state.lock().unwrap();
+        state.clients = vec![json!({
+            "id": APP_ID,
+            "clientId": CLIENT_ID,
+            "clientSecretHash": Value::Null,
+            "redirectUris": [REDIRECT],
+            "allowedScopes": ["openid"],
+            "grantTypes": ["refresh_token"],
+            "isActive": true,
+        })];
+    }
+    let mut req = refresh_grant("refresh-1");
+    if let Grant::Refresh { client_secret, .. } = &mut req.grant {
+        *client_secret = None;
+    }
+    assert!(exchange(&db, &mut rng, req).await.is_ok());
+}
+
+#[tokio::test]
 async fn rotated_token_replays_within_grace_window() {
     let (db, mut rng) = harness();
     {
@@ -1007,7 +1056,7 @@ fn debug_redacts_secrets() {
 }
 
 #[tokio::test]
-async fn confidential_client_without_secret_needs_challenge() {
+async fn confidential_client_without_secret_is_rejected() {
     let (db, mut rng) = harness();
     {
         let mut state = db.state.lock().unwrap();
@@ -1023,7 +1072,7 @@ async fn confidential_client_without_secret_needs_challenge() {
         }));
     }
     let err = exchange(&db, &mut rng, code_grant("authcode-2", None, None)).await;
-    assert!(matches!(err, Err(WireError::InvalidGrant)));
+    assert!(matches!(err, Err(WireError::InvalidClient)));
 }
 
 #[tokio::test]

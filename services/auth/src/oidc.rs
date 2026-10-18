@@ -1,6 +1,7 @@
 use std::fmt::Write as _;
 
 use auth_core::{AuthError, verify_access, verify_id};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use auth_db::Kv as _;
 use auth_oidc::{
     AuthorizeRequest, ConsentChoice, ConsentRequest, Grant, LogoutRequest, RegisterRequest,
@@ -18,6 +19,21 @@ const NONCE_TTL: u64 = 600;
 
 fn nonce_key(code: &str) -> String {
     format!("acn:{code}")
+}
+
+fn basic_credentials(header: Option<&str>) -> Option<(String, String)> {
+    let encoded = header?.strip_prefix("Basic ")?;
+    let decoded = STANDARD.decode(encoded.trim()).ok()?;
+    let text = String::from_utf8(decoded).ok()?;
+    let (id, secret) = text.split_once(':')?;
+    Some((form_decode(id), form_decode(secret)))
+}
+
+fn form_decode(value: &str) -> String {
+    url::form_urlencoded::parse(format!("v={value}").as_bytes())
+        .next()
+        .map(|(_, decoded)| decoded.into_owned())
+        .unwrap_or_default()
 }
 
 fn oauth_error(cx: &Ctx, err: WireError) -> Result<Response> {
@@ -212,6 +228,11 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
         let value = field(key);
         if value.is_empty() { None } else { Some(value) }
     };
+    let basic = basic_credentials(header_opt(&req, "authorization").as_deref());
+    let basic_client = |field: String, optional: Option<String>| match &basic {
+        Some((id, secret)) => (id.clone(), Some(secret.clone())),
+        None => (field, optional),
+    };
     let grant = match field("grant_type").as_str() {
         "authorization_code" => {
             let code = field("code");
@@ -232,19 +253,26 @@ pub async fn token_route(mut req: Request, ctx: RouteContext<()>) -> Result<Resp
                     Err(_) => None,
                 }
             };
+            let (client_id, client_secret) =
+                basic_client(field("client_id"), optional("client_secret"));
             Grant::Code {
                 code,
                 redirect_uri: field("redirect_uri"),
-                client_id: field("client_id"),
-                client_secret: optional("client_secret"),
+                client_id,
+                client_secret,
                 code_verifier: optional("code_verifier"),
                 nonce,
             }
         }
-        "refresh_token" => Grant::Refresh {
-            refresh_token: field("refresh_token"),
-            client_id: field("client_id"),
-        },
+        "refresh_token" => {
+            let (client_id, client_secret) =
+                basic_client(field("client_id"), optional("client_secret"));
+            Grant::Refresh {
+                refresh_token: field("refresh_token"),
+                client_id,
+                client_secret,
+            }
+        }
         _ => return no_store(oauth_error(&cx, WireError::UnsupportedGrantType)),
     };
     let mut rng = match worker_rng() {
@@ -423,5 +451,32 @@ pub async fn register_route(mut req: Request, ctx: RouteContext<()>) -> Result<R
             201,
         ),
         Err(err) => oauth_error(&cx, err),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{basic_credentials, form_decode};
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    fn basic(id: &str, secret: &str) -> String {
+        format!("Basic {}", STANDARD.encode(format!("{id}:{secret}")))
+    }
+
+    #[test]
+    fn basic_credentials_decode_and_form_decode() {
+        let header = basic("web-app", "a+b/c%20d");
+        assert_eq!(
+            basic_credentials(Some(&header)),
+            Some(("web-app".to_string(), "a b/c d".to_string()))
+        );
+        assert_eq!(basic_credentials(Some("Bearer x")), None);
+        assert_eq!(basic_credentials(Some("Basic !!!")), None);
+    }
+
+    #[test]
+    fn form_decode_keeps_equals_and_plus() {
+        assert_eq!(form_decode("a%3Db"), "a=b");
+        assert_eq!(form_decode("x+y"), "x y");
     }
 }

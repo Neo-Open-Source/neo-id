@@ -161,7 +161,7 @@ fn pkce_policy() {
 #[test]
 fn secret_check_forms() {
     assert_eq!(client_secret_check(None, Some("x")), SecretCheck::Skipped);
-    assert_eq!(client_secret_check(Some("x"), None), SecretCheck::Skipped);
+    assert_eq!(client_secret_check(Some("x"), None), SecretCheck::Invalid);
     let bcrypt_hash = bcrypt::hash("s3cret", 4).unwrap();
     assert_eq!(
         client_secret_check(Some(&bcrypt_hash), Some("s3cret")),

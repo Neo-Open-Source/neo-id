@@ -83,7 +83,8 @@ pub enum SecretCheck {
 #[must_use]
 pub fn client_secret_check(stored_hash: Option<&str>, presented: Option<&str>) -> SecretCheck {
     match (stored_hash, presented) {
-        (None, _) | (_, None) => SecretCheck::Skipped,
+        (None, _) => SecretCheck::Skipped,
+        (Some(_), None) => SecretCheck::Invalid,
         (Some(stored), Some(secret)) if stored.starts_with("$2") => {
             match bcrypt::verify(secret, stored) {
                 Ok(true) => SecretCheck::Valid,
