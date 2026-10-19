@@ -33,6 +33,8 @@ fn main() {
             "passkeyAvailable",
         ),
         ("auth.v1.LiteStartResponse.email_hint", "emailHint"),
+        ("auth.v1.PasswordResetResponse.mfa_required", "mfaRequired"),
+        ("auth.v1.PasswordResetResponse.mfa_methods", "mfaMethods"),
     ] {
         config.field_attribute(field, format!("#[serde(rename = \"{name}\")]"));
     }
@@ -62,6 +64,9 @@ fn main() {
         "auth.v1.LoginFinishResponse.refresh_token",
         "auth.v1.LoginFinishResponse.id_token",
         "auth.v1.LiteStartResponse.email_hint",
+        "auth.v1.PasswordResetResponse.attempt_id",
+        "auth.v1.PasswordResetResponse.user_id",
+        "auth.v1.PasswordResetResponse.reset_grant",
     ] {
         config.field_attribute(field, "#[serde(skip_serializing_if = \"Option::is_none\")]");
     }

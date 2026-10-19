@@ -319,7 +319,7 @@ pub async fn password_forgot(mut req: Request, ctx: RouteContext<()>) -> Result<
     match auth_accounts::forgot_password(&cx.db, &mut rng, body_field(&body, "email"), cx.now).await
     {
         Ok(auth_accounts::ForgotOutcome::Emailed(ticket)) => {
-            let link = format!("{}/auth/reset-password?ticket={ticket}", cx.app.web_origin);
+            let link = format!("{}/reset-password?ticket={ticket}", cx.app.web_origin);
             let mailer = match mailer(&cx) {
                 Ok(mailer) => mailer,
                 Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
@@ -379,29 +379,128 @@ pub async fn password_reset(mut req: Request, ctx: RouteContext<()>) -> Result<R
         Ok(false) => return fail_status(&cx, 429, "RATE_LIMITED", "Too many requests"),
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     }
-    match auth_accounts::reset_password(&cx.db, body_field(&body, "ticket"), cx.now).await {
-        Ok(Some(user_id)) => {
-            let grant = auth_core::generate_id(&mut rng);
-            if store
-                .put(&format!("pwdreset:{grant}"), user_id.as_bytes(), 600)
-                .await
-                .is_err()
-            {
-                return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
-            }
-            crate::respond::ok_message(
-                &cx.request_id,
-                cx.now_ms,
-                &auth_proto::auth::v1::PasswordResetResponse {
-                    user_id,
-                    reset_grant: grant,
-                },
-                200,
-            )
+    let ticket = body_field(&body, "ticket");
+    let user_id = match auth_accounts::reset_ticket(&cx.db, ticket, cx.now).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let user = match auth_accounts::load_user_by_id(&cx.db, &user_id).await {
+        Ok(user) => user,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let account = match auth_accounts::lite_account(&cx.db, &user.email).await {
+        Ok(Some(account)) => account,
+        Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    if auth_accounts::lite_methods(&account).totp {
+        let attempt_id = auth_core::generate_id(&mut rng);
+        let challenge = auth_accounts::MfaChallenge {
+            user_id: account.user.id.clone(),
+            email: account.user.email.clone(),
+            role: account.user.role.clone(),
+            totp: true,
+            email_mfa: account.email_mfa,
+            passkey: account.passkey,
+        };
+        if let Err(err) = auth_accounts::store_challenge(&store, &attempt_id, &challenge).await {
+            return fail(&cx.request_id, cx.now_ms, &err);
         }
-        Ok(None) => fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        return crate::respond::ok_message(
+            &cx.request_id,
+            cx.now_ms,
+            &auth_proto::auth::v1::PasswordResetResponse {
+                mfa_required: true,
+                mfa_methods: vec!["totp".to_string()],
+                attempt_id: Some(attempt_id),
+                user_id: None,
+                reset_grant: None,
+            },
+            200,
+        );
+    }
+    finish_password_reset(&cx, &mut rng, &store, ticket).await
+}
+
+pub async fn password_reset_verify(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let cx = match load_cx(&ctx.env) {
+        Ok(cx) => cx,
+        Err(err) => return fail("unknown", 0, &err),
+    };
+    let body = match json_body(&mut req).await {
+        Ok(body) => body,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let mut rng = match worker_rng() {
+        Ok(rng) => rng,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+    };
+    let attempt_id = body_field(&body, "attempt_id");
+    let challenge = match auth_accounts::load_challenge(&store, attempt_id).await {
+        Ok(Some(challenge)) => challenge,
+        Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    match auth_accounts::totp_check(
+        &cx.db,
+        &challenge.user_id,
+        body_field(&body, "code"),
+        cx.now,
+    )
+    .await
+    {
+        Ok(true) => {
+            if let Err(err) = auth_accounts::clear_challenge(&store, attempt_id).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
+            }
+            finish_password_reset(&cx, &mut rng, &store, body_field(&body, "ticket")).await
+        }
+        Ok(false) => {
+            if let Err(err) = auth_accounts::fail_attempt(&store, attempt_id).await {
+                return fail(&cx.request_id, cx.now_ms, &err);
+            }
+            fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials)
+        }
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
     }
+}
+
+async fn finish_password_reset<R: rand_core::RngCore + rand_core::CryptoRng>(
+    cx: &Ctx,
+    rng: &mut R,
+    store: &crate::kv::StatesKv,
+    ticket: &str,
+) -> Result<Response> {
+    let user_id = match auth_accounts::reset_password(&cx.db, ticket, cx.now).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let grant = auth_core::generate_id(rng);
+    if store
+        .put(&format!("pwdreset:{grant}"), user_id.as_bytes(), 600)
+        .await
+        .is_err()
+    {
+        return fail(&cx.request_id, cx.now_ms, &AuthError::Internal);
+    }
+    crate::respond::ok_message(
+        &cx.request_id,
+        cx.now_ms,
+        &auth_proto::auth::v1::PasswordResetResponse {
+            mfa_required: false,
+            mfa_methods: Vec::new(),
+            attempt_id: None,
+            user_id: Some(user_id),
+            reset_grant: Some(grant),
+        },
+        200,
+    )
 }
 
 pub async fn password_change(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {

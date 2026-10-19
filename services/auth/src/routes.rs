@@ -757,6 +757,10 @@ pub fn router() -> Router<'static, ()> {
             crate::account::password_reset,
         )
         .post_async(
+            "/api/v1/auth/password/reset/verify",
+            crate::account::password_reset_verify,
+        )
+        .post_async(
             "/api/v1/user/password/change",
             crate::account::password_change,
         )

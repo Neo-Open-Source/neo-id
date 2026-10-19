@@ -31,7 +31,7 @@ pub use passkeys::{
     NewCredential, VerifiedCounter, authenticate_begin, authenticate_finish, register_begin,
     register_finish,
 };
-pub use password::{ForgotOutcome, forgot_password, reset_password};
+pub use password::{ForgotOutcome, forgot_password, reset_password, reset_ticket};
 pub use rate_limit::rate_limit_allow;
 pub use refresh::{Rotation, rotate_refresh};
 pub use register::{Availability, check_email, finish_registration};

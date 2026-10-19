@@ -33,20 +33,27 @@ pub async fn forgot_password<E: Executor, R: rand::RngCore + rand::CryptoRng>(
     Ok(ForgotOutcome::Emailed(ticket))
 }
 
-pub async fn reset_password<E: Executor>(
+pub async fn reset_ticket<E: Executor>(
     db: &E,
     ticket: &str,
     now: u64,
 ) -> Result<Option<String>, AuthError> {
     let rows = db.run(find_by_reset_hash(&hash_token(ticket), now)).await?;
-    let Some(row) = rows.first() else {
+    Ok(rows
+        .first()
+        .and_then(|row| row.get("id"))
+        .and_then(serde_json::Value::as_str)
+        .map(String::from))
+}
+
+pub async fn reset_password<E: Executor>(
+    db: &E,
+    ticket: &str,
+    now: u64,
+) -> Result<Option<String>, AuthError> {
+    let Some(id) = reset_ticket(db, ticket, now).await? else {
         return Ok(None);
     };
-    let id = row
-        .get("id")
-        .and_then(serde_json::Value::as_str)
-        .ok_or(AuthError::MalformedMessage)?
-        .to_string();
     db.run(clear_reset_token(&id)).await?;
     db.run(revoke_user_refreshes(&id, "password_reset", now))
         .await?;

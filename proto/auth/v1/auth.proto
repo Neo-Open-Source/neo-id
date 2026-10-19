@@ -31,8 +31,11 @@ message RegisterStartResponse {
 }
 
 message PasswordResetResponse {
-  string user_id = 1;
-  string reset_grant = 2;
+  bool mfa_required = 1;
+  repeated string mfa_methods = 2;
+  optional string attempt_id = 3;
+  optional string user_id = 4;
+  optional string reset_grant = 5;
 }
 
 // Result of POST /api/v1/auth/lite/start (no-JS email-code login). An unknown
