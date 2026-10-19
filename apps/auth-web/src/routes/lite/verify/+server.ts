@@ -34,6 +34,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const headers = new Headers();
   for (const cookie of res.headers.getSetCookie?.() ?? []) headers.append('set-cookie', cookie);
-  headers.set('location', target || '/');
+  headers.set('location', target || '/lite');
   return new Response(null, { status: 303, headers });
 };

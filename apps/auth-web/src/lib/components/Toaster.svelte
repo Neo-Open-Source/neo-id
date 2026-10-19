@@ -24,7 +24,7 @@
       <span class="flex-1">{item.message}</span>
       <button
         type="button"
-        class="-mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-control-sm text-faint hover:bg-wash hover:text-ink"
+        class="icon-btn -mr-1 size-8"
         onclick={() => dismiss(item.id)}
         aria-label={t('common.close')}
       >

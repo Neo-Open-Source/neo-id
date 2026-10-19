@@ -5,15 +5,11 @@
   import { env } from '$env/dynamic/public';
   import { fromJson, type JsonValue } from '@bufbuild/protobuf';
   import { t } from '$i18n';
-  import {
-    LoginFinishResponseSchema,
-    LoginStartResponseSchema,
-    ProfileResponseSchema
-  } from '$lib/gen/auth/v1/auth_pb';
+  import { ProfileResponseSchema } from '$lib/gen/auth/v1/auth_pb';
   import { api, errorMessage } from '$lib/api';
-  import { captchaMode, captchaPayload } from '$lib/config';
-  import { saveMfa, type MfaMethod } from '$lib/flows';
-  import { loginFinish, loginStart } from '$lib/opaque';
+  import { captchaMode } from '$lib/config';
+  import { performLogin } from '$lib/flows';
+  import { signInWithPasskey } from '$lib/passkey';
   import { logout, hasSessionCookie, safeRedirect } from '$lib/session';
   import { notify } from '$lib/toast.svelte';
   import AuthLayout from '$lib/components/AuthLayout.svelte';
@@ -28,6 +24,7 @@
   let step = $state<'email' | 'password'>('email');
   let loading = $state(false);
   let captchaToken = $state<string | null>(null);
+  let captchaRefresh = $state(0);
   let checking = $state(true);
   let signedInAs = $state<string | null>(null);
 
@@ -38,6 +35,12 @@
     redirect !== '/'
       ? `${extra}${extra.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(redirect)}`
       : extra;
+
+  function social(provider: string) {
+    const dest = redirect !== '/' ? redirect : home || '/auth';
+    const target = new URL(dest, location.origin).href;
+    window.location.href = `/api/v1/oauth/${provider}/start?redirect=${encodeURIComponent(target)}`;
+  }
 
   onMount(async () => {
     if (!hasSessionCookie()) {
@@ -58,19 +61,19 @@
     }
   });
 
-  async function continueToApp() {
+  function continueToApp() {
     const dest = redirect !== '/' ? redirect : home;
-    if (dest) {
-      window.location.assign(dest);
-      return;
-    }
+    window.location.assign(dest || '/');
+  }
+
+  async function passkey() {
+    loading = true;
     try {
-      const data = fromJson(
-        ProfileResponseSchema,
-        await api<JsonValue>('/api/v1/user/profile')
-      );
-      signedInAs = data.email || email;
-    } finally {
+      await signInWithPasskey({});
+      const dest = redirect !== '/' ? redirect : home;
+      window.location.assign(dest || '/auth');
+    } catch (error) {
+      notify.error(errorMessage(error) || t('mfa.passkeyUnsupported'));
       loading = false;
     }
   }
@@ -88,41 +91,16 @@
 
     loading = true;
     try {
-      const start = await loginStart(password);
-      const started = fromJson(
-        LoginStartResponseSchema,
-        await api<JsonValue>('/api/v1/auth/login/start', {
-          method: 'POST',
-          body: { email, request: start.request, ...captchaPayload(captchaToken) }
-        })
-      );
-      const finish = await loginFinish(password, start.state, started.response);
-      const result = fromJson(
-        LoginFinishResponseSchema,
-        await api<JsonValue>('/api/v1/auth/login/finish', {
-          method: 'POST',
-          body: { attempt_id: started.attemptId, finalization: finish.finalization, email }
-        }),
-        { ignoreUnknownFields: true }
-      );
-
-      if (result.mfaRequired) {
-        saveMfa({
-          attemptId: started.attemptId,
-          email,
-          methods: result.mfaMethods as MfaMethod[],
-          passkeyAvailable: result.passkeyAvailable ?? false,
-          emailHint: result.emailHint ?? '',
-          redirect
-        });
+      const outcome = await performLogin({ email, password, captchaToken, redirect });
+      if (outcome.mfa) {
         await goto('/2fa');
         return;
       }
-
       await continueToApp();
     } catch (error) {
       notify.error(errorMessage(error));
       captchaToken = null;
+      captchaRefresh += 1;
       loading = false;
     }
   }
@@ -170,7 +148,7 @@
       {/if}
 
       {#if step === 'password' && captchaMode !== 'off'}
-        <Captcha onverify={(token) => (captchaToken = token)} />
+        <Captcha onverify={(token) => (captchaToken = token)} refresh={captchaRefresh} />
       {/if}
 
       <Button type="submit" full loading={loading} disabled={!email || (step === 'password' && !password)}>
@@ -192,16 +170,34 @@
     {#if step === 'email'}
       <div class="or-divider" role="separator">{t('common.or')}</div>
       <div class="flex flex-col gap-2">
-        <span title={t('login.passkeySoon')}>
-          <Button variant="secondary" full disabled>
-            <Icon name="passkey" size={18} />
-            {t('login.passkeyLogin')}
-          </Button>
-        </span>
+        <Button variant="secondary" full loading={loading} onclick={passkey}>
+          <Icon name="passkey" size={18} />
+          {t('login.passkeyLogin')}
+        </Button>
         <Button variant="secondary" full href={mfaQuery('/qr')}>
           <Icon name="qr" size={18} />
           {t('login.qr')}
         </Button>
+        <div class="social-row">
+          <button
+            type="button"
+            class="social-btn"
+            aria-label={t('login.google')}
+            title={t('login.google')}
+            onclick={() => social('google')}
+          >
+            <Icon name="google" size={20} />
+          </button>
+          <button
+            type="button"
+            class="social-btn"
+            aria-label={t('login.github')}
+            title={t('login.github')}
+            onclick={() => social('github')}
+          >
+            <Icon name="github" size={20} />
+          </button>
+        </div>
       </div>
     {/if}
 

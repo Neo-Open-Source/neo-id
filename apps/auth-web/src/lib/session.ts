@@ -1,4 +1,3 @@
-import { goto } from '$app/navigation';
 import { api } from './api';
 
 export type SessionUser = { id: string; email: string; role: string };
@@ -12,7 +11,7 @@ export async function logout(): Promise<void> {
   try {
     await api('/api/v1/auth/logout', { method: 'POST' });
   } finally {
-    await goto('/');
+    window.location.assign('/');
   }
 }
 

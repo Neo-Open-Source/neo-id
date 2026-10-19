@@ -1,4 +1,5 @@
 <script lang="ts">
+  import '$lib/lite.css';
   import { page } from '$app/stores';
   import { t } from '$i18n';
 
@@ -12,7 +13,7 @@
   <title>NeoID</title>
 </svelte:head>
 
-<div class="page">
+<div class="page lite-root">
   <div class="card">
     <h1>{t('lite.codeTitle')}</h1>
     <p class="sub">{t('lite.codeSubtitle', { email })}</p>
@@ -45,64 +46,3 @@
     </form>
   </div>
 </div>
-
-<style>
-  .page {
-    min-height: 100vh;
-    background: #f0f0f0;
-    padding: 48px 16px;
-    box-sizing: border-box;
-  }
-  .card {
-    width: 320px;
-    margin: 0 auto;
-    background: #fff;
-    border: 1px solid #c8c8c8;
-    padding: 20px 24px 24px;
-    font-family: Arial, Helvetica, sans-serif;
-    color: #000;
-  }
-  h1 {
-    font-size: 20px;
-    margin: 0 0 4px;
-  }
-  .sub {
-    color: #666;
-    margin: 0 0 16px;
-    font-size: 13px;
-  }
-  label {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 13px;
-  }
-  input[type='text'] {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 8px;
-    font-size: 18px;
-    letter-spacing: 2px;
-    border: 1px solid #999;
-    margin-bottom: 12px;
-  }
-  button {
-    width: 100%;
-    padding: 8px;
-    font-size: 15px;
-  }
-  .error {
-    color: #c00;
-  }
-  .resend {
-    margin-top: 12px;
-  }
-  .resend button {
-    background: none;
-    border: 0;
-    padding: 0;
-    color: #00c;
-    text-decoration: underline;
-    font-size: 13px;
-  }
-</style>

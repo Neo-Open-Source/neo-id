@@ -50,6 +50,10 @@ pub(crate) fn test_ctx_with(now: u64, alg: SigningAlg) -> Ctx {
         turnstile_secret: None,
         altcha_secret: None,
         altcha_fallback: true,
+        google_client_id: None,
+        google_client_secret: None,
+        github_client_id: None,
+        github_client_secret: None,
         #[cfg(feature = "passkeys")]
         rp_id: "id.neome.uk".to_string(),
         #[cfg(feature = "passkeys")]

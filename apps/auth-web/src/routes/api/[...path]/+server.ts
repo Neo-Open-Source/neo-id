@@ -8,8 +8,7 @@ const HOP_BY_HOP = new Set([
   'connection',
   'content-length',
   'accept-encoding',
-  'transfer-encoding',
-  'cookie'
+  'transfer-encoding'
 ]);
 
 const upstream = () => (env.AUTH_API_ORIGIN ?? '').replace(/\/$/, '');

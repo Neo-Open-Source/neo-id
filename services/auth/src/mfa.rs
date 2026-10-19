@@ -2,6 +2,9 @@ use auth_accounts::CodeOutcome;
 use auth_core::AuthError;
 use worker::{Request, Response, Result, RouteContext};
 
+#[cfg(feature = "passkeys")]
+use db::Executor;
+
 use super::{
     mail::mailer,
     respond::{fail, ok},
@@ -462,12 +465,45 @@ pub async fn passkey_register_finish(mut req: Request, ctx: RouteContext<()>) ->
                 credential.backup_state,
             );
             match cx.db.run(query).await {
-                Ok(()) => ok(&cx.request_id, cx.now_ms, &serde_json::json!({}), 200),
+                Ok(_) => ok(&cx.request_id, cx.now_ms, &serde_json::json!({}), 200),
                 Err(err) => fail(&cx.request_id, cx.now_ms, &err),
             }
         }
         Err(err) => fail(&cx.request_id, cx.now_ms, &err),
     }
+}
+
+#[cfg(feature = "passkeys")]
+fn passkey_state_key(email: &str, state_id: &str) -> String {
+    if email.is_empty() {
+        format!("mfa:pkdisc:{state_id}")
+    } else {
+        format!("mfa:pkauth:{state_id}")
+    }
+}
+
+#[cfg(feature = "passkeys")]
+async fn finish_passkey(
+    cx: &Ctx,
+    req: &Request,
+    user: &auth_accounts::LoginUser,
+    verified: auth_accounts::VerifiedCounter,
+) -> Result<Response> {
+    if let Err(err) = cx
+        .db
+        .run(auth_db::update_counter(
+            &verified.credential_id_b64,
+            verified.counter,
+        ))
+        .await
+    {
+        return fail(&cx.request_id, cx.now_ms, &err);
+    }
+    let mut rng = match worker_rng() {
+        Ok(rng) => rng,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    mint_response(cx, req, &mut rng, user).await
 }
 
 #[cfg(feature = "passkeys")]
@@ -480,33 +516,39 @@ pub async fn passkey_auth_start(mut req: Request, ctx: RouteContext<()>) -> Resu
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let Ok(user) = auth_accounts::load_user(&cx.db, body_field(&body, "email")).await else {
-        return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
-    };
     let rp = match passkey_rp(&cx) {
         Ok(rp) => rp,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    match auth_accounts::authenticate_begin(&cx.db, &rp, &user.id).await {
-        Ok((options, state)) => {
-            let state_id = cx.request_id.clone();
-            match kv_put(&ctx, &format!("mfa:pkauth:{state_id}"), &state).await {
-                Ok(()) => {}
-                Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-            }
-            let options = match raw_options(&options) {
-                Ok(options) => options,
-                Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-            };
-            ok(
-                &cx.request_id,
-                cx.now_ms,
-                &serde_json::json!({"options": options, "state_id": state_id}),
-                200,
-            )
+    let email = body_field(&body, "email");
+    let (options, state) = if email.is_empty() {
+        match auth_accounts::discoverable_begin(&rp) {
+            Ok(flow) => flow,
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
         }
-        Err(err) => fail(&cx.request_id, cx.now_ms, &err),
+    } else {
+        let Ok(user) = auth_accounts::load_user(&cx.db, email).await else {
+            return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
+        };
+        match auth_accounts::authenticate_begin(&cx.db, &rp, &user.id).await {
+            Ok(flow) => flow,
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        }
+    };
+    let state_id = cx.request_id.clone();
+    if let Err(err) = kv_put(&ctx, &passkey_state_key(email, &state_id), &state).await {
+        return fail(&cx.request_id, cx.now_ms, &err);
     }
+    let options = match raw_options(&options) {
+        Ok(options) => options,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    ok(
+        &cx.request_id,
+        cx.now_ms,
+        &serde_json::json!({"options": options, "state_id": state_id}),
+        200,
+    )
 }
 
 #[cfg(feature = "passkeys")]
@@ -519,37 +561,43 @@ pub async fn passkey_auth_finish(mut req: Request, ctx: RouteContext<()>) -> Res
         Ok(body) => body,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let state_id = body_field(&body, "state_id");
-    let state = match kv_take(&ctx, &format!("mfa:pkauth:{state_id}")).await {
-        Ok(state) => state,
-        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-    };
-    let Ok(user) = auth_accounts::load_user(&cx.db, body_field(&body, "email")).await else {
-        return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
-    };
     let rp = match passkey_rp(&cx) {
         Ok(rp) => rp,
         Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
     };
-    let verified =
-        match auth_accounts::authenticate_finish(&rp, body_field(&body, "response"), &state) {
+    let email = body_field(&body, "email");
+    let state_id = body_field(&body, "state_id");
+    let state = match kv_take(&ctx, &passkey_state_key(email, state_id)).await {
+        Ok(state) => state,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    let response = body_field(&body, "response");
+    let (user, verified) = if email.is_empty() {
+        let credential_id = match auth_accounts::discoverable_credential_id(&rp, response) {
+            Ok(credential_id) => credential_id,
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        };
+        let Ok((user_id, stored)) = auth_accounts::load_passkey(&cx.db, &credential_id).await
+        else {
+            return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
+        };
+        let verified = match auth_accounts::discoverable_finish(&rp, response, &state, &stored) {
             Ok(verified) => verified,
             Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
         };
-    match cx
-        .db
-        .run(auth_db::update_counter(
-            &verified.credential_id_b64,
-            verified.counter,
-        ))
-        .await
-    {
-        Ok(_) => {}
-        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
-    }
-    let mut rng = match worker_rng() {
-        Ok(rng) => rng,
-        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        let Ok(user) = auth_accounts::load_user_by_id(&cx.db, &user_id).await else {
+            return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
+        };
+        (user, verified)
+    } else {
+        let Ok(user) = auth_accounts::load_user(&cx.db, email).await else {
+            return fail(&cx.request_id, cx.now_ms, &AuthError::InvalidCredentials);
+        };
+        let verified = match auth_accounts::authenticate_finish(&rp, response, &state) {
+            Ok(verified) => verified,
+            Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+        };
+        (user, verified)
     };
-    mint_response(&cx, &req, &mut rng, &user).await
+    finish_passkey(&cx, &req, &user, verified).await
 }

@@ -35,5 +35,5 @@ tokio = { version = "1", features = ["macros", "rt"] }
 workspace = true
 
 [features]
-default = []
+default = ["passkeys"]
 passkeys = ["auth-accounts/passkeys", "auth-core/webauthn"]

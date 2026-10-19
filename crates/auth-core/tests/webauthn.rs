@@ -2,8 +2,8 @@
 
 use auth_core::{
     AuthError, AuthenticationState, PasskeyRp, RegistrationState, StoredCredential,
-    authentication_options, registration_options, user_uuid, verify_authentication,
-    verify_registration,
+    authentication_options, registration_options, require_resident_key, user_uuid,
+    verify_authentication, verify_registration,
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
@@ -44,10 +44,10 @@ fn fixed_credential(counter: u32) -> StoredCredential {
     }
 }
 
-fn register_token(rp: &PasskeyRp) -> (StoredCredential, WebauthnAuthenticator<SoftPasskey>) {
+fn register_token(rp: &PasskeyRp) -> (StoredCredential, SoftPasskey) {
     let (options, state) =
         registration_options(rp, Uuid::new_v4(), "alice@example.com", &[]).unwrap();
-    let mut token = WebauthnAuthenticator::new(SoftPasskey::new(true));
+    let mut token = SoftPasskey::new(true);
     let response = token.do_registration(origin(), options).unwrap();
     let stored =
         verify_registration(rp, &serde_json::to_string(&response).unwrap(), &state).unwrap();
@@ -111,11 +111,32 @@ fn registration_options_exclude_existing_credentials() {
 }
 
 #[test]
+fn resident_key_required_toggles_authenticator_selection() {
+    let rp = rp();
+    let (options, _) = registration_options(&rp, Uuid::new_v4(), "alice@example.com", &[]).unwrap();
+    let plain = serde_json::to_value(&options).unwrap();
+    assert_ne!(
+        plain["publicKey"]["authenticatorSelection"]["requireResidentKey"],
+        true
+    );
+
+    let required = serde_json::to_value(require_resident_key(options)).unwrap();
+    assert_eq!(
+        required["publicKey"]["authenticatorSelection"]["residentKey"],
+        "required"
+    );
+    assert_eq!(
+        required["publicKey"]["authenticatorSelection"]["requireResidentKey"],
+        true
+    );
+}
+
+#[test]
 fn full_ceremony_roundtrip_advances_counter() {
     let rp = rp();
     let (options, state) =
         registration_options(&rp, Uuid::new_v4(), "alice@example.com", &[]).unwrap();
-    let mut token = WebauthnAuthenticator::new(SoftPasskey::new(true));
+    let mut token = SoftPasskey::new(true);
     let response = token.do_registration(origin(), options).unwrap();
     let stored =
         verify_registration(&rp, &serde_json::to_string(&response).unwrap(), &state).unwrap();
@@ -159,7 +180,7 @@ fn registration_response_bound_to_another_state_fails() {
     let (options, _) = registration_options(&rp, Uuid::new_v4(), "alice@example.com", &[]).unwrap();
     let (_, other_state) =
         registration_options(&rp, Uuid::new_v4(), "alice@example.com", &[]).unwrap();
-    let mut token = WebauthnAuthenticator::new(SoftPasskey::new(true));
+    let mut token = SoftPasskey::new(true);
     let response = token.do_registration(origin(), options).unwrap();
     assert_eq!(
         verify_registration(
@@ -189,7 +210,7 @@ fn registration_with_foreign_origin_fails() {
     let mut response = token
         .perform_register(hostile_hash, options.public_key.clone(), 60_000)
         .unwrap();
-    response.response.client_data_json = hostile_client_data.into();
+    response.response.client_data_json = hostile_client_data;
     assert_eq!(
         verify_registration(&rp, &serde_json::to_string(&response).unwrap(), &state).unwrap_err(),
         AuthError::InvalidCredentials
@@ -295,7 +316,7 @@ fn webauthn_errors_map_to_coarse_auth_errors() {
         AuthError::InvalidCredentials
     );
     assert_eq!(
-        map(WebauthnError::AttestationChainNotTrusted("x".to_string())),
+        map(WebauthnError::SignatureInvalid),
         AuthError::InvalidCredentials
     );
     assert_eq!(

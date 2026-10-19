@@ -193,6 +193,41 @@ async fn create_user<E: Executor>(db: &E, email: &str, now: u64) -> Result<Strin
         .ok_or(AuthError::Internal)
 }
 
+async fn register_check(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let cx = match load_cx(&ctx.env) {
+        Ok(cx) => cx,
+        Err(err) => return fail("unknown", 0, &err),
+    };
+    let body: serde_json::Value = match req.json().await {
+        Ok(body) => body,
+        Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::MalformedMessage),
+    };
+    let store = match kv_store(&ctx) {
+        Ok(store) => crate::kv::StatesKv::new(store),
+        Err(_) => return fail(&cx.request_id, cx.now_ms, &AuthError::Internal),
+    };
+    let bucket = format!(
+        "rl:regcheck:{}",
+        header_opt(&req, "cf-connecting-ip").unwrap_or_default()
+    );
+    match auth_accounts::rate_limit_allow(&store, &bucket, 30, 3600).await {
+        Ok(true) => {}
+        Ok(false) => return fail_status(&cx, 429, "RATE_LIMITED", "Too many requests"),
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    }
+    let available = match auth_accounts::check_email(&cx.db, body_field(&body, "email")).await {
+        Ok(auth_accounts::Availability::Taken) => false,
+        Ok(_) => true,
+        Err(err) => return fail(&cx.request_id, cx.now_ms, &err),
+    };
+    crate::respond::ok_message(
+        &cx.request_id,
+        cx.now_ms,
+        &auth_proto::auth::v1::CheckEmailResponse { available },
+        200,
+    )
+}
+
 pub(crate) fn fail_status(cx: &Ctx, status: u16, code: &str, message: &str) -> Result<Response> {
     Response::from_json(&serde_json::json!({
         "ok": false,
@@ -688,12 +723,15 @@ pub fn router() -> Router<'static, ()> {
         .get_async("/api/v1/captcha/altcha", crate::captcha::altcha_challenge)
         .get_async("/api/v1/captcha/altcha.js", crate::captcha::altcha_script)
         .get_async("/api/v1/captcha/lite", crate::captcha::lite_challenge)
+        .post_async("/api/v1/auth/register/check", register_check)
         .post_async("/api/v1/auth/register/start", register_start)
         .post_async("/api/v1/auth/register/finish", register_finish)
         .post_async("/api/v1/auth/login/start", login_start)
         .post_async("/api/v1/auth/login/finish", login_finish)
         .post_async("/api/v1/auth/refresh", refresh_route)
         .post_async("/api/v1/auth/lite/start", crate::mfa::lite_start)
+        .get_async("/api/v1/oauth/:provider/start", crate::social::start)
+        .get_async("/api/v1/oauth/:provider/callback", crate::social::callback)
         .post_async("/api/v1/auth/logout", logout_route)
         .get_async("/api/v1/oauth2/authorize", crate::oidc::authorize_route)
         .post_async(

@@ -59,11 +59,17 @@ export const POST: RequestHandler = async ({ request }) => {
   const started = fromJson(LiteStartResponseSchema, payload.data ?? {}, {
     ignoreUnknownFields: true
   });
-  if (!started.sent || !started.attemptId) {
+  if (!started.attemptId) redirect(303, `/lite?error=nomethod${redirectQuery}`);
+
+  const base = `attempt=${encodeURIComponent(started.attemptId)}&email=${encodeURIComponent(email)}`;
+  const withTarget = (path: string) => `${path}?${base}${redirectQuery}`;
+  const methods = started.mfaMethods ?? [];
+
+  if (methods.length === 0) redirect(303, `/lite?error=nomethod${redirectQuery}`);
+  if (methods.length === 1) {
+    if (methods[0] === 'totp') redirect(303, withTarget('/lite/totp'));
+    if (methods[0] === 'email') redirect(303, withTarget('/lite/code'));
     redirect(303, `/lite?error=nomethod${redirectQuery}`);
   }
-  redirect(
-    303,
-    `/lite/code?attempt=${encodeURIComponent(started.attemptId)}&email=${encodeURIComponent(email)}${redirectQuery}`
-  );
+  redirect(303, withTarget('/lite/2fa'));
 };

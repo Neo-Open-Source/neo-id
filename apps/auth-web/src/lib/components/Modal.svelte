@@ -71,7 +71,7 @@
       <div class="relative text-center">
         <button
           type="button"
-          class="absolute right-0 top-0 -mr-1 inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-wash hover:text-ink"
+          class="icon-btn absolute right-0 top-0 -mr-1 size-9"
           onclick={() => onclose?.()}
           aria-label={t('common.close')}
         >

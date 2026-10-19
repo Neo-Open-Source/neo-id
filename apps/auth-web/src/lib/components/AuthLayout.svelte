@@ -25,7 +25,7 @@
       {#if back}
         <button
           type="button"
-          class="absolute left-4 top-4 inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-wash hover:text-ink"
+          class="icon-btn absolute left-4 top-4 size-9"
           onclick={back}
           aria-label={backLabel ?? t('common.back')}
         >

@@ -3,8 +3,8 @@
   import { captchaMode, setCaptchaFallback, turnstileSiteKey } from '$lib/config';
   import { t } from '$i18n';
 
-  type Props = { onverify: (token: string | null) => void };
-  let { onverify }: Props = $props();
+  type Props = { onverify: (token: string | null) => void; refresh?: number };
+  let { onverify, refresh = 0 }: Props = $props();
 
   const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
   const LOAD_TIMEOUT_MS = 8000;
@@ -93,6 +93,26 @@
     mode = 'altcha';
     void mountAltcha();
   }
+
+  function reset() {
+    onverify(null);
+    if (mode === 'turnstile') {
+      if (turnstileWidget && window.turnstile) window.turnstile.reset(turnstileWidget);
+      return;
+    }
+    altchaWidget?.remove();
+    altchaWidget = null;
+    void mountAltcha();
+  }
+
+  let seenRefresh = 0;
+  $effect(() => {
+    const value = refresh;
+    if (value === seenRefresh) return;
+    seenRefresh = value;
+    if (value === 0 || captchaMode === 'off') return;
+    reset();
+  });
 
   onMount(() => {
     if (captchaMode === 'off') return;

@@ -2,7 +2,12 @@
 
 Rust (edition 2024, MSRV 1.85) on Cloudflare Workers via `workers-rs`, free tier.
 10ms CPU/request ⇒ **no server-side password KDF**: OPAQUE (RFC 9807, `opaque-ke`),
-Argon2id runs on the user device. Web: SvelteKit + adapter-cloudflare.
+Argon2id runs on the user device.
+
+Microservices on one Cloudflare account: one Rust worker + one SvelteKit app
+per domain, front and API served together on that single domain (no public API
+subdomain, no per-app HTTP proxy). Domains: `auth.neome.uk` (auth),
+`id.neome.uk` (account), `dev.neome.uk` (developer), `panel.neome.uk` (admin).
 Models: `proto/` (buf), written once. No extra *.md files without owner approval.
 
 ## Commands
@@ -11,6 +16,7 @@ Models: `proto/` (buf), written once. No extra *.md files without owner approval
 nix develop
 just gate            # full local gate: fmt check + clippy + test + deny + audit
 just fmt | just lint | just test | just deny | just proto
+just migrate         # apply migrations/*.sql over Neon SQL-over-HTTP
 just mutants <file>  # new mutants must be killed
 ```
 
@@ -18,15 +24,52 @@ just mutants <file>  # new mutants must be killed
 
 ```
 proto/auth/v1/*.proto              # contracts: user, session, client, claims
-services/auth/                      # deployable worker crate (`auth-worker`)
-crates/auth-core/                   # pure logic: no I/O, no clock, rng passed in
-crates/auth-db/                   # shared Neon HTTP kernel: auth, accounts, admin, developer
-services/auth/src/lib.rs            # entry: adapt request → crates → response
-apps/auth-web/                      # SvelteKit (planned)
+crates/auth-core/                  # pure logic: no I/O, no clock, rng passed in
+crates/auth-proto/                 # generated types from proto/ (buf)
+crates/db/                         # Neon SQL-over-HTTP kernel
+crates/auth-db/                    # shared query builders (users, sessions, oauth, ...)
+services/auth/                     # auth worker (`auth-worker`)
+services/account/                  # account worker (profile, connections, avatars)
+services/developer/                # developer worker (service_apps, logos)
+services/admin/                    # admin worker (users, services, audit)
+apps/auth-web/                     # SvelteKit: sign-in / register / 2FA / device / lite
+apps/id-web/                       # SvelteKit: profile, security, connected apps
+apps/developer-web/                # SvelteKit: developer console
+apps/admin-web/                    # SvelteKit: admin panel
+packages/ui/                       # shared frontend: api client, session, i18n, UI kit
 ```
 
-Library crates hold logic; the worker crate only wires. One domain concept
+Library crates hold logic; each worker crate only wires. One domain concept
 per file. `lib.rs` is a facade: docs + `mod` + `pub use`, nothing else.
+
+## Services & domains
+
+- One service = one Rust worker + one SvelteKit app on one domain. The SvelteKit
+  (adapter-cloudflare) worker serves the app and reaches its Rust worker through
+  a **Service Binding** for `/api/*` — no public API host, no extra proxy.
+- Each worker owns its `wrangler` config, bindings, and env. Frontends never
+  call a worker cross-domain over the public internet.
+- `apps/*` are independent SvelteKit projects (Svelte 5 runes, Tailwind v4, bun);
+  share frontend code via `packages/ui` (rule of three before extracting).
+
+## Data, sessions, service-to-service
+
+- One Neon database, one Cloudflare account. Inter-worker calls go over
+  **Service Bindings** (trusted, in-account), never public HTTP.
+- Table ownership is per service: `auth` = `users`(credential/role/status/MFA
+  flags), `opaque_records`, `sessions`, `refresh_tokens`, `mfa_codes`,
+  `passkeys`, `identities`, `oauth_states`, `device_codes`; `account` =
+  profile fields + `authorized_connections` + avatar R2 keys; `developer` =
+  `service_apps`; `admin` = `audit_log` + read-only aggregation. A service
+  reads/writes only its tables; others go through its API/binding.
+- Sessions: access/refresh cookies scoped to `.neome.uk`, so every frontend
+  sees the same session. Workers verify access tokens locally against
+  `auth`'s public **JWKS** (cached) — no per-request call to `auth`.
+- Avatars: R2 bucket + CDN, owned by `account`; key = sha256, `prevAvatarKey`
+  refcount on replace. `users.avatar` holds the CDN URL.
+- Schema changes: `migrations/*.sql` applied by `just migrate` over Neon
+  SQL-over-HTTP (`_migrations` ledger, idempotent), tagged with the owning
+  service. Prisma is not the source of truth.
 
 ## Models live in proto/
 
@@ -56,8 +99,8 @@ per file. `lib.rs` is a facade: docs + `mod` + `pub use`, nothing else.
   change (audit status, MSRV fit, wasm32 build, maintenance signs).
 - wasm32 closure stays native-free: crates in the worker build use
   `default-features = false` on workspace deps; non-portable code
-  (webauthn/openssl) behind opt-in features. Verify with
-  `cargo check -p auth-worker --target wasm32-unknown-unknown`.
+  (webauthn/openssl) behind opt-in features. Verify every worker crate, e.g.
+  `cargo check -p auth-worker -p account-worker --target wasm32-unknown-unknown`.
 - Ubiquitous language, no synonyms: OP (our server), RP (external app),
   envelope (OPAQUE server record — never "hash"), OPRF key (service secret),
   KSF (client Argon2id), kid, re-enrollment (bcrypt → OPAQUE via email

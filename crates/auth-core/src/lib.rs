@@ -49,7 +49,9 @@ pub use setup::OpaqueSetup;
 pub use totp::{generate_secret, setup_uri, verify_totp};
 #[cfg(feature = "webauthn")]
 pub use webauthn::{
-    AuthenticationState, CreationChallengeResponse, PasskeyRp, RegistrationState,
-    RequestChallengeResponse, StoredCredential, VerifiedAuthentication, authentication_options,
-    registration_options, user_uuid, verify_authentication, verify_registration,
+    AuthenticationState, CreationChallengeResponse, DiscoverableAuthenticationState, PasskeyRp,
+    RegistrationState, RequestChallengeResponse, StoredCredential, VerifiedAuthentication,
+    authentication_options, discoverable_authentication_options, identify_discoverable,
+    registration_options, require_resident_key, user_uuid, verify_authentication,
+    verify_discoverable, verify_registration,
 };

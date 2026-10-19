@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { fromJson, type JsonValue } from '@bufbuild/protobuf';
   import { t } from '$i18n';
@@ -141,7 +140,7 @@
     {open}
     title={t('reset.newTitle')}
     subtitle={t('reset.newSubtitle')}
-    onclose={() => goto('/')}
+    onclose={() => window.location.assign('/')}
   >
     <form onsubmit={submit} class="stack">
       <Input

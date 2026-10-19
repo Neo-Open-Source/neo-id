@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { env } from '$env/dynamic/public';
   import { fromJson, type JsonValue } from '@bufbuild/protobuf';
@@ -48,12 +47,7 @@
       deviceCode = data.deviceCode;
       userCode = data.userCode;
       deadline = Date.now() + data.expiresIn * 1000;
-      const QRCode = (await import('qrcode')).default;
-      qr = await QRCode.toDataURL(data.verificationUriComplete, {
-        margin: 1,
-        width: 320,
-        color: { dark: '#111113', light: '#ffffff' }
-      });
+      qr = `/qr/image?uri=${encodeURIComponent(data.verificationUriComplete)}`;
       phase = 'ready';
       stop();
       timer = setInterval(() => void poll(), Math.max(2, data.interval) * 1000);
@@ -105,21 +99,30 @@
     }
   }
 
-  async function finish() {
+  function finish() {
     const dest = redirect !== '/' ? redirect : home;
-    if (dest) {
-      window.location.assign(dest);
-      return;
-    }
-    await goto('/');
+    window.location.assign(dest || '/');
   }
 
   function backToLogin() {
-    goto(redirect !== '/' ? `/?redirect=${encodeURIComponent(redirect)}` : '/');
+    window.location.assign(redirect !== '/' ? `/?redirect=${encodeURIComponent(redirect)}` : '/');
   }
 
+  let gateDone = $state(false);
+
   $effect(() => {
-    if (started || !(captchaMode === 'off' || captchaToken)) return;
+    void (async () => {
+      try {
+        await api('/api/v1/user/profile');
+        finish();
+      } catch {
+        gateDone = true;
+      }
+    })();
+  });
+
+  $effect(() => {
+    if (!gateDone || started || !(captchaMode === 'off' || captchaToken)) return;
     started = true;
     void start();
   });

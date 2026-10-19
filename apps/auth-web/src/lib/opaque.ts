@@ -1,4 +1,5 @@
 import * as opaque from '@serenity-kit/opaque';
+import { ApiError } from './api';
 
 export type RegistrationStart = { state: string; request: string };
 export type LoginStart = { state: string; request: string };
@@ -42,6 +43,6 @@ export async function loginFinish(
     loginResponse: response,
     password
   });
-  if (!result) throw new Error('opaque login finish failed');
+  if (!result) throw new ApiError('INVALID_CREDENTIALS', 'invalid credentials', 401);
   return { finalization: result.finishLoginRequest, sessionKey: result.sessionKey };
 }

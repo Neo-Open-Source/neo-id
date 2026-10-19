@@ -88,7 +88,7 @@
     {#if isPassword && !managerActive}
       <button
         type="button"
-        class="absolute inset-y-0 right-2 my-auto inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-wash hover:text-ink"
+        class="icon-btn absolute inset-y-0 right-2 my-auto size-8"
         onclick={() => (reveal = !reveal)}
         aria-label={reveal ? t('common.hidePassword') : t('common.showPassword')}
         aria-pressed={reveal}

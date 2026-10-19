@@ -33,6 +33,14 @@ pub fn passkeys_by_user(user_id: &str) -> Query {
 }
 
 #[must_use]
+pub fn passkey_by_credential(credential_id_b64: &str) -> Query {
+    Query {
+        sql: r#"SELECT "userId","credentialId","publicKey","counter","transports","backupEligible","backupState" FROM "passkeys" WHERE "credentialId"=$1"#,
+        params: vec![text(credential_id_b64)],
+    }
+}
+
+#[must_use]
 pub fn update_counter(credential_id_b64: &str, counter: u32) -> Query {
     Query {
         sql: r#"UPDATE "passkeys" SET "counter"=$2,"lastUsedAt"=now() WHERE "credentialId"=$1"#,

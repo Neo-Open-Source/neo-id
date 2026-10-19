@@ -1,4 +1,5 @@
 use auth_core::AuthError;
+use base64::{Engine, engine::general_purpose::STANDARD};
 use worker::kv::KvStore;
 
 pub struct StatesKv {
@@ -13,18 +14,24 @@ impl StatesKv {
 
 impl db::Kv for StatesKv {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, AuthError> {
-        self.store
+        let value = self
+            .store
             .get(key)
             .text()
             .await
-            .map(|value| value.map(String::into_bytes))
-            .map_err(|_| AuthError::Internal)
+            .map_err(|_| AuthError::Internal)?;
+        match value {
+            Some(text) => STANDARD
+                .decode(text)
+                .map(Some)
+                .map_err(|_| AuthError::Internal),
+            None => Ok(None),
+        }
     }
 
     async fn put(&self, key: &str, value: &[u8], ttl_secs: u64) -> Result<(), AuthError> {
-        let text = std::str::from_utf8(value).map_err(|_| AuthError::Internal)?;
         self.store
-            .put(key, text.to_string())
+            .put(key, STANDARD.encode(value))
             .map_err(|_| AuthError::Internal)?
             .expiration_ttl(ttl_secs)
             .execute()

@@ -1,9 +1,10 @@
 use auth_core::{
-    AuthError, AuthenticationState, PasskeyRp, RegistrationState, StoredCredential,
-    authentication_options, registration_options, user_uuid, verify_authentication,
-    verify_registration,
+    AuthError, AuthenticationState, DiscoverableAuthenticationState, PasskeyRp, RegistrationState,
+    StoredCredential, authentication_options, discoverable_authentication_options,
+    identify_discoverable, registration_options, require_resident_key, user_uuid,
+    verify_authentication, verify_discoverable, verify_registration,
 };
-use auth_db::{Executor, passkeys_by_user};
+use auth_db::{Executor, passkey_by_credential, passkeys_by_user};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 
 fn stored(row: &serde_json::Value) -> Result<StoredCredential, AuthError> {
@@ -64,7 +65,8 @@ pub async fn register_begin<E: Executor>(
         user_name,
         &credentials(db, user_id).await?,
     )?;
-    let json = serde_json::to_string(&options).map_err(|_| AuthError::Internal)?;
+    let json =
+        serde_json::to_string(&require_resident_key(options)).map_err(|_| AuthError::Internal)?;
     Ok((json, state.to_bytes()?))
 }
 
@@ -121,6 +123,48 @@ pub fn authenticate_finish(
 ) -> Result<VerifiedCounter, AuthError> {
     let state = AuthenticationState::from_bytes(state_bytes)?;
     let verified = verify_authentication(rp, response_json, &state)?;
+    Ok(VerifiedCounter {
+        credential_id_b64: URL_SAFE_NO_PAD.encode(&verified.credential_id),
+        counter: verified.counter,
+    })
+}
+
+pub fn discoverable_begin(rp: &PasskeyRp) -> Result<(String, Vec<u8>), AuthError> {
+    let (options, state) = discoverable_authentication_options(rp)?;
+    let json = serde_json::to_string(&options).map_err(|_| AuthError::Internal)?;
+    Ok((json, state.to_bytes()?))
+}
+
+pub fn discoverable_credential_id(
+    rp: &PasskeyRp,
+    response_json: &str,
+) -> Result<String, AuthError> {
+    let credential_id = identify_discoverable(rp, response_json)?;
+    Ok(URL_SAFE_NO_PAD.encode(&credential_id))
+}
+
+pub async fn load_passkey<E: Executor>(
+    db: &E,
+    credential_id_b64: &str,
+) -> Result<(String, StoredCredential), AuthError> {
+    let rows = db.run(passkey_by_credential(credential_id_b64)).await?;
+    let row = rows.first().ok_or(AuthError::InvalidCredentials)?;
+    let user_id = row
+        .get("userId")
+        .and_then(serde_json::Value::as_str)
+        .ok_or(AuthError::MalformedMessage)?
+        .to_string();
+    Ok((user_id, stored(row)?))
+}
+
+pub fn discoverable_finish(
+    rp: &PasskeyRp,
+    response_json: &str,
+    state_bytes: &[u8],
+    credential: &StoredCredential,
+) -> Result<VerifiedCounter, AuthError> {
+    let state = DiscoverableAuthenticationState::from_bytes(state_bytes)?;
+    let verified = verify_discoverable(rp, response_json, &state, credential)?;
     Ok(VerifiedCounter {
         credential_id_b64: URL_SAFE_NO_PAD.encode(&verified.credential_id),
         counter: verified.counter,

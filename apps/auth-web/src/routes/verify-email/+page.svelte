@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import { fromJson, type JsonValue } from '@bufbuild/protobuf';
   import { t } from '$i18n';
   import { ProfileResponseSchema } from '$lib/gen/auth/v1/auth_pb';
@@ -30,7 +29,7 @@
         email = data.email;
         await send();
       } catch {
-        await goto(`/?redirect=${encodeURIComponent('/verify-email')}`);
+        window.location.assign(`/?redirect=${encodeURIComponent('/verify-email')}`);
       }
     })();
     const timer = setInterval(() => {

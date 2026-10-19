@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
   import type { MessageKey } from '$i18n';
   import { t } from '$i18n';
   import { fromJson, type JsonValue } from '@bufbuild/protobuf';
@@ -39,7 +38,7 @@
         window.location.assign(target);
         return;
       }
-      await goto('/');
+      window.location.assign('/');
     } catch (error) {
       notify.error(errorMessage(error));
       loading = null;

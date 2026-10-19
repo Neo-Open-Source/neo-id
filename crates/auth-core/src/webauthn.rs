@@ -3,13 +3,14 @@ use std::collections::BTreeMap;
 use serde_cbor_2::Value;
 use sha2::{Digest, Sha256};
 use webauthn_rs::prelude::{
-    Passkey, PasskeyAuthentication, PasskeyRegistration, Url, Uuid, Webauthn, WebauthnBuilder,
-    WebauthnError,
+    DiscoverableAuthentication, DiscoverableKey, Passkey, PasskeyAuthentication,
+    PasskeyRegistration, Url, Uuid, Webauthn, WebauthnBuilder, WebauthnError,
 };
 use webauthn_rs_core::proto::{
     AttestationFormat, AttestationMetadata, AuthenticatorTransport, COSEAlgorithm, COSEKey,
     COSEKeyType, Credential, ECDSACurve, EDDSACurve, ParsedAttestation, ParsedAttestationData,
-    PublicKeyCredential, RegisterPublicKeyCredential, RegisteredExtensions, UserVerificationPolicy,
+    PublicKeyCredential, RegisterPublicKeyCredential, RegisteredExtensions, ResidentKeyRequirement,
+    UserVerificationPolicy,
 };
 
 use crate::error::AuthError;
@@ -49,6 +50,9 @@ pub struct RegistrationState(PasskeyRegistration);
 #[derive(Debug, Clone)]
 pub struct AuthenticationState(PasskeyAuthentication);
 
+#[derive(Debug, Clone)]
+pub struct DiscoverableAuthenticationState(DiscoverableAuthentication);
+
 impl RegistrationState {
     pub fn to_bytes(&self) -> Result<Vec<u8>, AuthError> {
         serde_json::to_vec(&self.0).map_err(|_| AuthError::Internal)
@@ -62,6 +66,18 @@ impl RegistrationState {
 }
 
 impl AuthenticationState {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, AuthError> {
+        serde_json::to_vec(&self.0).map_err(|_| AuthError::Internal)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AuthError> {
+        serde_json::from_slice(bytes)
+            .map(Self)
+            .map_err(|_| AuthError::MalformedMessage)
+    }
+}
+
+impl DiscoverableAuthenticationState {
     pub fn to_bytes(&self) -> Result<Vec<u8>, AuthError> {
         serde_json::to_vec(&self.0).map_err(|_| AuthError::Internal)
     }
@@ -97,7 +113,7 @@ pub fn registration_options(
 ) -> Result<(CreationChallengeResponse, RegistrationState), AuthError> {
     let excluded = exclude
         .iter()
-        .map(|credential| credential.id.clone().into())
+        .map(|credential| credential.id.clone())
         .collect::<Vec<_>>();
     let excluded = if excluded.is_empty() {
         None
@@ -108,6 +124,15 @@ pub fn registration_options(
         .start_passkey_registration(user_id, user_name, user_name, excluded)
         .map(|(options, state)| (options, RegistrationState(state)))
         .map_err(AuthError::from)
+}
+
+#[must_use]
+pub fn require_resident_key(mut options: CreationChallengeResponse) -> CreationChallengeResponse {
+    if let Some(selection) = options.public_key.authenticator_selection.as_mut() {
+        selection.resident_key = Some(ResidentKeyRequirement::Required);
+        selection.require_resident_key = true;
+    }
+    options
 }
 
 pub fn verify_registration(
@@ -141,6 +166,37 @@ pub fn verify_registration(
     })
 }
 
+fn passkey_from(stored: &StoredCredential) -> Result<Passkey, AuthError> {
+    let value: Value =
+        serde_cbor_2::from_slice(&stored.key).map_err(|_| AuthError::MalformedMessage)?;
+    let key = COSEKey::try_from(&value).map_err(AuthError::from)?;
+    let transports = stored
+        .transports
+        .iter()
+        .filter_map(|transport| transport.parse::<AuthenticatorTransport>().ok())
+        .collect::<Vec<_>>();
+    Ok(Passkey::from(Credential {
+        cred_id: stored.id.clone(),
+        cred: key,
+        counter: stored.counter,
+        transports: if transports.is_empty() {
+            None
+        } else {
+            Some(transports)
+        },
+        user_verified: false,
+        backup_eligible: stored.backup_eligible,
+        backup_state: stored.backup_state,
+        registration_policy: UserVerificationPolicy::Required,
+        extensions: RegisteredExtensions::none(),
+        attestation: ParsedAttestation {
+            data: ParsedAttestationData::None,
+            metadata: AttestationMetadata::None,
+        },
+        attestation_format: AttestationFormat::None,
+    }))
+}
+
 pub fn authentication_options(
     rp: &PasskeyRp,
     credentials: &[StoredCredential],
@@ -150,41 +206,53 @@ pub fn authentication_options(
     }
     let passkeys = credentials
         .iter()
-        .map(|stored| {
-            let value: Value =
-                serde_cbor_2::from_slice(&stored.key).map_err(|_| AuthError::MalformedMessage)?;
-            let key = COSEKey::try_from(&value).map_err(AuthError::from)?;
-            let transports = stored
-                .transports
-                .iter()
-                .filter_map(|transport| transport.parse::<AuthenticatorTransport>().ok())
-                .collect::<Vec<_>>();
-            Ok(Passkey::from(Credential {
-                cred_id: stored.id.clone().into(),
-                cred: key,
-                counter: stored.counter,
-                transports: if transports.is_empty() {
-                    None
-                } else {
-                    Some(transports)
-                },
-                user_verified: false,
-                backup_eligible: stored.backup_eligible,
-                backup_state: stored.backup_state,
-                registration_policy: UserVerificationPolicy::Required,
-                extensions: RegisteredExtensions::none(),
-                attestation: ParsedAttestation {
-                    data: ParsedAttestationData::None,
-                    metadata: AttestationMetadata::None,
-                },
-                attestation_format: AttestationFormat::None,
-            }))
-        })
+        .map(passkey_from)
         .collect::<Result<Vec<_>, AuthError>>()?;
     rp.inner
         .start_passkey_authentication(&passkeys)
         .map(|(options, state)| (options, AuthenticationState(state)))
         .map_err(AuthError::from)
+}
+
+pub fn discoverable_authentication_options(
+    rp: &PasskeyRp,
+) -> Result<(RequestChallengeResponse, DiscoverableAuthenticationState), AuthError> {
+    rp.inner
+        .start_discoverable_authentication()
+        .map(|(mut options, state)| {
+            options.mediation = None;
+            (options, DiscoverableAuthenticationState(state))
+        })
+        .map_err(AuthError::from)
+}
+
+pub fn identify_discoverable(rp: &PasskeyRp, response_json: &str) -> Result<Vec<u8>, AuthError> {
+    let response: PublicKeyCredential =
+        serde_json::from_str(response_json).map_err(|_| AuthError::MalformedMessage)?;
+    let (_, credential_id) = rp
+        .inner
+        .identify_discoverable_authentication(&response)
+        .map_err(AuthError::from)?;
+    Ok(credential_id.to_vec())
+}
+
+pub fn verify_discoverable(
+    rp: &PasskeyRp,
+    response_json: &str,
+    state: &DiscoverableAuthenticationState,
+    credential: &StoredCredential,
+) -> Result<VerifiedAuthentication, AuthError> {
+    let response: PublicKeyCredential =
+        serde_json::from_str(response_json).map_err(|_| AuthError::MalformedMessage)?;
+    let key: DiscoverableKey = passkey_from(credential)?.into();
+    let result = rp
+        .inner
+        .finish_discoverable_authentication(&response, state.0.clone(), &[key])
+        .map_err(AuthError::from)?;
+    Ok(VerifiedAuthentication {
+        credential_id: result.cred_id().as_slice().to_vec(),
+        counter: result.counter(),
+    })
 }
 
 pub fn verify_authentication(
@@ -208,7 +276,7 @@ pub(crate) fn cose_bytes(key: &COSEKey) -> Result<Vec<u8>, AuthError> {
     let algorithm = match key.type_ {
         COSEAlgorithm::ES256 => -7,
         COSEAlgorithm::ES384 => -35,
-        COSEAlgorithm::ES512 => -36,
+        COSEAlgorithm::ES521 => -36,
         COSEAlgorithm::RS256 => -257,
         COSEAlgorithm::EDDSA => -8,
         COSEAlgorithm::RS384
@@ -310,6 +378,8 @@ impl From<WebauthnError> for AuthError {
             | WebauthnError::AuthenticationFailure
             | WebauthnError::InconsistentUserVerificationPolicy
             | WebauthnError::AttestationCredentialSubjectKeyMismatch
+            | WebauthnError::CertificatePublicKeyAlgorthimMismatch
+            | WebauthnError::SignatureInvalid
             | WebauthnError::CredentialCrossOrigin => Self::InvalidCredentials,
             WebauthnError::InvalidClientDataType
             | WebauthnError::MissingAttestationCredentialData
@@ -327,6 +397,9 @@ impl From<WebauthnError> for AuthError {
             | WebauthnError::COSEKeyEDDSAXInvalid
             | WebauthnError::COSEKeyEDDSAInvalidCurve
             | WebauthnError::COSEKeyInvalidAlgorithm
+            | WebauthnError::EcdsaPointInvalid
+            | WebauthnError::RsaParametersInvalid
+            | WebauthnError::X509DerInvalid
             | WebauthnError::InvalidUsername
             | WebauthnError::InvalidUserUniqueId
             | WebauthnError::ECDSACurveInvalidNid
@@ -337,14 +410,13 @@ impl From<WebauthnError> for AuthError {
             | WebauthnError::SshPublicKeyInconsistentUserVerification => Self::MalformedMessage,
             WebauthnError::Configuration
             | WebauthnError::ChallengePersistenceError
-            | WebauthnError::OpenSSLError(_)
-            | WebauthnError::OpenSSLErrorNoCurveName
             | WebauthnError::CredentialExistCheckError
             | WebauthnError::CredentialAlreadyExists
             | WebauthnError::CredentialPersistenceError
             | WebauthnError::CredentialRetrievalError
             | WebauthnError::CredentialCounterUpdateFailure
             | WebauthnError::CredentialCompromiseReportFailure
+            | WebauthnError::HmacKeyInvalid
             | WebauthnError::MissingAttestationCaList => Self::Internal,
         }
     }
@@ -359,8 +431,8 @@ mod tests {
         assert_eq!(cose_bytes(key).unwrap(), expected);
     }
 
-    fn bytes(n: usize) -> base64urlsafedata::HumanBinaryData {
-        vec![9u8; n].into()
+    fn bytes(n: usize) -> Vec<u8> {
+        vec![9u8; n]
     }
 
     fn cased(head: &[u8], first: &[u8], mid: &[u8], second: &[u8]) -> Vec<u8> {
@@ -369,10 +441,6 @@ mod tests {
         out.extend_from_slice(mid);
         out.extend_from_slice(second);
         out
-    }
-
-    fn coord(n: usize) -> Vec<u8> {
-        vec![9u8; n]
     }
 
     #[test]
@@ -388,9 +456,9 @@ mod tests {
             },
             &cased(
                 &[0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20],
-                &coord(32),
+                &bytes(32),
                 &[0x22, 0x58, 0x20],
-                &coord(32),
+                &bytes(32),
             ),
         );
         check(
@@ -406,14 +474,14 @@ mod tests {
                 &[
                     0xa5, 0x01, 0x02, 0x03, 0x38, 0x22, 0x20, 0x02, 0x21, 0x58, 0x30,
                 ],
-                &coord(48),
+                &bytes(48),
                 &[0x22, 0x58, 0x30],
-                &coord(48),
+                &bytes(48),
             ),
         );
         check(
             &COSEKey {
-                type_: COSEAlgorithm::ES512,
+                type_: COSEAlgorithm::ES521,
                 key: COSEKeyType::EC_EC2(COSEEC2Key {
                     curve: ECDSACurve::SECP521R1,
                     x: bytes(66),
@@ -424,9 +492,9 @@ mod tests {
                 &[
                     0xa5, 0x01, 0x02, 0x03, 0x38, 0x23, 0x20, 0x03, 0x21, 0x58, 0x42,
                 ],
-                &coord(66),
+                &bytes(66),
                 &[0x22, 0x58, 0x42],
-                &coord(66),
+                &bytes(66),
             ),
         );
         check(
@@ -439,7 +507,7 @@ mod tests {
             },
             &cased(
                 &[0xa4, 0x01, 0x01, 0x03, 0x27, 0x20, 0x06, 0x21, 0x58, 0x20],
-                &coord(32),
+                &bytes(32),
                 &[],
                 &[],
             ),
@@ -454,7 +522,7 @@ mod tests {
             },
             &cased(
                 &[0xa4, 0x01, 0x03, 0x03, 0x39, 0x01, 0x00, 0x20, 0x48],
-                &coord(8),
+                &bytes(8),
                 &[0x21, 0x43],
                 &[0x01, 0x00, 0x01],
             ),

@@ -5,6 +5,7 @@
 
 mod clients;
 mod connections;
+mod identity;
 mod mfa;
 mod oauth;
 mod opaque;
@@ -15,11 +16,13 @@ mod users;
 
 pub use clients::{create_client, find_client};
 pub use connections::{find_connection, upsert_connection};
+pub use identity::{find_identity, insert_identity};
 pub use mfa::{invalidate_pending, issue_code, latest_valid, mark_used};
 pub use oauth::{create_code, delete_code, find_code};
 pub use opaque::{OPAQUE_RECORDS_DDL, delete_envelope, find_envelope, upsert_envelope};
 pub use passkeys::{
-    PASSKEYS_BACKUP_COLUMNS_DDL, delete_passkey, insert_passkey, passkeys_by_user, update_counter,
+    PASSKEYS_BACKUP_COLUMNS_DDL, delete_passkey, insert_passkey, passkey_by_credential,
+    passkeys_by_user, update_counter,
 };
 pub use refresh::{
     create_refresh, find_refresh, parse_refresh, revoke_refresh, revoke_session_refreshes,

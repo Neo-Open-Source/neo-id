@@ -16,6 +16,10 @@ pub struct AppEnv {
     pub turnstile_secret: Option<String>,
     pub altcha_secret: Option<String>,
     pub altcha_fallback: bool,
+    pub google_client_id: Option<String>,
+    pub google_client_secret: Option<String>,
+    pub github_client_id: Option<String>,
+    pub github_client_secret: Option<String>,
     #[cfg(feature = "passkeys")]
     pub rp_id: String,
     #[cfg(feature = "passkeys")]
@@ -44,6 +48,14 @@ fn secret_pem(env: &Env, name: &str) -> Option<Vec<u8>> {
 
 fn non_empty(value: Option<String>) -> Option<String> {
     value.filter(|raw| !raw.is_empty())
+}
+
+fn var_opt(env: &Env, name: &str) -> Option<String> {
+    non_empty(env.var(name).map(|value| value.to_string()).ok())
+}
+
+fn secret_opt(env: &Env, name: &str) -> Option<String> {
+    non_empty(env.secret(name).map(|value| value.to_string()).ok())
 }
 
 fn flag(value: Option<&str>) -> bool {
@@ -141,6 +153,10 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
             .ok()
             .as_deref(),
     );
+    let google_client_id = var_opt(env, "GOOGLE_CLIENT_ID");
+    let google_client_secret = secret_opt(env, "GOOGLE_CLIENT_SECRET");
+    let github_client_id = var_opt(env, "GITHUB_CLIENT_ID");
+    let github_client_secret = secret_opt(env, "GITHUB_CLIENT_SECRET");
     #[cfg(feature = "passkeys")]
     let rp_id = env
         .var("RP_ID")
@@ -163,6 +179,10 @@ pub fn load(env: &Env) -> Result<AppEnv, AuthError> {
         turnstile_secret,
         altcha_secret,
         altcha_fallback,
+        google_client_id,
+        google_client_secret,
+        github_client_id,
+        github_client_secret,
         #[cfg(feature = "passkeys")]
         rp_id,
         #[cfg(feature = "passkeys")]

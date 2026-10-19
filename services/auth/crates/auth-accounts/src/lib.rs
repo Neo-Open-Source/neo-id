@@ -14,6 +14,7 @@ mod rate_limit;
 mod refresh;
 mod register;
 mod sessions;
+mod social;
 mod user;
 
 pub use login::{
@@ -28,14 +29,15 @@ pub use mfa::{
 pub use mfa_challenge::{Attempt, clear_challenge, fail_attempt, load_challenge, store_challenge};
 #[cfg(feature = "passkeys")]
 pub use passkeys::{
-    NewCredential, VerifiedCounter, authenticate_begin, authenticate_finish, register_begin,
-    register_finish,
+    NewCredential, VerifiedCounter, authenticate_begin, authenticate_finish, discoverable_begin,
+    discoverable_credential_id, discoverable_finish, load_passkey, register_begin, register_finish,
 };
 pub use password::{ForgotOutcome, forgot_password, reset_password, reset_ticket};
 pub use rate_limit::rate_limit_allow;
 pub use refresh::{Rotation, rotate_refresh};
 pub use register::{Availability, check_email, finish_registration};
 pub use sessions::{list_sessions, revoke_all_sessions, revoke_session};
+pub use social::resolve_social_user;
 pub use user::{change_email_confirm, change_email_request, confirm_email, update_user_profile};
 
 use auth_core::AuthError;

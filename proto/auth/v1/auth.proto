@@ -30,6 +30,13 @@ message RegisterStartResponse {
   string response = 3;
 }
 
+// Availability of an email for registration. `available` is false only when a
+// complete account exists (an OPAQUE record is present); accounts without a
+// password (interrupted or social signups) remain registrable.
+message CheckEmailResponse {
+  bool available = 1;
+}
+
 message PasswordResetResponse {
   bool mfa_required = 1;
   repeated string mfa_methods = 2;

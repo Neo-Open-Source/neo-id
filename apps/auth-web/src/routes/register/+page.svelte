@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { fromJson, type JsonValue } from '@bufbuild/protobuf';
   import { t } from '$i18n';
-  import { RegisterStartResponseSchema } from '$lib/gen/auth/v1/auth_pb';
+  import { CheckEmailResponseSchema, RegisterStartResponseSchema } from '$lib/gen/auth/v1/auth_pb';
   import { api, errorMessage } from '$lib/api';
   import { captchaMode, captchaPayload } from '$lib/config';
+  import { afterAuthUrl, performLogin } from '$lib/flows';
   import { registerFinish, registerStart } from '$lib/opaque';
   import { isAcceptable, passwordStrength } from '$lib/password';
   import { safeRedirect } from '$lib/session';
@@ -22,6 +24,8 @@
   let confirm = $state('');
   let loading = $state(false);
   let captchaToken = $state<string | null>(null);
+  let captchaRefresh = $state(0);
+  let ageOk = $state(false);
   let done = $state(false);
 
   const redirect = $derived(safeRedirect($page.url.searchParams.get('redirect'), '/'));
@@ -40,11 +44,32 @@
     return { title: t('register.verifyTitle'), subtitle: t('register.verifySubtitle') };
   });
 
-  function advance(event: Event) {
+  async function advance(event: Event) {
     event.preventDefault();
-    if (step === 'email' && emailValid) step = 'password';
-    else if (step === 'password' && isAcceptable(password) && password === confirm)
-      step = 'captcha';
+    if (step === 'password') {
+      if (isAcceptable(password) && password === confirm) step = 'captcha';
+      return;
+    }
+    if (!emailValid || loading) return;
+    loading = true;
+    try {
+      const { available } = fromJson(
+        CheckEmailResponseSchema,
+        await api<JsonValue>('/api/v1/auth/register/check', {
+          method: 'POST',
+          body: { email: email.trim() }
+        })
+      );
+      if (!available) {
+        notify.error(t('errors.emailExists'));
+        return;
+      }
+      step = 'password';
+    } catch (error) {
+      notify.error(errorMessage(error));
+    } finally {
+      loading = false;
+    }
   }
 
   function back() {
@@ -71,10 +96,23 @@
         method: 'POST',
         body: { user_id: started.userId, upload }
       });
-      done = true;
+
+      try {
+        const outcome = await performLogin({ email: address, password, captchaToken, redirect });
+        if (outcome.mfa) {
+          await goto('/2fa');
+          return;
+        }
+        window.location.assign(afterAuthUrl(redirect));
+        return;
+      } catch (loginError) {
+        notify.error(errorMessage(loginError));
+        done = true;
+      }
     } catch (error) {
       notify.error(errorMessage(error));
       captchaToken = null;
+      captchaRefresh += 1;
       loading = false;
     }
   }
@@ -101,7 +139,9 @@
           bind:value={email}
           required
         />
-        <Button type="submit" full disabled={!emailValid}>{t('common.continue')}</Button>
+        <Button type="submit" full loading={loading} disabled={!emailValid || loading}>
+          {t('common.continue')}
+        </Button>
       </form>
     {:else if step === 'password'}
       <form onsubmit={advance} class="stack">
@@ -149,10 +189,15 @@
         </p>
 
         {#if captchaMode !== 'off'}
-          <Captcha onverify={(token) => (captchaToken = token)} />
+          <Captcha onverify={(token) => (captchaToken = token)} refresh={captchaRefresh} />
         {/if}
 
-        <Button type="submit" full loading={loading} disabled={!captchaReady}>
+        <label class="age-check">
+          <input type="checkbox" bind:checked={ageOk} required />
+          <span>{t('age.confirm', { age: '16' })}</span>
+        </label>
+
+        <Button type="submit" full loading={loading} disabled={!captchaReady || !ageOk}>
           {t('register.createAccount')}
         </Button>
       </form>

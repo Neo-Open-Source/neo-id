@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { t } from '$i18n';
   import { api, errorMessage } from '$lib/api';
@@ -20,7 +19,7 @@
       await api('/api/v1/user/profile');
     } catch {
       const back = `/device${code ? `?code=${encodeURIComponent(code)}` : ''}`;
-      await goto(`/?redirect=${encodeURIComponent(back)}`);
+      window.location.assign(`/?redirect=${encodeURIComponent(back)}`);
     }
   });
 

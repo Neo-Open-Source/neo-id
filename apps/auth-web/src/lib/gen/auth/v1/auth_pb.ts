@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file auth/v1/auth.proto.
  */
 export const file_auth_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChJhdXRoL3YxL2F1dGgucHJvdG8SB2F1dGgudjEiOgoSTG9naW5TdGFydFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSEAoIcmVzcG9uc2UYAiABKAkixAIKE0xvZ2luRmluaXNoUmVzcG9uc2USFAoMbWZhX3JlcXVpcmVkGAEgASgIEhcKCmF0dGVtcHRfaWQYAiABKAlIAIgBARITCgttZmFfbWV0aG9kcxgDIAMoCRIeChFwYXNza2V5X2F2YWlsYWJsZRgEIAEoCEgBiAEBEhcKCmVtYWlsX2hpbnQYBSABKAlIAogBARIZCgxhY2Nlc3NfdG9rZW4YBiABKAlIA4gBARIaCg1yZWZyZXNoX3Rva2VuGAcgASgJSASIAQESFQoIaWRfdG9rZW4YCCABKAlIBYgBAUINCgtfYXR0ZW1wdF9pZEIUChJfcGFzc2tleV9hdmFpbGFibGVCDQoLX2VtYWlsX2hpbnRCDwoNX2FjY2Vzc190b2tlbkIQCg5fcmVmcmVzaF90b2tlbkILCglfaWRfdG9rZW4iSgoVUmVnaXN0ZXJTdGFydFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCRIPCgd1c2VyX2lkGAIgASgJEhAKCHJlc3BvbnNlGAMgASgJIrYBChVQYXNzd29yZFJlc2V0UmVzcG9uc2USFAoMbWZhX3JlcXVpcmVkGAEgASgIEhMKC21mYV9tZXRob2RzGAIgAygJEhcKCmF0dGVtcHRfaWQYAyABKAlIAIgBARIUCgd1c2VyX2lkGAQgASgJSAGIAQESGAoLcmVzZXRfZ3JhbnQYBSABKAlIAogBAUINCgtfYXR0ZW1wdF9pZEIKCghfdXNlcl9pZEIOCgxfcmVzZXRfZ3JhbnQijQEKEUxpdGVTdGFydFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSEwoLbWZhX21ldGhvZHMYAiADKAkSGQoRcGFzc2tleV9hdmFpbGFibGUYAyABKAgSFwoKZW1haWxfaGludBgEIAEoCUgAiAEBEgwKBHNlbnQYBSABKAhCDQoLX2VtYWlsX2hpbnQiSgoPUHJvZmlsZVJlc3BvbnNlEgoKAmlkGAEgASgJEg0KBWVtYWlsGAIgASgJEgwKBHJvbGUYAyABKAkSDgoGc3RhdHVzGAQgASgJIiMKD0NvbnNlbnRSZXNwb25zZRIQCghyZWRpcmVjdBgBIAEoCSKfAQoYQXV0aG9yaXplQ29uc2VudFJlc3BvbnNlEhgKEGNvbnNlbnRfcmVxdWlyZWQYASABKAgSDQoFc3RhdGUYAiABKAkSFAoMcmVkaXJlY3RfdXJpGAMgASgJEhYKDnNlcnZpY2VfYXBwX2lkGAQgASgJEhIKBW5vbmNlGAUgASgJSACIAQESDgoGc2NvcGVzGAYgAygJQggKBl9ub25jZSIcCgxTZW50UmVzcG9uc2USDAoEc2VudBgBIAEoCCIkChBWZXJpZmllZFJlc3BvbnNlEhAKCHZlcmlmaWVkGAEgASgIIiIKD0NoYW5nZWRSZXNwb25zZRIPCgdjaGFuZ2VkGAEgASgIIiQKEEFwcHJvdmVkUmVzcG9uc2USEAoIYXBwcm92ZWQYASABKAgiIgoPRW5hYmxlZFJlc3BvbnNlEg8KB2VuYWJsZWQYASABKAgiIgoPUmV2b2tlZFJlc3BvbnNlEg8KB3Jldm9rZWQYASABKAhiBnByb3RvMw");
+  fileDesc("ChJhdXRoL3YxL2F1dGgucHJvdG8SB2F1dGgudjEiOgoSTG9naW5TdGFydFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSEAoIcmVzcG9uc2UYAiABKAkixAIKE0xvZ2luRmluaXNoUmVzcG9uc2USFAoMbWZhX3JlcXVpcmVkGAEgASgIEhcKCmF0dGVtcHRfaWQYAiABKAlIAIgBARITCgttZmFfbWV0aG9kcxgDIAMoCRIeChFwYXNza2V5X2F2YWlsYWJsZRgEIAEoCEgBiAEBEhcKCmVtYWlsX2hpbnQYBSABKAlIAogBARIZCgxhY2Nlc3NfdG9rZW4YBiABKAlIA4gBARIaCg1yZWZyZXNoX3Rva2VuGAcgASgJSASIAQESFQoIaWRfdG9rZW4YCCABKAlIBYgBAUINCgtfYXR0ZW1wdF9pZEIUChJfcGFzc2tleV9hdmFpbGFibGVCDQoLX2VtYWlsX2hpbnRCDwoNX2FjY2Vzc190b2tlbkIQCg5fcmVmcmVzaF90b2tlbkILCglfaWRfdG9rZW4iSgoVUmVnaXN0ZXJTdGFydFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCRIPCgd1c2VyX2lkGAIgASgJEhAKCHJlc3BvbnNlGAMgASgJIicKEkNoZWNrRW1haWxSZXNwb25zZRIRCglhdmFpbGFibGUYASABKAgitgEKFVBhc3N3b3JkUmVzZXRSZXNwb25zZRIUCgxtZmFfcmVxdWlyZWQYASABKAgSEwoLbWZhX21ldGhvZHMYAiADKAkSFwoKYXR0ZW1wdF9pZBgDIAEoCUgAiAEBEhQKB3VzZXJfaWQYBCABKAlIAYgBARIYCgtyZXNldF9ncmFudBgFIAEoCUgCiAEBQg0KC19hdHRlbXB0X2lkQgoKCF91c2VyX2lkQg4KDF9yZXNldF9ncmFudCKNAQoRTGl0ZVN0YXJ0UmVzcG9uc2USEgoKYXR0ZW1wdF9pZBgBIAEoCRITCgttZmFfbWV0aG9kcxgCIAMoCRIZChFwYXNza2V5X2F2YWlsYWJsZRgDIAEoCBIXCgplbWFpbF9oaW50GAQgASgJSACIAQESDAoEc2VudBgFIAEoCEINCgtfZW1haWxfaGludCJKCg9Qcm9maWxlUmVzcG9uc2USCgoCaWQYASABKAkSDQoFZW1haWwYAiABKAkSDAoEcm9sZRgDIAEoCRIOCgZzdGF0dXMYBCABKAkiIwoPQ29uc2VudFJlc3BvbnNlEhAKCHJlZGlyZWN0GAEgASgJIp8BChhBdXRob3JpemVDb25zZW50UmVzcG9uc2USGAoQY29uc2VudF9yZXF1aXJlZBgBIAEoCBINCgVzdGF0ZRgCIAEoCRIUCgxyZWRpcmVjdF91cmkYAyABKAkSFgoOc2VydmljZV9hcHBfaWQYBCABKAkSEgoFbm9uY2UYBSABKAlIAIgBARIOCgZzY29wZXMYBiADKAlCCAoGX25vbmNlIhwKDFNlbnRSZXNwb25zZRIMCgRzZW50GAEgASgIIiQKEFZlcmlmaWVkUmVzcG9uc2USEAoIdmVyaWZpZWQYASABKAgiIgoPQ2hhbmdlZFJlc3BvbnNlEg8KB2NoYW5nZWQYASABKAgiJAoQQXBwcm92ZWRSZXNwb25zZRIQCghhcHByb3ZlZBgBIAEoCCIiCg9FbmFibGVkUmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCCIiCg9SZXZva2VkUmVzcG9uc2USDwoHcmV2b2tlZBgBIAEoCGIGcHJvdG8z");
 
 /**
  * @generated from message auth.v1.LoginStartResponse
@@ -117,6 +117,27 @@ export const RegisterStartResponseSchema: GenMessage<RegisterStartResponse> = /*
   messageDesc(file_auth_v1_auth, 2);
 
 /**
+ * Availability of an email for registration. `available` is false only when a
+ * complete account exists (an OPAQUE record is present); accounts without a
+ * password (interrupted or social signups) remain registrable.
+ *
+ * @generated from message auth.v1.CheckEmailResponse
+ */
+export type CheckEmailResponse = Message<"auth.v1.CheckEmailResponse"> & {
+  /**
+   * @generated from field: bool available = 1;
+   */
+  available: boolean;
+};
+
+/**
+ * Describes the message auth.v1.CheckEmailResponse.
+ * Use `create(CheckEmailResponseSchema)` to create a new message.
+ */
+export const CheckEmailResponseSchema: GenMessage<CheckEmailResponse> = /*@__PURE__*/
+  messageDesc(file_auth_v1_auth, 3);
+
+/**
  * @generated from message auth.v1.PasswordResetResponse
  */
 export type PasswordResetResponse = Message<"auth.v1.PasswordResetResponse"> & {
@@ -151,7 +172,7 @@ export type PasswordResetResponse = Message<"auth.v1.PasswordResetResponse"> & {
  * Use `create(PasswordResetResponseSchema)` to create a new message.
  */
 export const PasswordResetResponseSchema: GenMessage<PasswordResetResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 3);
+  messageDesc(file_auth_v1_auth, 4);
 
 /**
  * Result of POST /api/v1/auth/lite/start (no-JS email-code login). An unknown
@@ -191,7 +212,7 @@ export type LiteStartResponse = Message<"auth.v1.LiteStartResponse"> & {
  * Use `create(LiteStartResponseSchema)` to create a new message.
  */
 export const LiteStartResponseSchema: GenMessage<LiteStartResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 4);
+  messageDesc(file_auth_v1_auth, 5);
 
 /**
  * @generated from message auth.v1.ProfileResponse
@@ -223,7 +244,7 @@ export type ProfileResponse = Message<"auth.v1.ProfileResponse"> & {
  * Use `create(ProfileResponseSchema)` to create a new message.
  */
 export const ProfileResponseSchema: GenMessage<ProfileResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 5);
+  messageDesc(file_auth_v1_auth, 6);
 
 /**
  * Location returned by the consent endpoint once the user decides.
@@ -242,7 +263,7 @@ export type ConsentResponse = Message<"auth.v1.ConsentResponse"> & {
  * Use `create(ConsentResponseSchema)` to create a new message.
  */
 export const ConsentResponseSchema: GenMessage<ConsentResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 6);
+  messageDesc(file_auth_v1_auth, 7);
 
 /**
  * Consent-required outcome of POST /api/v1/oauth2/authorize (unwrapped by the
@@ -287,7 +308,7 @@ export type AuthorizeConsentResponse = Message<"auth.v1.AuthorizeConsentResponse
  * Use `create(AuthorizeConsentResponseSchema)` to create a new message.
  */
 export const AuthorizeConsentResponseSchema: GenMessage<AuthorizeConsentResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 7);
+  messageDesc(file_auth_v1_auth, 8);
 
 /**
  * Acknowledgement bodies for fire-and-forget mutations. Distinct messages keep
@@ -307,7 +328,7 @@ export type SentResponse = Message<"auth.v1.SentResponse"> & {
  * Use `create(SentResponseSchema)` to create a new message.
  */
 export const SentResponseSchema: GenMessage<SentResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 8);
+  messageDesc(file_auth_v1_auth, 9);
 
 /**
  * @generated from message auth.v1.VerifiedResponse
@@ -324,7 +345,7 @@ export type VerifiedResponse = Message<"auth.v1.VerifiedResponse"> & {
  * Use `create(VerifiedResponseSchema)` to create a new message.
  */
 export const VerifiedResponseSchema: GenMessage<VerifiedResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 9);
+  messageDesc(file_auth_v1_auth, 10);
 
 /**
  * @generated from message auth.v1.ChangedResponse
@@ -341,7 +362,7 @@ export type ChangedResponse = Message<"auth.v1.ChangedResponse"> & {
  * Use `create(ChangedResponseSchema)` to create a new message.
  */
 export const ChangedResponseSchema: GenMessage<ChangedResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 10);
+  messageDesc(file_auth_v1_auth, 11);
 
 /**
  * @generated from message auth.v1.ApprovedResponse
@@ -358,7 +379,7 @@ export type ApprovedResponse = Message<"auth.v1.ApprovedResponse"> & {
  * Use `create(ApprovedResponseSchema)` to create a new message.
  */
 export const ApprovedResponseSchema: GenMessage<ApprovedResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 11);
+  messageDesc(file_auth_v1_auth, 12);
 
 /**
  * @generated from message auth.v1.EnabledResponse
@@ -375,7 +396,7 @@ export type EnabledResponse = Message<"auth.v1.EnabledResponse"> & {
  * Use `create(EnabledResponseSchema)` to create a new message.
  */
 export const EnabledResponseSchema: GenMessage<EnabledResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 12);
+  messageDesc(file_auth_v1_auth, 13);
 
 /**
  * @generated from message auth.v1.RevokedResponse
@@ -392,5 +413,5 @@ export type RevokedResponse = Message<"auth.v1.RevokedResponse"> & {
  * Use `create(RevokedResponseSchema)` to create a new message.
  */
 export const RevokedResponseSchema: GenMessage<RevokedResponse> = /*@__PURE__*/
-  messageDesc(file_auth_v1_auth, 13);
+  messageDesc(file_auth_v1_auth, 14);
 

@@ -14,6 +14,7 @@ mod neon;
 mod oidc;
 mod respond;
 mod routes;
+mod social;
 #[cfg(test)]
 mod test_support;
 
