@@ -10,6 +10,8 @@ unmaintained = "all"
 unsound = "all"
 ignore = [
   { id = "RUSTSEC-2023-0071", reason = "rsa reaches us only via jsonwebtoken for RS256 sign/verify; no decryption path exists so the Marvin padding oracle is unreachable. Re-evaluate if decrypt APIs are ever used or rsa ships a fix." },
+  { id = "RUSTSEC-2026-0192", reason = "ttf-parser reaches us only via captcha-rs/ab_glyph to draw the lite raster challenge from a bundled font; no untrusted font is parsed and no fixed release exists." },
+  { id = "RUSTSEC-2024-0436", reason = "paste reaches us only via captcha-rs/imageproc's image dependency tree (exr/ravif/nalgebra); it is a compile-time proc-macro with no fixed release and no drop-in replacement in that tree." },
 ]
 
 [licenses]
