@@ -31,11 +31,6 @@
 
 <svelte:head>
   <title>NeoID</title>
-  <style>
-    body > noscript {
-      display: none !important;
-    }
-  </style>
   {#if captchaMode === 'altcha'}
     <script>
       (function () {
@@ -52,7 +47,7 @@
   {/if}
 </svelte:head>
 
-<div class="page">
+<div class="page lite-root">
   <div class="card">
     <h1>NeoID</h1>
     <p class="sub">{t('lite.subtitle')}</p>

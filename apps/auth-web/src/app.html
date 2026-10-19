@@ -31,6 +31,12 @@
     <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
+    <style>
+      body:has(.lite-root) > noscript,
+      body:has(.lite-root) > #neo-legacy {
+        display: none !important;
+      }
+    </style>
     <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
     <link
