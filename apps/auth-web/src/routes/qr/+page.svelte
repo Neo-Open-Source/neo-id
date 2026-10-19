@@ -24,7 +24,6 @@
   let qr = $state('');
   let userCode = $state('');
   let deviceCode = $state('');
-  let verificationUrl = $state('');
   let error = $state('');
   let deadline = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -48,7 +47,6 @@
       );
       deviceCode = data.deviceCode;
       userCode = data.userCode;
-      verificationUrl = data.verificationUriComplete;
       deadline = Date.now() + data.expiresIn * 1000;
       const QRCode = (await import('qrcode')).default;
       qr = await QRCode.toDataURL(data.verificationUriComplete, {
@@ -147,14 +145,6 @@
         <Spinner />
         {t('qr.waiting')}
       </p>
-      {#if verificationUrl}
-        <a
-          class="text-[0.8125rem] font-medium text-ink underline decoration-line-strong underline-offset-2 transition-colors hover:decoration-ink"
-          href={verificationUrl}
-        >
-          {t('qr.openDevice')}
-        </a>
-      {/if}
     </div>
   {:else if phase === 'approved'}
     <p class="py-8 text-center text-muted" aria-live="polite">{t('qr.approved')}</p>
